@@ -943,6 +943,11 @@ static cmd_params parse_cmd_params(int argc, char ** argv) {
                         if (buft) {
                             buft_list[ggml_backend_buft_name(buft)] = buft;
                         }
+                        // customware: pinned host memory of a GPU (e.g. CUDA_Host) as an explicit target
+                        auto * host_buft = ggml_backend_dev_host_buffer_type(dev);
+                        if (host_buft) {
+                            buft_list[ggml_backend_buft_name(host_buft)] = host_buft;
+                        }
                     }
                 }
                 auto override_group_span_len = std::strcspn(value, ",");

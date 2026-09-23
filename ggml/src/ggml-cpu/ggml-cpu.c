@@ -3148,6 +3148,8 @@ static int ggml_cpu_prof_cmp(const void * a, const void * b) {
     return ta < tb ? 1 : ta > tb ? -1 : 0;
 }
 
+static void ggml_cpu_prof_print_experts(void);
+
 static void ggml_cpu_prof_print(void) {
     static struct ggml_cpu_prof_key keys[GGML_OP_COUNT*GGML_TYPE_COUNT*2];
     int n_keys = 0;
@@ -3179,6 +3181,100 @@ static void ggml_cpu_prof_print(void) {
                 ggml_op_name((enum ggml_op) keys[i].op), ggml_type_name((enum ggml_type) keys[i].type), keys[i].cls,
                 (long long) e->n, e->us_comp / 1000.0, e->us_wait / 1000.0, (double) (e->us_comp + e->us_wait) / (double) e->n, gbs);
     }
+    ggml_cpu_prof_print_experts();
+}
+
+// expert usage per layer, counted on the gate matmul only ("blk.N.ffn_gate_exps.weight")
+#define GGML_CPU_PROF_MAX_LAYERS  128
+#define GGML_CPU_PROF_MAX_EXPERTS 1024
+static int64_t g_cpu_prof_expert[GGML_CPU_PROF_MAX_LAYERS][GGML_CPU_PROF_MAX_EXPERTS];
+static int     g_cpu_prof_expert_n[GGML_CPU_PROF_MAX_LAYERS];
+
+static int ggml_cpu_prof_cmp_i64_desc(const void * a, const void * b) {
+    const int64_t x = *(const int64_t *) a;
+    const int64_t y = *(const int64_t *) b;
+    return x < y ? 1 : x > y ? -1 : 0;
+}
+
+static void ggml_cpu_prof_print_experts(void) {
+    static int64_t sorted[GGML_CPU_PROF_MAX_EXPERTS];
+    int64_t all_total = 0;
+    int64_t all_top[3] = {0, 0, 0};
+    const double fracs[3] = {0.05, 0.10, 0.20};
+    int n_layers = 0;
+    for (int il = 0; il < GGML_CPU_PROF_MAX_LAYERS; il++) {
+        const int n = g_cpu_prof_expert_n[il];
+        if (n == 0) {
+            continue;
+        }
+        int64_t total = 0;
+        for (int e = 0; e < n; e++) {
+            sorted[e] = g_cpu_prof_expert[il][e];
+            total += sorted[e];
+        }
+        if (total == 0) {
+            continue;
+        }
+        qsort(sorted, n, sizeof(sorted[0]), ggml_cpu_prof_cmp_i64_desc);
+        int64_t top[3] = {0, 0, 0};
+        int n_used = 0;
+        for (int e = 0; e < n; e++) {
+            n_used += sorted[e] > 0;
+            for (int f = 0; f < 3; f++) {
+                if (e < (int) (n*fracs[f] + 0.5)) {
+                    top[f] += sorted[e];
+                }
+            }
+        }
+        if (n_layers == 0) {
+            fprintf(stderr, "cpu-prof: expert usage per layer: share of routed slots taken by the top 5%% / 10%% / 20%% of experts\n");
+        }
+        fprintf(stderr, "cpu-prof:   layer %3d: %5d used of %4d, top5=%5.1f%% top10=%5.1f%% top20=%5.1f%% (n=%lld)\n", il, n_used, n,
+                100.0*top[0]/total, 100.0*top[1]/total, 100.0*top[2]/total, (long long) total);
+        for (int f = 0; f < 3; f++) {
+            all_top[f] += top[f];
+        }
+        all_total += total;
+        n_layers++;
+    }
+    if (all_total > 0) {
+        fprintf(stderr, "cpu-prof:   all %d layers: top5=%5.1f%% top10=%5.1f%% top20=%5.1f%%\n", n_layers,
+                100.0*all_top[0]/all_total, 100.0*all_top[1]/all_total, 100.0*all_top[2]/all_total);
+    }
+    // raw counts for offline placement decisions: one line per layer
+    for (int il = 0; il < GGML_CPU_PROF_MAX_LAYERS; il++) {
+        const int n = g_cpu_prof_expert_n[il];
+        if (n == 0) {
+            continue;
+        }
+        fprintf(stderr, "cpu-prof-experts: %d", il);
+        for (int e = 0; e < n; e++) {
+            fprintf(stderr, " %lld", (long long) g_cpu_prof_expert[il][e]);
+        }
+        fprintf(stderr, "\n");
+    }
+}
+
+static void ggml_cpu_prof_count_experts(const struct ggml_tensor * node) {
+    const struct ggml_tensor * src0 = node->src[0];
+    const struct ggml_tensor * ids  = node->src[2];
+    int il = -1;
+    if (sscanf(src0->name, "blk.%d.ffn_gate_exps", &il) != 1 || il < 0 || il >= GGML_CPU_PROF_MAX_LAYERS) {
+        return;
+    }
+    const int n = (int) src0->ne[2];
+    if (n > GGML_CPU_PROF_MAX_EXPERTS) {
+        return;
+    }
+    g_cpu_prof_expert_n[il] = n;
+    for (int64_t i1 = 0; i1 < ids->ne[1]; i1++) {
+        for (int64_t i0 = 0; i0 < ids->ne[0]; i0++) {
+            const int32_t e = *(const int32_t *) ((const char *) ids->data + i1*ids->nb[1] + i0*ids->nb[0]);
+            if (e >= 0 && e < n) {
+                g_cpu_prof_expert[il][e]++;
+            }
+        }
+    }
 }
 
 static void ggml_cpu_prof_record(const struct ggml_tensor * node, int64_t us_comp, int64_t us_wait) {
@@ -3191,6 +3287,7 @@ static void ggml_cpu_prof_record(const struct ggml_tensor * node, int64_t us_com
         const struct ggml_tensor * ids = node->src[2];
         cls   = ids->ne[1] > 1 ? 1 : 0;
         bytes = ids->ne[0]*ids->ne[1]*src0->nb[2];
+        ggml_cpu_prof_count_experts(node);
     } else if (node->op == GGML_OP_MUL_MAT) {
         cls   = src1->ne[1]*src1->ne[2] > 1 ? 1 : 0;
         bytes = ggml_nbytes(src0);

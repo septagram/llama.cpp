@@ -1291,6 +1291,19 @@ static void * ggml_cuda_host_malloc(size_t size) {
     return ptr;
 }
 
+// customware: WDDM refuses single pinned allocations of tens of GB but accepts many smaller ones,
+// so cap the buffer size and let the allocator split large contexts (GGML_CUDA_HOST_MAX_SIZE_MB, default 2048)
+static size_t ggml_backend_cuda_host_buffer_type_get_max_size(ggml_backend_buffer_type_t buft) {
+    static const size_t max_size = [] {
+        const char * env = getenv("GGML_CUDA_HOST_MAX_SIZE_MB");
+        const long mb = env ? atol(env) : 2048;
+        return mb > 0 ? (size_t) mb * 1024 * 1024 : SIZE_MAX;
+    }();
+    return max_size;
+
+    GGML_UNUSED(buft);
+}
+
 static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
     void * ptr = ggml_cuda_host_malloc(size);
 
@@ -1312,7 +1325,7 @@ ggml_backend_buffer_type_t ggml_backend_cuda_host_buffer_type() {
             /* .get_name         = */ ggml_backend_cuda_host_buffer_type_name,
             /* .alloc_buffer     = */ ggml_backend_cuda_host_buffer_type_alloc_buffer,
             /* .get_alignment    = */ ggml_backend_cpu_buffer_type()->iface.get_alignment,
-            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
+            /* .get_max_size     = */ ggml_backend_cuda_host_buffer_type_get_max_size,
             /* .get_alloc_size   = */ ggml_backend_cpu_buffer_type()->iface.get_alloc_size,
             /* .is_host          = */ ggml_backend_cpu_buffer_type()->iface.is_host,
         },
