@@ -4,10 +4,23 @@
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static double now() { LARGE_INTEGER f, t; QueryPerformanceFrequency(&f); QueryPerformanceCounter(&t); return (double) t.QuadPart / f.QuadPart; }
 
 int main(int argc, char ** argv) {
+    if (argc > 1 && strcmp(argv[1], "loop") == 0) {
+        // how much can be pinned in total with 2 GB allocations?
+        size_t chunk = (size_t) 2 << 30, total = 0;
+        for (int i = 0; i < 64; i++) {
+            void * q = NULL;
+            if (cudaMallocHost(&q, chunk) != cudaSuccess) { printf("pin loop: failed at %zu GB total: %s\n", total >> 30, cudaGetErrorString(cudaGetLastError())); break; }
+            memset(q, 1, chunk);
+            total += chunk;
+        }
+        printf("pin loop: %zu GB pinned in 2 GB chunks (not freed until exit)\n", total >> 30);
+        return 0;
+    }
     size_t gb = argc > 1 ? (size_t) atoi(argv[1]) : 8;
     size_t bytes = gb << 30;
     void * p = NULL;

@@ -1231,6 +1231,10 @@ struct ggml_tensor * llama_model_loader::create_tensor(
 
         ggml_backend_buffer_type_t buft = nullptr;
 
+        // customware: an override that names a host buffer type (e.g. -ot ...=CUDA_Host) is kept even with mmap:
+        // the data is copied out of the mapping into pinned memory, which the GPU can then stream by DMA
+        bool host_buft_override = false;
+
         // check overrides
         if (tensor_buft_overrides) {
             std::string tensor_name = tn.str();
@@ -1248,6 +1252,8 @@ struct ggml_tensor * llama_model_loader::create_tensor(
                         }
                     } else {
                         buft = overrides->buft;
+                        auto * dev = ggml_backend_buft_get_device(buft);
+                        host_buft_override = dev && buft == ggml_backend_dev_host_buffer_type(dev);
                     }
 
                     LLAMA_LOG_DEBUG("tensor %s (%zu MiB %s) buffer type overridden to %s\n",
@@ -1259,10 +1265,6 @@ struct ggml_tensor * llama_model_loader::create_tensor(
             }
         }
 
-        // customware: an explicit override to a host buffer type (e.g. -ot ...=CUDA_Host) is kept even with mmap:
-        // the data is copied out of the mapping into pinned memory, which the GPU can then stream by DMA
-        const bool buft_from_override = buft != nullptr;
-
         if (!buft) {
             buft = select_weight_buft(hparams, t_meta, op, buft_list);
             if (!buft) {
@@ -1272,7 +1274,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
 
         // avoid using a host buffer when using mmap
         auto * buft_dev = ggml_backend_buft_get_device(buft);
-        if (use_mmap && !buft_from_override && buft_dev && buft == ggml_backend_dev_host_buffer_type(buft_dev)) {
+        if (use_mmap && !host_buft_override && buft_dev && buft == ggml_backend_dev_host_buffer_type(buft_dev)) {
             auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
             if (!cpu_dev) {
                 throw std::runtime_error("no CPU backend found");
