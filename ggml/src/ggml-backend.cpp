@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -1643,6 +1644,31 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
     return true;
 }
 
+// customware: split timeline. GGML_SCHED_PROFILE=N prints a per-backend summary of every graph compute
+// and the per-split rows of every N-th one. Each split is synchronized after compute so GPU time is real.
+struct ggml_sched_prof_backend {
+    int64_t us_copy = 0;
+    int64_t us_comp = 0;
+    int     n_splits = 0;
+    int     n_nodes = 0;
+};
+
+struct ggml_sched_prof_row {
+    int          backend_id;
+    int          n_nodes;
+    const char * name;
+    int64_t      us_copy;
+    int64_t      us_comp;
+};
+
+static int ggml_sched_prof_level() {
+    static const int level = [] {
+        const char * env = getenv("GGML_SCHED_PROFILE");
+        return env ? atoi(env) : 0;
+    }();
+    return level;
+}
+
 static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     GGML_ASSERT(sched);
     struct ggml_backend_sched_split * splits = sched->splits;
@@ -1653,10 +1679,20 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
 
     int prev_backend_id = -1;
 
+    const int prof = ggml_sched_prof_level();
+    static int64_t prof_calls = 0;
+    const bool prof_dump = prof > 0 && (prof_calls % prof) == 0;
+    const int64_t prof_t_graph = prof ? ggml_time_us() : 0;
+    ggml_sched_prof_backend prof_b[GGML_SCHED_MAX_BACKENDS];
+    std::vector<ggml_sched_prof_row> prof_rows;
+
     for (int split_id = 0; split_id < sched->n_splits; split_id++) {
         struct ggml_backend_sched_split * split = &splits[split_id];
         int split_backend_id = split->backend_id;
         ggml_backend_t split_backend = sched->backends[split_backend_id];
+
+        const int64_t prof_t0 = prof ? ggml_time_us() : 0;
+        int64_t prof_t1 = 0;
 
         // ensure the previous split's async work has completed before we start
         // this split, the allocator may have reused buffer regions across splits
@@ -1795,6 +1831,10 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
             }
         }
 
+        if (prof) {
+            prof_t1 = ggml_time_us();
+        }
+
         if (!sched->callback_eval) {
             enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &split->graph);
             if (ec != GGML_STATUS_SUCCESS) {
@@ -1834,12 +1874,49 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
             }
         }
 
+        if (prof) {
+            ggml_backend_synchronize(split_backend);
+            const int64_t prof_t2 = ggml_time_us();
+            ggml_sched_prof_backend & b = prof_b[split_backend_id];
+            b.us_copy += prof_t1 - prof_t0;
+            b.us_comp += prof_t2 - prof_t1;
+            b.n_splits += 1;
+            b.n_nodes  += split->graph.n_nodes;
+            if (prof_dump) {
+                const char * name = split->graph.n_nodes > 0 ? split->graph.nodes[0]->name : "(empty)";
+                prof_rows.push_back({split_backend_id, split->graph.n_nodes, name, prof_t1 - prof_t0, prof_t2 - prof_t1});
+            }
+        }
+
         // record the event of this split
         if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
             ggml_backend_event_record(sched->events[split_backend_id][sched->cur_copy], split_backend);
         }
 
         prev_backend_id = split_backend_id;
+    }
+
+    if (prof) {
+        const int64_t us_total = ggml_time_us() - prof_t_graph;
+        if (prof_dump) {
+            for (size_t i = 0; i < prof_rows.size(); i++) {
+                const ggml_sched_prof_row & r = prof_rows[i];
+                fprintf(stderr, "sched-prof:   split %3zu %-6s nodes=%4d copy=%8.1f us comp=%8.1f us  %s\n",
+                        i, ggml_backend_name(sched->backends[r.backend_id]), r.n_nodes, (double) r.us_copy, (double) r.us_comp, r.name);
+            }
+        }
+        std::string line;
+        for (int b = 0; b < sched->n_backends; b++) {
+            if (prof_b[b].n_splits == 0) {
+                continue;
+            }
+            char buf[256];
+            snprintf(buf, sizeof(buf), " | %s n=%d nodes=%d copy=%.2f comp=%.2f", ggml_backend_name(sched->backends[b]),
+                     prof_b[b].n_splits, prof_b[b].n_nodes, prof_b[b].us_copy / 1000.0, prof_b[b].us_comp / 1000.0);
+            line += buf;
+        }
+        fprintf(stderr, "sched-prof: graph %lld total=%.2f ms splits=%d%s\n", (long long) prof_calls, us_total / 1000.0, sched->n_splits, line.c_str());
+        prof_calls++;
     }
 
     return GGML_STATUS_SUCCESS;

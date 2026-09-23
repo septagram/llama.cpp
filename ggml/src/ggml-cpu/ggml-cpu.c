@@ -3106,12 +3106,111 @@ static int ggml_cpu_try_fuse_ops(
     return 0;
 }
 
+// customware: per-op wall time as seen by thread 0. GGML_CPU_PROFILE=N prints the table every N graph
+// computes and at exit. "comp" is the op body, "wait" is the barrier after it (thread imbalance or a stuck thread).
+struct ggml_cpu_prof_entry {
+    int64_t us_comp;
+    int64_t us_wait;
+    int64_t n;
+    int64_t bytes;   // weight bytes read by MUL_MAT / MUL_MAT_ID, for an effective GB/s
+};
+
+// [op][src0 type][batch class: 0 = one row of src1, 1 = more]
+static struct ggml_cpu_prof_entry g_cpu_prof[GGML_OP_COUNT][GGML_TYPE_COUNT][2];
+static int64_t g_cpu_prof_graphs   = 0;
+static int64_t g_cpu_prof_us_total = 0;
+
+static int ggml_cpu_prof_level(void) {
+    static int level = -1;
+    if (level < 0) {
+        const char * env = getenv("GGML_CPU_PROFILE");
+        level = env ? atoi(env) : 0;
+        if (level < 0) {
+            level = 0;
+        }
+    }
+    return level;
+}
+
+struct ggml_cpu_prof_key {
+    int op;
+    int type;
+    int cls;
+};
+
+static int ggml_cpu_prof_cmp(const void * a, const void * b) {
+    const struct ggml_cpu_prof_key * ka = (const struct ggml_cpu_prof_key *) a;
+    const struct ggml_cpu_prof_key * kb = (const struct ggml_cpu_prof_key *) b;
+    const struct ggml_cpu_prof_entry * ea = &g_cpu_prof[ka->op][ka->type][ka->cls];
+    const struct ggml_cpu_prof_entry * eb = &g_cpu_prof[kb->op][kb->type][kb->cls];
+    const int64_t ta = ea->us_comp + ea->us_wait;
+    const int64_t tb = eb->us_comp + eb->us_wait;
+    return ta < tb ? 1 : ta > tb ? -1 : 0;
+}
+
+static void ggml_cpu_prof_print(void) {
+    static struct ggml_cpu_prof_key keys[GGML_OP_COUNT*GGML_TYPE_COUNT*2];
+    int n_keys = 0;
+    int64_t us_comp_all = 0;
+    int64_t us_wait_all = 0;
+    for (int op = 0; op < GGML_OP_COUNT; op++) {
+        for (int type = 0; type < GGML_TYPE_COUNT; type++) {
+            for (int cls = 0; cls < 2; cls++) {
+                const struct ggml_cpu_prof_entry * e = &g_cpu_prof[op][type][cls];
+                if (e->n == 0) {
+                    continue;
+                }
+                keys[n_keys].op = op; keys[n_keys].type = type; keys[n_keys].cls = cls;
+                n_keys++;
+                us_comp_all += e->us_comp;
+                us_wait_all += e->us_wait;
+            }
+        }
+    }
+    qsort(keys, n_keys, sizeof(keys[0]), ggml_cpu_prof_cmp);
+
+    fprintf(stderr, "cpu-prof: %lld graph computes, %.2f ms in graphs, ops: comp %.2f ms + wait %.2f ms\n",
+            (long long) g_cpu_prof_graphs, g_cpu_prof_us_total / 1000.0, us_comp_all / 1000.0, us_wait_all / 1000.0);
+    fprintf(stderr, "cpu-prof: %-16s %-8s %-3s %10s %12s %12s %10s %8s\n", "op", "src0", "cls", "count", "comp ms", "wait ms", "avg us", "GB/s");
+    for (int i = 0; i < n_keys; i++) {
+        const struct ggml_cpu_prof_entry * e = &g_cpu_prof[keys[i].op][keys[i].type][keys[i].cls];
+        const double gbs = e->us_comp > 0 && e->bytes > 0 ? (double) e->bytes / (double) e->us_comp / 1000.0 : 0.0;
+        fprintf(stderr, "cpu-prof: %-16s %-8s %-3d %10lld %12.2f %12.2f %10.1f %8.2f\n",
+                ggml_op_name((enum ggml_op) keys[i].op), ggml_type_name((enum ggml_type) keys[i].type), keys[i].cls,
+                (long long) e->n, e->us_comp / 1000.0, e->us_wait / 1000.0, (double) (e->us_comp + e->us_wait) / (double) e->n, gbs);
+    }
+}
+
+static void ggml_cpu_prof_record(const struct ggml_tensor * node, int64_t us_comp, int64_t us_wait) {
+    const struct ggml_tensor * src0 = node->src[0];
+    const struct ggml_tensor * src1 = node->src[1];
+    const int type = src0 ? src0->type : node->type;
+    int cls = 0;
+    int64_t bytes = 0;
+    if (node->op == GGML_OP_MUL_MAT_ID) {
+        const struct ggml_tensor * ids = node->src[2];
+        cls   = ids->ne[1] > 1 ? 1 : 0;
+        bytes = ids->ne[0]*ids->ne[1]*src0->nb[2];
+    } else if (node->op == GGML_OP_MUL_MAT) {
+        cls   = src1->ne[1]*src1->ne[2] > 1 ? 1 : 0;
+        bytes = ggml_nbytes(src0);
+    }
+    struct ggml_cpu_prof_entry * e = &g_cpu_prof[node->op][type][cls];
+    e->us_comp += us_comp;
+    e->us_wait += us_wait;
+    e->n      += 1;
+    e->bytes  += bytes;
+}
+
 static thread_ret_t ggml_graph_compute_thread(void * data) {
     struct ggml_compute_state * state = (struct ggml_compute_state *) data;
     struct ggml_threadpool    * tp    = state->threadpool;
 
     const struct ggml_cgraph * cgraph = tp->cgraph;
     const struct ggml_cplan  * cplan  = tp->cplan;
+
+    const bool prof = state->ith == 0 && ggml_cpu_prof_level() > 0;
+    const int64_t prof_t_graph = prof ? ggml_time_us() : 0;
 
 #ifdef GGML_USE_CPU_RISCV64_SPACEMIT
     ggml_backend_cpu_riscv64_spacemit_set_numa_thread_affinity(state->ith);
@@ -3146,6 +3245,8 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
             continue;
         }
 
+        const int64_t prof_t0 = prof ? ggml_time_us() : 0;
+
         // TODO: move fused-op detection into ggml_graph_plan so fusion decisions are made once at planning time
         // Try fused ops, fall back to normal compute
         const int n_fused = ggml_cpu_try_fuse_ops(cgraph, node_n, &params, cplan);
@@ -3161,8 +3262,27 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
             tp->ec    = GGML_STATUS_ABORTED;
         }
 
+        const int64_t prof_t1 = prof ? ggml_time_us() : 0;
+
         if (node_n + 1 < cgraph->n_nodes) {
             ggml_barrier(state->threadpool);
+        }
+
+        if (prof) {
+            ggml_cpu_prof_record(node, prof_t1 - prof_t0, ggml_time_us() - prof_t1);
+        }
+    }
+
+    if (prof) {
+        g_cpu_prof_us_total += ggml_time_us() - prof_t_graph;
+        g_cpu_prof_graphs++;
+        static bool registered = false;
+        if (!registered) {
+            registered = true;
+            atexit(ggml_cpu_prof_print);
+        }
+        if (g_cpu_prof_graphs % ggml_cpu_prof_level() == 0) {
+            ggml_cpu_prof_print();
         }
     }
 
