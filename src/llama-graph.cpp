@@ -1965,7 +1965,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
          ggml_tensor * up_exps_s,
          ggml_tensor * gate_exps_s,
          ggml_tensor * down_exps_s,
-         ggml_tensor * selected_experts_in) const {
+         ggml_tensor * selected_experts_in,
+   const llm_moe_hot * hot) const {
     return build_moe_ffn(
         cur,
         gate_inp,  /* gate_inp_b  */ nullptr,
@@ -1986,7 +1987,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
         up_exps_s,
         gate_exps_s,
         down_exps_s,
-        selected_experts_in
+        selected_experts_in,
+        hot
     );
 }
 
@@ -2014,7 +2016,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
          ggml_tensor * up_exps_s,
          ggml_tensor * gate_exps_s,
          ggml_tensor * down_exps_s,
-         ggml_tensor * selected_experts_in) const {
+         ggml_tensor * selected_experts_in,
+   const llm_moe_hot * hot) const {
     const int64_t n_embd   = cur->ne[0];
     const int64_t n_tokens = cur->ne[1];
     const bool weight_before_ffn = arch == LLM_ARCH_LLAMA4; // for llama4, we apply the sigmoid-ed weights before the FFN
@@ -2153,6 +2156,64 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
 
     //call early so that topk-moe can be used
     ggml_build_forward_expand(gf, weights);
+
+    // customware: hot experts (LLAMA_HOT_EXPERTS). For small batches the routed slots are split: slots whose expert
+    // has a GPU copy run there on the compacted tensors, the other slots run on the host tensors with the hot
+    // slots marked -1 (the CPU kernel leaves those rows zero). Both halves are masked by the routing weights and added.
+    // Large batches keep the plain path: the scheduler streams the host experts to the GPU there anyway.
+    static const int64_t hot_max_batch = [] {
+        const char * env = getenv("GGML_OP_OFFLOAD_MIN_BATCH");
+        return env ? (int64_t) atoi(env) : (int64_t) 32;
+    }();
+    const bool hot_simple = hot && hot->valid() && gate_exps && !gate_up_exps &&
+        !up_exps_b && !gate_exps_b && !down_exps_b && !up_exps_s && !gate_exps_s && !down_exps_s &&
+        type_op == LLM_FFN_SILU && !weight_before_ffn && (il < 0 || hparams.swiglu_clamp_exp[il] <= 1e-6f);
+    if (hot_simple && n_tokens < hot_max_batch) {
+        const int64_t n_expert_all = hot->hot_map->ne[0];
+
+        ggml_tensor * ids_gpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_map,  1, n_expert_all), selected_experts);
+        ggml_tensor * ids_cpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->cold_map, 1, n_expert_all), selected_experts);
+        ggml_tensor * mask    = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_mask, 1, n_expert_all), selected_experts); // [1, n_expert_used, n_tokens]
+        ids_gpu = ggml_reshape_2d(ctx0, ids_gpu, n_expert_used, n_tokens);
+        ids_cpu = ggml_reshape_2d(ctx0, ids_cpu, n_expert_used, n_tokens);
+        cb(ids_gpu, "ffn_moe_ids_hot", il);
+        cb(ids_cpu, "ffn_moe_ids_cold", il);
+
+        ggml_tensor * w_gpu = ggml_mul(ctx0, weights, mask);
+        ggml_tensor * w_cpu = ggml_sub(ctx0, weights, w_gpu);
+
+        ggml_tensor * x = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
+
+        auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag) {
+            ggml_tensor * u = build_lora_mm_id(w_up,   x, ids, nullptr); // [n_ff, n_expert_used, n_tokens]
+            ggml_tensor * g = build_lora_mm_id(w_gate, x, ids, nullptr);
+            ggml_tensor * h = ggml_swiglu_split(ctx0, g, u);
+            ggml_tensor * d = build_lora_mm_id(w_down, h, ids, nullptr); // [n_embd, n_expert_used, n_tokens]
+            d = ggml_mul(ctx0, d, w);
+            cb(d, tag, il);
+            return d;
+        };
+
+        ggml_tensor * part_hot  = run(hot->up_hot, hot->gate_hot, hot->down_hot, ids_gpu, w_gpu, "ffn_moe_weighted_hot");
+        ggml_tensor * part_cold = run(up_exps,     gate_exps,     down_exps,     ids_cpu, w_cpu, "ffn_moe_weighted_cold");
+
+        ggml_tensor * experts = ggml_add(ctx0, part_hot, part_cold);
+        cb(experts, "ffn_moe_weighted", il);
+        ggml_build_forward_expand(gf, experts);
+
+        const uint32_t n_expert_used_il = hparams.n_expert_used(il);
+        ggml_tensor * moe_out = nullptr;
+        for (uint32_t i = 0; i < n_expert_used_il; ++i) {
+            ggml_tensor * e = ggml_view_2d(ctx0, experts, n_embd, n_tokens, experts->nb[2], i*experts->nb[1]);
+            moe_out = moe_out ? ggml_add(ctx0, moe_out, e) : e;
+            ggml_build_forward_expand(gf, moe_out);
+        }
+        if (n_expert_used_il == 1) {
+            moe_out = ggml_cont(ctx0, moe_out);
+        }
+        cb(moe_out, "ffn_moe_out", il);
+        return moe_out;
+    }
 
     cur = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
 

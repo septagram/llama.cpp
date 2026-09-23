@@ -1109,6 +1109,18 @@ struct llm_graph_context {
        llm_ffn_gate_type   type_gate,
                      int   il) const;
 
+    // customware: GPU copies of a layer's most used experts (see LLAMA_HOT_EXPERTS in llama-model.cpp)
+    struct llm_moe_hot {
+        ggml_tensor * gate_hot  = nullptr;
+        ggml_tensor * up_hot    = nullptr;
+        ggml_tensor * down_hot  = nullptr;
+        ggml_tensor * hot_map   = nullptr;
+        ggml_tensor * cold_map  = nullptr;
+        ggml_tensor * hot_mask  = nullptr;
+
+        bool valid() const { return gate_hot && up_hot && down_hot && hot_map && cold_map && hot_mask; }
+    };
+
     // build MoE FFN without bias tensors
     ggml_tensor * build_moe_ffn(
              ggml_tensor * cur,
@@ -1129,7 +1141,8 @@ struct llm_graph_context {
              ggml_tensor * up_exps_s = nullptr,
              ggml_tensor * gate_exps_s = nullptr,
              ggml_tensor * down_exps_s = nullptr,
-             ggml_tensor * selected_experts_in = nullptr) const;
+             ggml_tensor * selected_experts_in = nullptr,
+       const llm_moe_hot * hot = nullptr) const;
 
     ggml_tensor * build_moe_ffn(
              ggml_tensor * cur,
@@ -1155,7 +1168,8 @@ struct llm_graph_context {
              ggml_tensor * up_exps_s = nullptr,
              ggml_tensor * gate_exps_s = nullptr,
              ggml_tensor * down_exps_s = nullptr,
-             ggml_tensor * selected_experts_in = nullptr) const;
+             ggml_tensor * selected_experts_in = nullptr,
+       const llm_moe_hot * hot = nullptr) const;
 
     //
     // inputs

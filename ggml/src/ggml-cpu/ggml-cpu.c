@@ -1654,7 +1654,13 @@ static void ggml_compute_forward_mul_mat_id(
             for (int id = 0; id < n_ids; ++id) {
                 const int32_t i02 = *(const int32_t *) ((const char *) ids->data + iid1*ids->nb[1] + id*ids->nb[0]);
 
-                assert(i02 >= 0 && i02 < n_as);
+                // customware: a negative id is a slot served elsewhere (hot expert on the GPU), leave zeros
+                if (i02 < 0) {
+                    memset((char *) dst->data + id*nb1 + iid1*nb2, 0, ne0*sizeof(float));
+                    continue;
+                }
+
+                assert(i02 < n_as);
 
                 MMID_MATRIX_ROW(i02, matrix_row_counts[i02]) = (struct mmid_row_mapping) {id, iid1};
                 matrix_row_counts[i02] += 1;
@@ -3189,6 +3195,8 @@ static void ggml_cpu_prof_print(void) {
 #define GGML_CPU_PROF_MAX_EXPERTS 1024
 static int64_t g_cpu_prof_expert[GGML_CPU_PROF_MAX_LAYERS][GGML_CPU_PROF_MAX_EXPERTS];
 static int     g_cpu_prof_expert_n[GGML_CPU_PROF_MAX_LAYERS];
+static int64_t g_cpu_prof_skipped = 0; // routed slots with a negative id (served by a hot expert elsewhere)
+static int64_t g_cpu_prof_slots   = 0;
 
 static int ggml_cpu_prof_cmp_i64_desc(const void * a, const void * b) {
     const int64_t x = *(const int64_t *) a;
@@ -3237,6 +3245,10 @@ static void ggml_cpu_prof_print_experts(void) {
         all_total += total;
         n_layers++;
     }
+    if (g_cpu_prof_slots > 0) {
+        fprintf(stderr, "cpu-prof:   routed slots on the CPU gate matmul: %lld, skipped (negative id): %lld (%.1f%%)\n",
+                (long long) g_cpu_prof_slots, (long long) g_cpu_prof_skipped, 100.0*g_cpu_prof_skipped/g_cpu_prof_slots);
+    }
     if (all_total > 0) {
         fprintf(stderr, "cpu-prof:   all %d layers: top5=%5.1f%% top10=%5.1f%% top20=%5.1f%%\n", n_layers,
                 100.0*all_top[0]/all_total, 100.0*all_top[1]/all_total, 100.0*all_top[2]/all_total);
@@ -3259,7 +3271,7 @@ static void ggml_cpu_prof_count_experts(const struct ggml_tensor * node) {
     const struct ggml_tensor * src0 = node->src[0];
     const struct ggml_tensor * ids  = node->src[2];
     int il = -1;
-    if (sscanf(src0->name, "blk.%d.ffn_gate_exps", &il) != 1 || il < 0 || il >= GGML_CPU_PROF_MAX_LAYERS) {
+    if (sscanf(src0->name, "blk.%d.", &il) != 1 || il < 0 || il >= GGML_CPU_PROF_MAX_LAYERS || strstr(src0->name, "ffn_gate_exps") == NULL) {
         return;
     }
     const int n = (int) src0->ne[2];
@@ -3272,7 +3284,10 @@ static void ggml_cpu_prof_count_experts(const struct ggml_tensor * node) {
             const int32_t e = *(const int32_t *) ((const char *) ids->data + i1*ids->nb[1] + i0*ids->nb[0]);
             if (e >= 0 && e < n) {
                 g_cpu_prof_expert[il][e]++;
+            } else if (e < 0) {
+                g_cpu_prof_skipped++;
             }
+            g_cpu_prof_slots++;
         }
     }
 }

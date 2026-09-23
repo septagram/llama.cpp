@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <numeric>
@@ -1429,6 +1430,40 @@ void llama_model_base::load_vocab(llama_model_loader & ml) {
     vocab.load(ml, kv);
 }
 
+// customware: LLAMA_HOT_EXPERTS=<file>, one line per layer: "<layer> <expert> <expert> ...". Those experts get a
+// copy on the first GPU device and build_moe_ffn serves them from there while the host tensors serve the rest.
+struct llama_hot_experts_spec {
+    std::map<int, std::vector<int32_t>> layers;
+};
+
+static llama_hot_experts_spec llama_hot_experts_read() {
+    llama_hot_experts_spec spec;
+    const char * path = getenv("LLAMA_HOT_EXPERTS");
+    if (!path || !*path) {
+        return spec;
+    }
+    std::ifstream f(path);
+    if (!f) {
+        LLAMA_LOG_WARN("%s: cannot open LLAMA_HOT_EXPERTS file %s\n", __func__, path);
+        return spec;
+    }
+    std::string line;
+    while (std::getline(f, line)) {
+        std::istringstream ss(line);
+        int il = -1;
+        if (!(ss >> il)) {
+            continue;
+        }
+        std::vector<int32_t> & v = spec.layers[il];
+        int32_t e = 0;
+        while (ss >> e) {
+            v.push_back(e);
+        }
+    }
+    LLAMA_LOG_INFO("%s: LLAMA_HOT_EXPERTS %s: %zu layers listed\n", __func__, path, spec.layers.size());
+    return spec;
+}
+
 bool llama_model_base::load_tensors(llama_model_loader & ml) {
     const auto & split_mode   = params.split_mode;
     const bool use_mlock      = params.load_mode == LLAMA_LOAD_MODE_MLOCK || params.load_mode == LLAMA_LOAD_MODE_MMAP_MLOCK;
@@ -1718,6 +1753,47 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
     }
     ml.done_getting_tensors();
 
+    // customware: hot experts get a GPU copy next to the host tensors (metadata now, data after the load)
+    const llama_hot_experts_spec hot_spec = llama_hot_experts_read();
+    if (!hot_spec.layers.empty()) {
+        if (devices.empty()) {
+            LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS set but there is no GPU device, ignored\n", __func__);
+        } else {
+            ggml_backend_buffer_type_t buft = ggml_backend_dev_buffer_type(devices[0].dev);
+            auto it = ml.ctx_map.find({buft, false});
+            if (it == ml.ctx_map.end()) {
+                LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS: no context for %s, ignored\n", __func__, ggml_backend_buft_name(buft));
+            } else {
+                ggml_context * ctx = it->second.get();
+                for (const auto & [il, experts] : hot_spec.layers) {
+                    if (il < 0 || il >= (int) layers.size() || experts.empty()) {
+                        continue;
+                    }
+                    auto & layer = layers[il];
+                    if (!layer.ffn_gate_exps || !layer.ffn_up_exps || !layer.ffn_down_exps) {
+                        continue;
+                    }
+                    const int64_t n_hot    = (int64_t) experts.size();
+                    const int64_t n_expert = layer.ffn_gate_exps->ne[2];
+                    auto mk = [&](ggml_tensor * src, const char * name) {
+                        ggml_tensor * t = ggml_new_tensor_3d(ctx, src->type, src->ne[0], src->ne[1], n_hot);
+                        ggml_format_name(t, "blk.%d.%s", il, name);
+                        return t;
+                    };
+                    layer.ffn_gate_hot = mk(layer.ffn_gate_exps, "ffn_gate_hot");
+                    layer.ffn_up_hot   = mk(layer.ffn_up_exps,   "ffn_up_hot");
+                    layer.ffn_down_hot = mk(layer.ffn_down_exps, "ffn_down_hot");
+                    layer.ffn_hot_map  = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_expert);
+                    layer.ffn_cold_map = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_expert);
+                    layer.ffn_hot_mask = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_expert);
+                    ggml_format_name(layer.ffn_hot_map,  "blk.%d.ffn_hot_map",  il);
+                    ggml_format_name(layer.ffn_cold_map, "blk.%d.ffn_cold_map", il);
+                    ggml_format_name(layer.ffn_hot_mask, "blk.%d.ffn_hot_mask", il);
+                }
+            }
+        }
+    }
+
     // Tied NVFP4 output is valid when no separate LM-head scale tensors are present.
     // If sidecar scales exist, the output weight must be an actual output tensor.
     GGML_ASSERT(!(output && tok_embd &&
@@ -1871,6 +1947,68 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
         if (!ml.load_all_data(ctx, buf_map, use_mlock ? &pimpl->mlock_mmaps : NULL, params.progress_callback, params.progress_callback_user_data)) {
             return false;
         }
+    }
+
+    // customware: fill the hot expert copies and their maps from the loaded full tensors
+    if (!hot_spec.layers.empty()) {
+        size_t n_hot_total = 0;
+        size_t bytes_total = 0;
+        size_t n_layers    = 0;
+        std::vector<uint8_t> tmp;
+        for (const auto & [il, experts] : hot_spec.layers) {
+            if (il < 0 || il >= (int) layers.size()) {
+                continue;
+            }
+            auto & layer = layers[il];
+            if (!layer.ffn_gate_hot) {
+                continue;
+            }
+            const int64_t n_expert = layer.ffn_gate_exps->ne[2];
+            std::vector<int32_t> hot_map(n_expert, 0);
+            std::vector<int32_t> cold_map(n_expert);
+            std::vector<float>   hot_mask(n_expert, 0.0f);
+            for (int64_t e = 0; e < n_expert; e++) {
+                cold_map[e] = (int32_t) e;
+            }
+            for (size_t s = 0; s < experts.size(); s++) {
+                const int32_t e = experts[s];
+                if (e < 0 || e >= n_expert) {
+                    continue;
+                }
+                hot_map[e]  = (int32_t) s;
+                cold_map[e] = -1;
+                hot_mask[e] = 1.0f;
+            }
+            ggml_backend_tensor_set(layer.ffn_hot_map,  hot_map.data(),  0, n_expert*sizeof(int32_t));
+            ggml_backend_tensor_set(layer.ffn_cold_map, cold_map.data(), 0, n_expert*sizeof(int32_t));
+            ggml_backend_tensor_set(layer.ffn_hot_mask, hot_mask.data(), 0, n_expert*sizeof(float));
+
+            auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
+                const size_t bytes = src->nb[2];
+                const bool host = ggml_backend_buffer_is_host(src->buffer);
+                for (size_t s = 0; s < experts.size(); s++) {
+                    const int32_t e = experts[s];
+                    if (e < 0 || e >= n_expert) {
+                        continue;
+                    }
+                    if (host) {
+                        ggml_backend_tensor_set(dst, (const char *) src->data + e*bytes, s*bytes, bytes);
+                    } else {
+                        tmp.resize(bytes);
+                        ggml_backend_tensor_get(src, tmp.data(), e*bytes, bytes);
+                        ggml_backend_tensor_set(dst, tmp.data(), s*bytes, bytes);
+                    }
+                    bytes_total += bytes;
+                }
+            };
+            copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
+            copy(layer.ffn_up_exps,   layer.ffn_up_hot);
+            copy(layer.ffn_down_exps, layer.ffn_down_hot);
+            n_hot_total += experts.size();
+            n_layers++;
+        }
+        LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s\n", __func__,
+                n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev));
     }
 
     if (use_mmap_buffer) {
