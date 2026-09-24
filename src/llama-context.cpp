@@ -758,10 +758,102 @@ void llama_context::sched_reserve() {
                 val(n_input_tensors_pp, n_input_tensors_tg).c_str());
     }
 
+    // customware: the compute buffers exist now, park the hot experts in the tail of the GPU one
+    hot_alias_place();
+
     const int64_t t_end_us = ggml_time_us();
 
     LLAMA_LOG_INFO("%s: reserve took %.2f ms, sched copies = %d\n",
             __func__, (t_end_us - t_start_us)/1000.0, ggml_backend_sched_get_n_copies(sched.get()));
+}
+
+void llama_context::hot_alias_place() {
+    hot_buf   = nullptr;
+    hot_dirty = true;
+    hot_alias = model.hot_alias();
+    if (!hot_alias) {
+        return;
+    }
+
+    hot_backend = nullptr;
+    for (ggml_backend_t b : backend_ptrs) {
+        if (!model.devices.empty() && ggml_backend_get_device(b) == model.devices[0].dev) {
+            hot_backend = b;
+        }
+    }
+    if (!hot_backend) {
+        LLAMA_LOG_WARN("%s: hot experts: no backend for the model's first device, hot experts disabled\n", __func__);
+        return;
+    }
+
+    ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched.get(), hot_backend);
+    if (!buf) {
+        LLAMA_LOG_WARN("%s: hot experts: %s has no compute buffer, hot experts disabled\n", __func__, ggml_backend_name(hot_backend));
+        return;
+    }
+
+    const size_t size  = ggml_backend_buffer_get_size(buf);
+    const size_t need  = model.hot_alias_bytes(buf);
+    const size_t align = ggml_backend_buffer_get_alignment(buf);
+    const size_t margin = 64u*1024*1024; // what a decode graph needs at the front, roughly
+
+    if (need + margin > size) {
+        LLAMA_LOG_WARN("%s: hot experts need %.1f MiB but the %s compute buffer is only %.1f MiB: hot experts disabled "
+                "(a bigger -ub or -c grows the buffer, or use a smaller placement)\n",
+                __func__, need / 1024.0 / 1024.0, ggml_backend_name(hot_backend), size / 1024.0 / 1024.0);
+        return;
+    }
+
+    hot_offset = (size - need) & ~(align - 1);
+    model.hot_alias_place(buf, hot_offset);
+
+    hot_buf       = buf;
+    hot_buf_size  = size;
+    hot_threshold = std::max(1u, cparams.n_ubatch / 2);
+
+    LLAMA_LOG_INFO("%s: hot experts parked at [%.1f, %.1f) MiB of the %.1f MiB %s compute buffer; "
+            "decode mode for ubatches up to %u tokens, refined as graphs are allocated\n", __func__,
+            hot_offset / 1024.0 / 1024.0, (hot_offset + need) / 1024.0 / 1024.0, size / 1024.0 / 1024.0,
+            ggml_backend_name(hot_backend), hot_threshold);
+}
+
+bool llama_context::hot_alias_check(bool decode_mode, uint32_t n_tokens) {
+    ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched.get(), hot_backend);
+    if (buf != hot_buf || (buf && ggml_backend_buffer_get_size(buf) != hot_buf_size)) {
+        LLAMA_LOG_WARN("%s: the %s compute buffer was reallocated (%.1f MiB), re-parking the hot experts\n", __func__,
+                ggml_backend_name(hot_backend), buf ? ggml_backend_buffer_get_size(buf) / 1024.0 / 1024.0 : 0.0);
+        hot_alias_place();
+        if (!hot_buf) {
+            return !decode_mode;
+        }
+    }
+
+    const size_t hwm = ggml_backend_sched_get_buffer_max_size(sched.get(), hot_backend);
+    if (hwm > hot_offset) {
+        hot_dirty = true;
+        if (decode_mode) {
+            hot_threshold = n_tokens > 0 ? n_tokens - 1 : 0;
+            LLAMA_LOG_INFO("%s: a %u-token ubatch needs %.1f MiB of the compute buffer, past the hot experts at %.1f MiB: "
+                    "prefill mode for ubatches above %u tokens\n", __func__,
+                    n_tokens, hwm / 1024.0 / 1024.0, hot_offset / 1024.0 / 1024.0, hot_threshold);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void llama_context::hot_refill() {
+    const int64_t t0 = ggml_time_us();
+
+    ggml_backend_sched_synchronize(sched.get());
+    const size_t bytes = model.hot_fill();
+
+    hot_dirty = false;
+    hot_n_refills++;
+
+    LLAMA_LOG_INFO("%s: hot experts restored: %.1f MiB in %.0f ms (refill #%" PRId64 ")\n", __func__,
+            bytes / 1024.0 / 1024.0, (ggml_time_us() - t0) / 1000.0, hot_n_refills);
 }
 
 void llama_context::synchronize() {
@@ -1398,9 +1490,13 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
     auto * res = get_gf_res_prev();
     auto * gf  = res->get_gf();
 
+    // customware: hot experts in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS): decode mode only for ubatches that
+    // are known to leave the tail alone; a bigger ubatch runs the plain path and dirties the tail
+    hot_mode_next = hot_alias ? (hot_buf != nullptr && ubatch.n_tokens <= hot_threshold) : true;
+
     // the new graph parameters
     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
-    const auto gparams = graph_params(res, ubatch, mctx, gtype);
+    auto gparams = graph_params(res, ubatch, mctx, gtype);
 
     if (!graph_reuse_disable && gf_res_prev_active == res && res->can_reuse(gparams)) {
         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
@@ -1414,31 +1510,46 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
 
         n_reused++;
     } else {
-        gf_res_prev_active = nullptr;
-        res->reset();
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            gf_res_prev_active = nullptr;
+            res->reset();
 
-        ggml_backend_sched_reset(sched.get());
-        ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
+            ggml_backend_sched_reset(sched.get());
+            ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
 
-        //const auto t_start_us = ggml_time_us();
+            //const auto t_start_us = ggml_time_us();
 
-        gf = model.build_graph(gparams);
+            gf = model.build_graph(gparams);
 
-        //LLAMA_LOG_INFO("graph build time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
+            //LLAMA_LOG_INFO("graph build time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
 
-        if (!gf) {
-            LLAMA_LOG_ERROR("%s: failed to initialize graph\n", __func__);
-            ret = GGML_STATUS_FAILED;
-            return nullptr;
+            if (!gf) {
+                LLAMA_LOG_ERROR("%s: failed to initialize graph\n", __func__);
+                ret = GGML_STATUS_FAILED;
+                return nullptr;
+            }
+
+            if (!ggml_backend_sched_alloc_graph(sched.get(), gf)) {
+                LLAMA_LOG_ERROR("%s: failed to allocate graph\n", __func__);
+                ret = GGML_STATUS_ALLOC_FAILED;
+                return nullptr;
+            }
+
+            gf_res_prev_active = res;
+
+            // customware: a decode-mode graph that reaches into the hot experts is rebuilt in prefill mode
+            if (hot_alias && !hot_alias_check(gparams.hot_experts, ubatch.n_tokens)) {
+                hot_mode_next = false;
+                gparams = graph_params(res, ubatch, mctx, gtype);
+                continue;
+            }
+            break;
         }
+    }
 
-        if (!ggml_backend_sched_alloc_graph(sched.get(), gf)) {
-            LLAMA_LOG_ERROR("%s: failed to allocate graph\n", __func__);
-            ret = GGML_STATUS_ALLOC_FAILED;
-            return nullptr;
-        }
-
-        gf_res_prev_active = res;
+    // customware: the hot experts were overwritten by a prefill-mode graph, restore them before the split uses them
+    if (hot_alias && hot_buf && gparams.hot_experts && hot_dirty) {
+        hot_refill();
     }
 
     // set the input data for the input tensors
@@ -2517,6 +2628,10 @@ ggml_cgraph * llama_context::graph_reserve(
 
     auto * res = gf_res_reserve.get();
 
+    // customware: with aliased hot experts the reserve graphs are plain (their storage does not exist yet and the
+    // reserve must size the buffer for the plain worst case); otherwise the split is part of the worst case
+    hot_mode_next = !model.hot_alias();
+
     const auto gparams = graph_params(res, ubatch, mctx, ctx_type_to_graph_type(cparams.ctx_type));
 
     res->reset();
@@ -2563,6 +2678,7 @@ llm_graph_params llama_context::graph_params(
         /*.n_outputs   =*/ n_outputs,
         /*.cb          =*/ graph_get_cb(),
         /*.res         =*/ res,
+        /*.hot_experts =*/ hot_mode_next,
     };
 }
 

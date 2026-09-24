@@ -349,6 +349,22 @@ private:
 
     bool sched_need_reserve = true;
 
+    // customware: hot experts parked in the tail of the GPU compute buffer (LLAMA_HOT_EXPERTS_ALIAS). A ubatch runs in
+    // "decode mode" (hot split, tail valid) or "prefill mode" (plain path, the graph may use the tail); see process_ubatch.
+    bool                  hot_alias     = false;
+    ggml_backend_t        hot_backend   = nullptr;
+    ggml_backend_buffer_t hot_buf       = nullptr;
+    size_t                hot_buf_size  = 0;
+    size_t                hot_offset    = 0;
+    bool                  hot_dirty     = true;
+    uint32_t              hot_threshold = 0;     // decode mode for ubatches up to this many tokens
+    bool                  hot_mode_next = true;  // read by graph_params(): build the hot split or not
+    int64_t               hot_n_refills = 0;
+
+    void hot_alias_place();                                          // (re)bind the hot tensors to the current compute buffer
+    bool hot_alias_check(bool decode_mode, uint32_t n_tokens);       // after alloc: false = rebuild in prefill mode
+    void hot_refill();                                               // copy the experts back in
+
     ggml_backend_t backend_cpu = nullptr;
     std::vector<ggml_backend_ptr> backends;
 

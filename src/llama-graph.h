@@ -810,6 +810,10 @@ struct llm_graph_params {
 
     llm_graph_result * res;
 
+    // customware: build the hot-expert split (decode mode). false = plain path for every layer (prefill mode), used
+    // while the hot tensors' storage is borrowed by a big prefill ubatch (LLAMA_HOT_EXPERTS_ALIAS)
+    bool hot_experts = true;
+
     // return true if the "other" params would result in a graph with the same topology as with the current params
     //   having the same topology allows us to reuse the graph in some cases
     bool allow_reuse(const llm_graph_params & other) const {
@@ -880,7 +884,8 @@ struct llm_graph_params {
             gtype == other.gtype &&
             cvec  == other.cvec  &&
             loras == other.loras &&
-            cross == other.cross;
+            cross == other.cross &&
+            hot_experts == other.hot_experts;
     }
 };
 
@@ -1035,6 +1040,8 @@ struct llm_graph_context {
 
     ggml_context * ctx0 = nullptr;
     ggml_cgraph  * gf   = nullptr;
+
+    const bool hot_experts; // customware: see llm_graph_params::hot_experts
 
     llm_graph_context(const llm_graph_params & params);
     virtual ~llm_graph_context() = default;

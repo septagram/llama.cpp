@@ -1209,7 +1209,41 @@ struct llama_model::impl {
     bool has_tensor_overrides;
 
     std::vector<float> tensor_split_owned;
+
+    // customware: hot experts (LLAMA_HOT_EXPERTS). In alias mode (LLAMA_HOT_EXPERTS_ALIAS=1) the three big tensors per
+    // layer live in a no-alloc context of their own and borrow their storage from the context's GPU compute buffer.
+    std::map<int, std::vector<int32_t>> hot_spec;
+    bool                                hot_alias = false;
+    ggml_context_ptr                    hot_ctx;
 };
+
+// customware: copy the listed experts of one layer from the (host) full tensors into the compacted hot tensors
+static size_t llama_hot_experts_copy(const llama_layer & layer, const std::vector<int32_t> & experts, std::vector<uint8_t> & tmp) {
+    const int64_t n_expert = layer.ffn_gate_exps->ne[2];
+    size_t bytes_total = 0;
+    auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
+        const size_t bytes = src->nb[2];
+        const bool host = ggml_backend_buffer_is_host(src->buffer);
+        for (size_t s = 0; s < experts.size(); s++) {
+            const int32_t e = experts[s];
+            if (e < 0 || e >= n_expert) {
+                continue;
+            }
+            if (host) {
+                ggml_backend_tensor_set(dst, (const char *) src->data + e*bytes, s*bytes, bytes);
+            } else {
+                tmp.resize(bytes);
+                ggml_backend_tensor_get(src, tmp.data(), e*bytes, bytes);
+                ggml_backend_tensor_set(dst, tmp.data(), s*bytes, bytes);
+            }
+            bytes_total += bytes;
+        }
+    };
+    copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
+    copy(layer.ffn_up_exps,   layer.ffn_up_hot);
+    copy(layer.ffn_down_exps, layer.ffn_down_hot);
+    return bytes_total;
+}
 
 llama_model::llama_model(const llama_model_params & params) : params(params), pimpl(std::make_unique<impl>()) {
     if (params.tensor_split != nullptr) {
@@ -1768,6 +1802,20 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                 LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS: no context for %s, ignored\n", __func__, ggml_backend_buft_name(buft));
             } else {
                 ggml_context * ctx = it->second.get();
+                // alias mode: the big tensors get no buffer of their own; the context parks them in its compute buffer
+                const char * alias_env = getenv("LLAMA_HOT_EXPERTS_ALIAS");
+                pimpl->hot_alias = alias_env && *alias_env && *alias_env != '0';
+                ggml_context * ctx_big = ctx;
+                if (pimpl->hot_alias) {
+                    ggml_init_params ip = {
+                        /*.mem_size   =*/ ggml_tensor_overhead()*3*hot_spec.layers.size() + 1024,
+                        /*.mem_buffer =*/ nullptr,
+                        /*.no_alloc   =*/ true,
+                    };
+                    pimpl->hot_ctx.reset(ggml_init(ip));
+                    ctx_big = pimpl->hot_ctx.get();
+                    LLAMA_LOG_INFO("%s: LLAMA_HOT_EXPERTS_ALIAS: hot expert storage is borrowed from the context's compute buffer\n", __func__);
+                }
                 for (const auto & [il, experts] : hot_spec.layers) {
                     if (il < 0 || il >= (int) layers.size() || experts.empty()) {
                         continue;
@@ -1778,8 +1826,9 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                     }
                     const int64_t n_hot    = (int64_t) experts.size();
                     const int64_t n_expert = layer.ffn_gate_exps->ne[2];
+                    pimpl->hot_spec[il] = experts;
                     auto mk = [&](ggml_tensor * src, const char * name) {
-                        ggml_tensor * t = ggml_new_tensor_3d(ctx, src->type, src->ne[0], src->ne[1], n_hot);
+                        ggml_tensor * t = ggml_new_tensor_3d(ctx_big, src->type, src->ne[0], src->ne[1], n_hot);
                         ggml_format_name(t, "blk.%d.%s", il, name);
                         return t;
                     };
@@ -1986,32 +2035,20 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
             ggml_backend_tensor_set(layer.ffn_cold_map, cold_map.data(), 0, n_expert*sizeof(int32_t));
             ggml_backend_tensor_set(layer.ffn_hot_mask, hot_mask.data(), 0, n_expert*sizeof(float));
 
-            auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
-                const size_t bytes = src->nb[2];
-                const bool host = ggml_backend_buffer_is_host(src->buffer);
-                for (size_t s = 0; s < experts.size(); s++) {
-                    const int32_t e = experts[s];
-                    if (e < 0 || e >= n_expert) {
-                        continue;
-                    }
-                    if (host) {
-                        ggml_backend_tensor_set(dst, (const char *) src->data + e*bytes, s*bytes, bytes);
-                    } else {
-                        tmp.resize(bytes);
-                        ggml_backend_tensor_get(src, tmp.data(), e*bytes, bytes);
-                        ggml_backend_tensor_set(dst, tmp.data(), s*bytes, bytes);
-                    }
-                    bytes_total += bytes;
-                }
-            };
-            copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
-            copy(layer.ffn_up_exps,   layer.ffn_up_hot);
-            copy(layer.ffn_down_exps, layer.ffn_down_hot);
+            if (pimpl->hot_alias) {
+                // no storage yet: the context fills the tensors once it has placed them (hot_fill)
+                bytes_total += (size_t) layer.ffn_gate_hot->nb[2]*experts.size()
+                             + (size_t) layer.ffn_up_hot->nb[2]*experts.size()
+                             + (size_t) layer.ffn_down_hot->nb[2]*experts.size();
+            } else {
+                bytes_total += llama_hot_experts_copy(layer, experts, tmp);
+            }
             n_hot_total += experts.size();
             n_layers++;
         }
-        LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s\n", __func__,
-                n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev));
+        LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s%s\n", __func__,
+                n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev),
+                pimpl->hot_alias ? " (storage borrowed from the compute buffer, filled at context creation)" : "");
     }
 
     // customware: LLAMA_LOCK_TENSORS=<regex> keeps only the matching host tensors resident (e.g. a sparsely and
@@ -2399,6 +2436,53 @@ ggml_backend_buffer_type_t llama_model::select_buft(int il) const {
                 ggml_tensor * layer_dir = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, hparams.n_embd);
                 return ggml_add(ctx, cur, layer_dir);
             });
+}
+
+bool llama_model::hot_alias() const {
+    return pimpl->hot_alias && !pimpl->hot_spec.empty();
+}
+
+size_t llama_model::hot_alias_bytes(ggml_backend_buffer_t buf) const {
+    const size_t align = ggml_backend_buffer_get_alignment(buf);
+    size_t total = 0;
+    for (const auto & [il, experts] : pimpl->hot_spec) {
+        const auto & layer = layers[il];
+        for (ggml_tensor * t : { layer.ffn_gate_hot, layer.ffn_up_hot, layer.ffn_down_hot }) {
+            total += GGML_PAD(ggml_backend_buffer_get_alloc_size(buf, t), align);
+        }
+    }
+    return total;
+}
+
+void llama_model::hot_alias_place(ggml_backend_buffer_t buf, size_t offset) const {
+    const size_t align = ggml_backend_buffer_get_alignment(buf);
+    char * base = (char *) ggml_backend_buffer_get_base(buf);
+    for (const auto & [il, experts] : pimpl->hot_spec) {
+        const auto & layer = layers[il];
+        for (ggml_tensor * t : { layer.ffn_gate_hot, layer.ffn_up_hot, layer.ffn_down_hot }) {
+            t->buffer = nullptr;
+            t->data   = nullptr;
+            const size_t size = ggml_backend_buffer_get_alloc_size(buf, t);
+            const ggml_status st = ggml_backend_tensor_alloc(buf, t, base + offset);
+            GGML_ASSERT(st == GGML_STATUS_SUCCESS);
+            offset += GGML_PAD(size, align);
+        }
+    }
+}
+
+size_t llama_model::hot_fill() const {
+    std::vector<uint8_t> tmp;
+    size_t bytes = 0;
+    for (const auto & [il, experts] : pimpl->hot_spec) {
+        const auto & layer = layers[il];
+        bytes += llama_hot_experts_copy(layer, experts, tmp);
+        // compute buffers do not zero the quantization padding of their tensors (weights buffers do): do it here,
+        // the CUDA matmuls read the padded tail of a quantized tensor
+        for (ggml_tensor * t : { layer.ffn_gate_hot, layer.ffn_up_hot, layer.ffn_down_hot }) {
+            ggml_backend_tensor_memset_padding(t);
+        }
+    }
+    return bytes;
 }
 
 bool llama_model::has_tensor_overrides() const {

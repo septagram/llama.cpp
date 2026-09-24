@@ -758,6 +758,14 @@ struct llama_model {
 
     bool has_tensor_overrides() const;
 
+    // customware: hot experts whose storage is borrowed from a context's GPU compute buffer (LLAMA_HOT_EXPERTS_ALIAS=1).
+    // The context reserves its compute buffers first, then places the hot tensors in the tail of the GPU one and fills
+    // them; a graph that reaches into that tail runs without the hot split and the context refills afterwards.
+    bool   hot_alias() const;
+    size_t hot_alias_bytes(ggml_backend_buffer_t buf) const;                // bytes needed in buf (padding + alignment included)
+    void   hot_alias_place(ggml_backend_buffer_t buf, size_t offset) const; // (re)bind the hot tensors to buf at offset
+    size_t hot_fill() const;                                                // copy the experts in, returns bytes copied
+
     const struct ggml_tensor * get_tensor(const char * name) const;
 
     float get_rope_freq_base (const llama_cparams & cparams, int il) const;

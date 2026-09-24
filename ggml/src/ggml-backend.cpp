@@ -2166,6 +2166,34 @@ size_t ggml_backend_sched_get_buffer_size(ggml_backend_sched_t sched, ggml_backe
     return ggml_gallocr_get_buffer_size(sched->galloc, backend_index);
 }
 
+void ggml_backend_tensor_memset_padding(struct ggml_tensor * tensor) {
+    GGML_ASSERT(tensor);
+    ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+    GGML_ASSERT(buf != NULL && tensor->data != NULL);
+
+    const size_t nbytes = ggml_nbytes(tensor);
+    const size_t alloc  = ggml_backend_buffer_get_alloc_size(buf, tensor);
+    if (alloc > nbytes && buf->iface.memset_tensor) {
+        buf->iface.memset_tensor(buf, tensor, 0, nbytes, alloc - nbytes);
+    }
+}
+
+ggml_backend_buffer_t ggml_backend_sched_get_buffer(ggml_backend_sched_t sched, ggml_backend_t backend) {
+    GGML_ASSERT(sched);
+    int backend_index = ggml_backend_sched_backend_id(sched, backend);
+    GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
+
+    return ggml_gallocr_get_buffer_chunk(sched->galloc, backend_index, 0);
+}
+
+size_t ggml_backend_sched_get_buffer_max_size(ggml_backend_sched_t sched, ggml_backend_t backend) {
+    GGML_ASSERT(sched);
+    int backend_index = ggml_backend_sched_backend_id(sched, backend);
+    GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
+
+    return ggml_gallocr_get_max_size(sched->galloc, backend_index);
+}
+
 void ggml_backend_sched_set_tensor_backend(ggml_backend_sched_t sched, struct ggml_tensor * node, ggml_backend_t backend) {
     GGML_ASSERT(sched);
     int backend_index = ggml_backend_sched_backend_id(sched, backend);

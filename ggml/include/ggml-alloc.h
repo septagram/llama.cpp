@@ -73,6 +73,12 @@ GGML_API bool ggml_gallocr_alloc_graph(ggml_gallocr_t galloc, struct ggml_cgraph
 
 GGML_API size_t ggml_gallocr_get_buffer_size(ggml_gallocr_t galloc, int buffer_id);
 
+// customware: the backend buffer behind one chunk of a galloc buffer (NULL if not allocated), and the high-water mark
+// (bytes of the first chunk used) of the graph reserved or allocated last. Lets a caller park its own tensors in the
+// tail of a compute buffer and know when a graph would reach into them.
+GGML_API ggml_backend_buffer_t ggml_gallocr_get_buffer_chunk(ggml_gallocr_t galloc, int buffer_id, int chunk);
+GGML_API size_t                ggml_gallocr_get_max_size(ggml_gallocr_t galloc, int buffer_id);
+
 // Utils
 // Create a buffer and allocate all the tensors in a ggml_context
 // ggml_backend_alloc_ctx_tensors_from_buft_size returns the size of the buffer that would be allocated by ggml_backend_alloc_ctx_tensors_from_buft

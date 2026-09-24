@@ -1493,7 +1493,8 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     cb_func          (params.cb),
     res              (params.res),
     ctx0             (res->get_ctx()),
-    gf               (res->get_gf()) {
+    gf               (res->get_gf()),
+    hot_experts      (params.hot_experts) {
         res->set_params(params);
     }
 
@@ -2190,7 +2191,14 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
 
         ggml_tensor * x = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
 
-        auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag) {
+        // when the hot tensors live in the GPU compute buffer (LLAMA_HOT_EXPERTS_ALIAS) the scheduler's "run where the
+        // weights are" rule does not see them (it only looks at WEIGHTS buffers), so their matmuls are pinned to the GPU
+        ggml_backend_t backend_pin = nullptr;
+        if (sched && hot->gate_hot->buffer && ggml_backend_buffer_get_usage(hot->gate_hot->buffer) != GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
+            backend_pin = ggml_backend_sched_get_backend(sched, 0);
+        }
+
+        auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag, bool pin) {
             ggml_tensor * u = build_lora_mm_id(w_up,   x, ids, nullptr); // [n_ff, n_expert_used, n_tokens]
             u->op_params[3] = 1; // ids may hold -1
             ggml_tensor * g = build_lora_mm_id(w_gate, x, ids, nullptr);
@@ -2198,13 +2206,18 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
             ggml_tensor * h = ggml_swiglu_split(ctx0, g, u);
             ggml_tensor * d = build_lora_mm_id(w_down, h, ids, nullptr); // [n_embd, n_expert_used, n_tokens]
             d->op_params[3] = 1; // ids may hold -1
+            if (pin && backend_pin) {
+                ggml_backend_sched_set_tensor_backend(sched, u, backend_pin);
+                ggml_backend_sched_set_tensor_backend(sched, g, backend_pin);
+                ggml_backend_sched_set_tensor_backend(sched, d, backend_pin);
+            }
             d = ggml_mul(ctx0, d, w);
             cb(d, tag, il);
             return d;
         };
 
-        ggml_tensor * part_hot  = run(hot->up_hot, hot->gate_hot, hot->down_hot, ids_gpu, w_gpu, "ffn_moe_weighted_hot");
-        ggml_tensor * part_cold = run(up_exps,     gate_exps,     down_exps,     ids_cpu, w_cpu, "ffn_moe_weighted_cold");
+        ggml_tensor * part_hot  = run(hot->up_hot, hot->gate_hot, hot->down_hot, ids_gpu, w_gpu, "ffn_moe_weighted_hot",  true);
+        ggml_tensor * part_cold = run(up_exps,     gate_exps,     down_exps,     ids_cpu, w_cpu, "ffn_moe_weighted_cold", false);
 
         ggml_tensor * experts = ggml_add(ctx0, part_hot, part_cold);
         cb(experts, "ffn_moe_weighted", il);
