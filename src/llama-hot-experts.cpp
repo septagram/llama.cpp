@@ -61,10 +61,12 @@ bool llama_hot_experts::load_stats() {
         if (!(ss >> il) || il < 0 || il >= n_layer) {
             continue;
         }
+        // the slow histogram is the file; the fast one starts at a quarter of it so a new workload takes over
+        // within a few thousand generated tokens while the shipped set is not churned out by the first few hundred
         float v = 0.0f;
         for (int e = 0; e < n_expert && (ss >> v); e++) {
-            total[(size_t) il * n_expert + e] = v;
-            recent[(size_t) il * n_expert + e] = v;
+            total[(size_t) il * n_expert + e]  = v;
+            recent[(size_t) il * n_expert + e] = 0.25f * v;
         }
         n_lines++;
     }

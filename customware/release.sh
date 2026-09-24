@@ -9,6 +9,11 @@ dst=/c/dev/llama.cpp-customware
 mkdir -p "$dst"
 cp -f build/bin/llama-server.exe build/bin/llama-bench.exe "$dst"/
 cp -f "${HOT_PLACEMENT:-customware/hot-experts-mixed-4000.txt}" "$dst/hot-experts.txt"
+# the routing statistics the placement was learned from seed the adaptive runtime on a fresh install; a stats file
+# that the server has already written (learned from real sessions) is never overwritten
+if [ ! -s "$dst/hot-experts.stats" ]; then
+  cp -f "${HOT_SEED:-customware/hot-experts-seed.stats}" "$dst/hot-experts.stats" && echo "seeded $dst/hot-experts.stats"
+fi
 { echo "commit: $(git rev-parse --short HEAD)"; echo "date:   $(date '+%F %T')"; git log --oneline -1; } > "$dst/VERSION.txt"
 cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 #!/bin/bash

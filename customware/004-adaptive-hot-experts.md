@@ -127,3 +127,19 @@ construct the runtime object.
   and in the decay clock, so generation dominates what the set adapts to; that is also what the offline placements
   were measured on (the CPU profiler only saw decode). The log cadence for the test is 256 tokens so the decode
   windows are visible.
+- Rerun with the prefill weighting and 256-token log windows (the box was quieter by then, ~12 t/s decode in every
+  run): code prompt 163 t/s prefill / 12.0 decode, cached 12.1, prose 190 / 11.9, cached 12.2; restart placed from
+  the stats: 170 / 11.9 with 1 swap in the decode window (converged). Decode-window coverage: 27.7% and 29.3% on the
+  code prompt, 15.8% and 19.3% after the switch to prose, 24.1% after the restart.
+- Second flaw, the cold start: the shipped placement serves 41.5% of decode routing when fixed, but a fresh session
+  starts with empty histograms, so its experts have no evidence to defend them and the 768 prefill-time swaps (even at
+  1/16 weight) reshuffle the set before generation starts; 300 generated tokens are not enough to recover. Fix: ship
+  the statistics the placement was learned from instead of the placement. `customware/stats-seed.py` merges the
+  offline histograms (x4) into `hot-experts-seed.stats`; `release.sh` installs it as the stats file when none has been
+  learned yet (a learned file is never overwritten), the placement at start comes from it, and `load_stats` seeds the
+  fast histogram with a quarter of the slow one, so the resident set is defended by ~2.5k tokens' worth of evidence
+  and a new workload takes over within a few thousand generated tokens.
+- The greedy log-prob comparison on the released launcher (alias, swaps on, short prompt through the CPU split):
+  41 of 48 tokens identical to the classic hot run, mean |delta| 0.015 nats over the prefix (0.002 vs plain up to the
+  known near-tie at token 2). Small-context perplexity runs could not exercise the parked path (the compute buffer at
+  8k-32k context is 290-980 MiB, too small to park even a 600 MiB set); each of them matched its reference exactly.
