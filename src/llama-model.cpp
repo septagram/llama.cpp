@@ -1188,6 +1188,9 @@ struct llama_model::impl {
     llama_mlocks mlock_bufs;
     llama_mlocks mlock_mmaps;
 
+    // customware: locks of single tensors selected by LLAMA_LOCK_TENSORS
+    llama_mlocks tensor_locks;
+
     // contexts where the model tensors metadata is stored as well as the corresponding buffers:
     std::vector<std::pair<ggml_context_ptr, std::vector<ggml_backend_buffer_ptr>>> ctxs_bufs;
 
@@ -1964,7 +1967,7 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                 continue;
             }
             const int64_t n_expert = layer.ffn_gate_exps->ne[2];
-            std::vector<int32_t> hot_map(n_expert, 0);
+            std::vector<int32_t> hot_map(n_expert, -1);
             std::vector<int32_t> cold_map(n_expert);
             std::vector<float>   hot_mask(n_expert, 0.0f);
             for (int64_t e = 0; e < n_expert; e++) {
@@ -2009,6 +2012,34 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
         }
         LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s\n", __func__,
                 n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev));
+    }
+
+    // customware: LLAMA_LOCK_TENSORS=<regex> keeps only the matching host tensors resident (e.g. a sparsely and
+    // randomly read table that keeps losing the page cache race against weights that are streamed every token)
+    if (const char * lock_pattern = getenv("LLAMA_LOCK_TENSORS"); lock_pattern && *lock_pattern) {
+        const std::regex re(lock_pattern);
+        const size_t page = llama_mlock::SUPPORTED ? 4096 : 0;
+        size_t locked = 0;
+        size_t n_locked = 0;
+        for (const auto & [name, t] : tensors_by_name) {
+            if (!t->buffer || !ggml_backend_buffer_is_host(t->buffer) || !t->data || !std::regex_search(name, re)) {
+                continue;
+            }
+            if (page == 0) {
+                LLAMA_LOG_WARN("%s: LLAMA_LOCK_TENSORS: memory locking is not supported on this platform\n", __func__);
+                break;
+            }
+            const uintptr_t start = (uintptr_t) t->data & ~(uintptr_t) (page - 1);
+            const size_t   size  = ggml_nbytes(t) + ((uintptr_t) t->data - start);
+            auto lock = std::make_unique<llama_mlock>();
+            lock->init((void *) start);
+            lock->grow_to(size);
+            pimpl->tensor_locks.emplace_back(std::move(lock));
+            locked += size;
+            n_locked++;
+            LLAMA_LOG_INFO("%s: locked %s (%.2f MiB)\n", __func__, name.c_str(), size / 1024.0 / 1024.0);
+        }
+        LLAMA_LOG_INFO("%s: LLAMA_LOCK_TENSORS '%s': %zu tensors, %.2f MiB locked in RAM\n", __func__, lock_pattern, n_locked, locked / 1024.0 / 1024.0);
     }
 
     if (use_mmap_buffer) {

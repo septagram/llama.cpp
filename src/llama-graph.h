@@ -1115,7 +1115,7 @@ struct llm_graph_context {
         ggml_tensor * up_hot    = nullptr;
         ggml_tensor * down_hot  = nullptr;
         ggml_tensor * hot_map   = nullptr;
-        ggml_tensor * cold_map  = nullptr;
+        ggml_tensor * cold_map  = nullptr; // cold -> expert, hot slots -> -1 (skipped by the kernels)
         ggml_tensor * hot_mask  = nullptr;
 
         bool valid() const { return gate_hot && up_hot && down_hot && hot_map && cold_map && hot_mask; }

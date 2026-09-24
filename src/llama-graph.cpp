@@ -2157,25 +2157,31 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
     //call early so that topk-moe can be used
     ggml_build_forward_expand(gf, weights);
 
-    // customware: hot experts (LLAMA_HOT_EXPERTS). For small batches the routed slots are split: slots whose expert
-    // has a GPU copy run there on the compacted tensors, the other slots run on the host tensors with the hot
-    // slots marked -1 (the CPU kernel leaves those rows zero). Both halves are masked by the routing weights and added.
-    // Large batches keep the plain path: the scheduler streams the host experts to the GPU there anyway.
-    static const int64_t hot_max_batch = [] {
-        const char * env = getenv("GGML_OP_OFFLOAD_MIN_BATCH");
-        return env ? (int64_t) atoi(env) : (int64_t) 32;
-    }();
+    // customware: hot experts (LLAMA_HOT_EXPERTS). The routed slots are split: slots whose expert has a GPU copy run
+    // there on the compacted tensors, the other slots run on the host tensors (on the CPU for small batches, streamed
+    // to the GPU by the scheduler for large ones). In each half the slots that belong to the other half carry the id
+    // -1, which the mul_mat_id kernels treat as "skip, leave zeros" (op_params[3] = 1 marks such ids). Both halves
+    // are masked by the routing weights and added.
     const bool hot_simple = hot && hot->valid() && gate_exps && !gate_up_exps &&
         !up_exps_b && !gate_exps_b && !down_exps_b && !up_exps_s && !gate_exps_s && !down_exps_s &&
         type_op == LLM_FFN_SILU && !weight_before_ffn && (il < 0 || hparams.swiglu_clamp_exp[il] <= 1e-6f);
-    if (hot_simple && n_tokens < hot_max_batch) {
+    if (hot_simple) {
         const int64_t n_expert_all = hot->hot_map->ne[0];
+        ggml_tensor * cold_map = hot->cold_map;
 
-        ggml_tensor * ids_gpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_map,  1, n_expert_all), selected_experts);
-        ggml_tensor * ids_cpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->cold_map, 1, n_expert_all), selected_experts);
-        ggml_tensor * mask    = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_mask, 1, n_expert_all), selected_experts); // [1, n_expert_used, n_tokens]
+        // the maps have no token dimension, so look them up with a flat index and restore the shape after
+        ggml_tensor * sel = selected_experts;
+        if (!ggml_is_contiguous(sel)) {
+            sel = ggml_cont(ctx0, sel);
+        }
+        sel = ggml_reshape_1d(ctx0, sel, n_expert_used*n_tokens);
+
+        ggml_tensor * ids_gpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_map,  1, n_expert_all), sel);
+        ggml_tensor * ids_cpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, cold_map, 1, n_expert_all), sel);
+        ggml_tensor * mask    = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_mask, 1, n_expert_all), sel);
         ids_gpu = ggml_reshape_2d(ctx0, ids_gpu, n_expert_used, n_tokens);
         ids_cpu = ggml_reshape_2d(ctx0, ids_cpu, n_expert_used, n_tokens);
+        mask    = ggml_reshape_3d(ctx0, mask, 1, n_expert_used, n_tokens);
         cb(ids_gpu, "ffn_moe_ids_hot", il);
         cb(ids_cpu, "ffn_moe_ids_cold", il);
 
@@ -2186,9 +2192,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
 
         auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag) {
             ggml_tensor * u = build_lora_mm_id(w_up,   x, ids, nullptr); // [n_ff, n_expert_used, n_tokens]
+            u->op_params[3] = 1; // ids may hold -1
             ggml_tensor * g = build_lora_mm_id(w_gate, x, ids, nullptr);
+            g->op_params[3] = 1; // ids may hold -1
             ggml_tensor * h = ggml_swiglu_split(ctx0, g, u);
             ggml_tensor * d = build_lora_mm_id(w_down, h, ids, nullptr); // [n_embd, n_expert_used, n_tokens]
+            d->op_params[3] = 1; // ids may hold -1
             d = ggml_mul(ctx0, d, w);
             cb(d, tag, il);
             return d;

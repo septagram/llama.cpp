@@ -339,8 +339,8 @@ struct llama_layer {
     struct ggml_tensor * ffn_gate_hot      = nullptr; // [n_embd, n_ff, n_hot]
     struct ggml_tensor * ffn_up_hot        = nullptr;
     struct ggml_tensor * ffn_down_hot      = nullptr; // [n_ff, n_embd, n_hot]
-    struct ggml_tensor * ffn_hot_map       = nullptr; // I32 [n_expert]: expert -> hot slot, cold -> 0
-    struct ggml_tensor * ffn_cold_map      = nullptr; // I32 [n_expert]: cold -> expert, hot -> -1
+    struct ggml_tensor * ffn_hot_map       = nullptr; // I32 [n_expert]: expert -> hot slot, cold -> -1 (skipped)
+    struct ggml_tensor * ffn_cold_map      = nullptr; // I32 [n_expert]: cold -> expert, hot -> -1 (skipped)
     struct ggml_tensor * ffn_hot_mask      = nullptr; // F32 [n_expert]: 1 for hot experts
     struct ggml_tensor * ffn_gate_inp_b    = nullptr;
     struct ggml_tensor * ffn_gate_exps_b   = nullptr;

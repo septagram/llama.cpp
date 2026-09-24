@@ -1986,17 +1986,24 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * 
     std::vector<int32_t> tokens_per_expert(ne02);
 
     ggml_cuda_pool_alloc<char> src1_sorted(ctx.pool(), ne12*n_expert_used*ne10*ts_src1_sorted);
-    ggml_cuda_pool_alloc<char>  dst_sorted(ctx.pool(), ne2 *n_expert_used* ne0*ts_dst_sorted);
+    // customware: one extra zero row at the end, the target of slots with a negative id (served elsewhere)
+    ggml_cuda_pool_alloc<char>  dst_sorted(ctx.pool(), (ne2 *n_expert_used + 1)* ne0*ts_dst_sorted);
+    CUDA_CHECK(cudaMemsetAsync(dst_sorted.ptr + ne_get_rows*ne0*ts_dst_sorted, 0, ne0*ts_dst_sorted, stream));
 
     std::vector<char> ids_host(ggml_nbytes(ids));
     CUDA_CHECK(cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
+    // customware: slots with a negative id (served elsewhere) get no compact row and read the zero row at the end
+    std::fill(ids_from_sorted_host.begin(), ids_from_sorted_host.end(), -1);
     for (int64_t i02 = 0; i02 < ne02; ++i02) { // expert matrices
         for (int64_t i12 = 0; i12 < ne12; ++i12) { // tokens
             for (int64_t iex = 0; iex < n_expert_used; ++iex) {
                 const int32_t expert_to_use = *(const int32_t *)(ids_host.data() + i12*ids->nb[1] + iex*ids->nb[0]);
-                assert(expert_to_use >= 0 && expert_to_use < ne02);
+                if (expert_to_use < 0) {
+                    continue;
+                }
+                assert(expert_to_use < ne02);
                 if (expert_to_use == i02) {
                     ids_from_sorted_host[i12*n_expert_used + iex] = ids_to_sorted_host.size();
                     ids_to_sorted_host.push_back(i12*ne11 + iex % ne11);
@@ -2006,20 +2013,26 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * 
             }
         }
     }
-    GGML_ASSERT(ids_to_sorted_host.size() == size_t(ne_get_rows));
+    const int64_t n_valid = (int64_t) ids_to_sorted_host.size();
+    GGML_ASSERT(n_valid <= ne_get_rows);
+    for (auto & v : ids_from_sorted_host) {
+        if (v < 0) {
+            v = (int32_t) ne_get_rows; // the zero row
+        }
+    }
 
     ids_to_sorted_host.insert(ids_to_sorted_host.end(), ids_from_sorted_host.begin(), ids_from_sorted_host.end());
 
-    CUDA_CHECK(cudaMemcpyAsync(ids_buf_dev.ptr, ids_to_sorted_host.data(), 2*ne_get_rows*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
+    CUDA_CHECK(cudaMemcpyAsync(ids_buf_dev.ptr, ids_to_sorted_host.data(), ids_to_sorted_host.size()*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
-    const int32_t * ids_to_sorted   = ids_buf_dev.ptr + 0*ne_get_rows;
-    const int32_t * ids_from_sorted = ids_buf_dev.ptr + 1*ne_get_rows;
+    const int32_t * ids_to_sorted   = ids_buf_dev.ptr;
+    const int32_t * ids_from_sorted = ids_buf_dev.ptr + n_valid;
 
     get_rows_cuda(src1->data, src1->type, ids_to_sorted, src1_sorted.ptr, type_src1_sorted,
         ne10, nb11, nb12, nb13,
-        ne_get_rows, 1, 1, sizeof(int32_t), ne_get_rows*sizeof(int32_t), ne_get_rows*sizeof(int32_t),
-        ne10*ts_src1_sorted, ne_get_rows*ne10*ts_src1_sorted, ne_get_rows*ne10*ts_src1_sorted, stream);
+        n_valid, 1, 1, sizeof(int32_t), n_valid*sizeof(int32_t), n_valid*sizeof(int32_t),
+        ne10*ts_src1_sorted, n_valid*ne10*ts_src1_sorted, n_valid*ne10*ts_src1_sorted, stream);
     CUDA_CHECK(cudaGetLastError());
 
     char * src1_data_cur = (char *) src1_sorted.ptr;

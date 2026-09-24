@@ -3,7 +3,9 @@
 #include "quantize.cuh"
 #include "mmid.cuh"
 
+#include <algorithm>
 #include <cstdint>
+#include <vector>
 
 static void ggml_cuda_mul_mat_q_switch_type(ggml_backend_cuda_context & ctx, const mmq_args & args, cudaStream_t stream) {
     switch (args.type_x) {
@@ -192,6 +194,43 @@ void ggml_cuda_mul_mat_q(
     // scatter to its slots. ids_src1 then holds the inverse map (token slot -> compact row).
     const bool dedup_bcast = ne11 == 1 && n_expert_used > 1;
 
+    // customware: op_params[3] == 1 marks ids that may hold -1 (slot served elsewhere); those slots get no
+    // compact row, so their inverse map entries stay -1 and their output rows stay zero
+    const bool ids_may_skip = ggml_get_op_params_i32(dst, 3) == 1;
+    if (ids_may_skip) {
+        // the helper writes one map entry per valid slot; the rest must read as "skip" for the quantize gather
+        CUDA_CHECK(cudaMemsetAsync(ids_src1.get(), 0xFF, ne_get_rows*sizeof(int32_t), stream));
+        CUDA_CHECK(cudaMemsetAsync(dst->data, 0, ggml_nbytes(dst), stream));
+    }
+
+    // customware: GGML_CUDA_MMQ_DEBUG=1 syncs after each stage and reports the ids summary on failure
+    static const bool mmq_debug = getenv("GGML_CUDA_MMQ_DEBUG") != nullptr;
+    auto mmq_stage = [&](const char * stage) {
+        if (!mmq_debug) {
+            return;
+        }
+        cudaError_t err = cudaStreamSynchronize(stream);
+        if (err == cudaSuccess) {
+            err = cudaGetLastError();
+        }
+        if (err != cudaSuccess) {
+            std::vector<int32_t> h(ne_get_rows);
+            (void) cudaGetLastError();
+            fprintf(stderr, "mmq-debug: stage '%s' failed: %s | %s: ne02=%lld ne12=%lld n_expert_used=%lld ne11=%lld dedup=%d skip=%d src0=%s\n",
+                    stage, cudaGetErrorString(err), dst->name, (long long) ne02, (long long) ne12, (long long) n_expert_used, (long long) ne11, (int) dedup_bcast, (int) ids_may_skip, ggml_type_name(src0->type));
+            GGML_ABORT("mmq-debug");
+        }
+    };
+    if (mmq_debug) {
+        std::vector<int32_t> h(ne_get_rows);
+        CUDA_CHECK(cudaMemcpy(h.data(), ids->data, ne_get_rows*sizeof(int32_t), cudaMemcpyDeviceToHost));
+        int64_t neg = 0, mn = INT32_MAX, mx = INT32_MIN;
+        for (int32_t v : h) { neg += v < 0; mn = std::min(mn, (int64_t) v); mx = std::max(mx, (int64_t) v); }
+        fprintf(stderr, "mmq-debug: %s ne02=%lld ne12=%lld n_used=%lld ne11=%lld dedup=%d skip=%d ids: neg=%lld min=%lld max=%lld\n",
+                dst->name, (long long) ne02, (long long) ne12, (long long) n_expert_used, (long long) ne11, (int) dedup_bcast, (int) ids_may_skip, (long long) neg, (long long) mn, (long long) mx);
+    }
+    mmq_stage("memset");
+
     {
         GGML_ASSERT(ids->nb[0] == ggml_element_size(ids));
         const int si1  = ids->nb[1] / ggml_element_size(ids);
@@ -200,6 +239,20 @@ void ggml_cuda_mul_mat_q(
         ggml_cuda_launch_mm_ids_helper((const int32_t *) ids->data, ids_src1.get(), ids_dst.get(), expert_bounds.get(),
             ne02, ne12, n_expert_used, ne11, si1, sis1, /*write_inverse =*/ dedup_bcast, stream);
         CUDA_CHECK(cudaGetLastError());
+        mmq_stage("ids helper");
+        if (mmq_debug) {
+            std::vector<int32_t> m(ne_get_rows), b(ne02 + 1), d(ne_get_rows);
+            CUDA_CHECK(cudaMemcpy(m.data(), ids_src1.get(), ne_get_rows*sizeof(int32_t), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(d.data(), ids_dst.get(),  ne_get_rows*sizeof(int32_t), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(b.data(), expert_bounds.get(), (ne02 + 1)*sizeof(int32_t), cudaMemcpyDeviceToHost));
+            int64_t n_valid = 0, mn = INT32_MAX, mx = INT32_MIN, dmx = INT32_MIN;
+            for (int32_t v : m) { if (v >= 0) { n_valid++; mn = std::min(mn, (int64_t) v); mx = std::max(mx, (int64_t) v); } }
+            for (int32_t v : d) { dmx = std::max(dmx, (int64_t) v); }
+            fprintf(stderr, "mmq-debug:   map: valid=%lld min=%lld max=%lld (src1 rows flat=%lld) ids_dst max=%lld bounds[last]=%d si1=%d sis1=%d | quantize: ne0=%lld ne1=%lld s11=%lld s12=%lld src1 ne=[%lld,%lld,%lld] nb=[%zu,%zu,%zu]\n",
+                    (long long) n_valid, (long long) mn, (long long) mx, (long long) (ne12*ne11), (long long) dmx, b[ne02], si1, sis1,
+                    (long long) ne10_padded, (long long) (ne12*n_expert_used), (long long) (src1->nb[1]/ts_src1), (long long) (src1->nb[2]/ts_src1),
+                    (long long) src1->ne[0], (long long) src1->ne[1], (long long) src1->ne[2], src1->nb[0], src1->nb[1], src1->nb[2]);
+        }
     }
 
     const size_t nbytes_src1_q8_1 = ne12*n_expert_used*ne10_padded * y_block_size/y_values_per_block +
@@ -237,6 +290,7 @@ void ggml_cuda_mul_mat_q(
                                    ne10_padded, ne11_flat, ne12_flat, ne13_flat, stream);
         }
         CUDA_CHECK(cudaGetLastError());
+        mmq_stage("quantize");
     }
 
     static_assert(QK_FP4_MMQ == 8 * QK_MXFP4, "QK_FP4_MMQ needs to be 8 * QK_MXFP4");
