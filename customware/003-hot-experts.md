@@ -113,3 +113,23 @@ into a lambda. The scheduler places each part by its weights, no forcing needed.
 - Coverage depends on the workload: per-prompt placements cover 57-61% of their own prompt, 34-38% of a different
   one; the mixed placement 53-55%. `GGML_CPU_PROFILE` in the server logs the histogram, so the placement can be
   regenerated from real sessions with `customware/expert-place.py`.
+- Real-config A/B (server, 22.2k code prompt, 300 generated, 160k context, 2 slots, unified KV, `-ub 1024`, page cache warm):
+  hot experts 4 GB (`hot-experts-mixed-4000.txt`, 41.5% of routed slots served from the GPU) 110 t/s prefill, 12.85/12.93 t/s
+  generation at 14.2 GB VRAM; plain 3 whole expert layers (28-30) at the same settings 115 / 11.51/11.48 at 15.2 GB: +12%
+  generation for 1 GB less VRAM. Bigger placements do not fit next to the 160k buffers: 4.5 GB + ub 1024 and 6 GB + ub 512
+  push VRAM past ~15 GB, where WDDM starts paging and everything crawls.
+- Launcher config (agreed trade of context for speed: 120k instead of 160k): `-c 120000 -np 2 --kv-unified -ub 2048 -b 2048`
+  + 4 GB hot experts = 14.6 GB VRAM, 169 t/s prefill and 12.5 t/s generation at 22k depth (the daily script did ~70 / ~7).
+  160k + ub 1024 (110 / 12.9) is documented in the launcher as the fallback. `customware/release.sh` writes both the frozen
+  binary + placement (`C:\dev\llama.cpp-customware`) and the launcher (`C:\dev\textgen\...customware.sh`).
+- Numerics with the split at prefill: greedy log-probs vs the plain config agree to 0.0025 nats (mean) over the identical
+  prefix and then a near-tie flips at token 2 (' answer' -0.63/-0.95 vs ' to' -1.15/-0.74); the earlier "byte-identical over
+  64 tokens" check compared token ids only and predates the prefill split. The GPU half (MMQ/MMVQ) and the CPU kernels
+  accumulate in different orders, so bit-equality is not expected; the perplexity comparison below is the check that matters.
+- Perplexity, same settings for both (`-c 8192 -ub 1024 -b 2048 --chunks 4`, 390 KB of repo docs + source, q8_0 KV, CUDA0 only):
+  plain 3 whole layers 2.1431 +/- 0.0301, hot 4 GB split (prefill through the split too) 2.1345 +/- 0.0298. Equal within
+  the error bar, so the split is numerically sound at prefill and decode; the token-2 flip above is a near-tie.
+- The launcher that crashed for the user ("out of memory while offloading") was the frozen binary from commit 5f782a926,
+  where `-ot ...=CPU` still landed the experts in pinned host memory (`CUDA_Host model buffer size = 67200 MiB` in the
+  log) and the WDDM shared budget ran out at the first GPU upload. Fixed by defc32010 in the repo; the release was
+  simply never refreshed. `release.sh` now ships 13684c74e and the launcher sets `-fit off` (the fit step aborts anyway).

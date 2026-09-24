@@ -1,0 +1,612 @@
+ggml_cuda_init: found 2 CUDA devices (Total VRAM: 24571 MiB):
+  Device 0: NVIDIA GeForce RTX 4060 Ti, compute capability 8.9, VMM: yes, VRAM: 16379 MiB
+  Device 1: NVIDIA GeForce RTX 2060 SUPER, compute capability 7.5, VMM: yes, VRAM: 8191 MiB
+llama-bench: benchmark 1/1: starting
+llama-bench: benchmark 1/1: warmup generation run
+sched-prof:   split   0 CPU    nodes=   4 copy=     1.0 us comp=   833.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes=  96 copy= 26407.0 us comp= 34676.0 us  hc_init
+sched-prof:   split   2 CUDA0  nodes=   1 copy=  2753.0 us comp=   360.0 us  ffn_moe_gate-0
+sched-prof:   split   3 CUDA0  nodes=   2 copy=  2694.0 us comp=   420.0 us  ffn_moe_up-0
+sched-prof:   split   4 CUDA0  nodes= 203 copy=  4276.0 us comp=  3121.0 us  ffn_moe_down-0
+sched-prof:   split   5 CUDA0  nodes=   1 copy=  2762.0 us comp=   349.0 us  ffn_moe_gate-1
+sched-prof:   split   6 CUDA0  nodes=   2 copy=  2682.0 us comp=   310.0 us  ffn_moe_up-1
+sched-prof:   split   7 CUDA0  nodes= 127 copy=  4196.0 us comp=  1143.0 us  ffn_moe_down-1
+sched-prof:   split   8 CUDA0  nodes=   1 copy=  4276.0 us comp=   317.0 us  ffn_moe_gate-2
+sched-prof:   split   9 CUDA0  nodes=   2 copy=  4333.0 us comp=   328.0 us  ffn_moe_up-2
+sched-prof:   split  10 CUDA0  nodes= 174 copy=  6641.0 us comp= 10572.0 us  ffn_moe_down-2
+sched-prof:   split  11 CUDA0  nodes=   1 copy=  2992.0 us comp=   312.0 us  ffn_moe_gate-3
+sched-prof:   split  12 CUDA0  nodes=   2 copy=  2706.0 us comp=   357.0 us  ffn_moe_up-3
+sched-prof:   split  13 CUDA0  nodes= 127 copy=  4254.0 us comp=  1019.0 us  ffn_moe_down-3
+sched-prof:   split  14 CUDA0  nodes=   1 copy=  2730.0 us comp=   357.0 us  ffn_moe_gate-4
+sched-prof:   split  15 CUDA0  nodes=   2 copy=  2694.0 us comp=   277.0 us  ffn_moe_up-4
+sched-prof:   split  16 CUDA0  nodes= 127 copy=  6341.0 us comp=  1230.0 us  ffn_moe_down-4
+sched-prof:   split  17 CUDA0  nodes=   1 copy=  3236.0 us comp=   292.0 us  ffn_moe_gate-5
+sched-prof:   split  18 CUDA0  nodes=   2 copy=  3219.0 us comp=   370.0 us  ffn_moe_up-5
+sched-prof:   split  19 CUDA0  nodes= 127 copy=  3877.0 us comp=  1717.0 us  ffn_moe_down-5
+sched-prof:   split  20 CUDA0  nodes=   1 copy=  2748.0 us comp=   270.0 us  ffn_moe_gate-6
+sched-prof:   split  21 CUDA0  nodes=   2 copy=  2669.0 us comp=   261.0 us  ffn_moe_up-6
+sched-prof:   split  22 CUDA0  nodes= 174 copy=  4003.0 us comp=  1163.0 us  ffn_moe_down-6
+sched-prof:   split  23 CUDA0  nodes=   1 copy=  3452.0 us comp=   311.0 us  ffn_moe_gate-7
+sched-prof:   split  24 CUDA0  nodes=   2 copy=  3277.0 us comp=   399.0 us  ffn_moe_up-7
+sched-prof:   split  25 CUDA0  nodes= 127 copy=  4433.0 us comp=  1032.0 us  ffn_moe_down-7
+sched-prof:   split  26 CUDA0  nodes=   1 copy=  2952.0 us comp=   373.0 us  ffn_moe_gate-8
+sched-prof:   split  27 CUDA0  nodes=   2 copy=  3018.0 us comp=   320.0 us  ffn_moe_up-8
+sched-prof:   split  28 CUDA0  nodes= 127 copy=  4287.0 us comp=  1102.0 us  ffn_moe_down-8
+sched-prof:   split  29 CUDA0  nodes=   1 copy=  2748.0 us comp=   276.0 us  ffn_moe_gate-9
+sched-prof:   split  30 CUDA0  nodes=   2 copy=  2791.0 us comp=   468.0 us  ffn_moe_up-9
+sched-prof:   split  31 CUDA0  nodes= 127 copy=  4073.0 us comp=  1031.0 us  ffn_moe_down-9
+sched-prof:   split  32 CUDA0  nodes=   1 copy=  2738.0 us comp=   350.0 us  ffn_moe_gate-10
+sched-prof:   split  33 CUDA0  nodes=   2 copy=  2697.0 us comp=   274.0 us  ffn_moe_up-10
+sched-prof:   split  34 CUDA0  nodes= 174 copy=  4065.0 us comp=  1510.0 us  ffn_moe_down-10
+sched-prof:   split  35 CUDA0  nodes=   1 copy=  2625.0 us comp=   298.0 us  ffn_moe_gate-11
+sched-prof:   split  36 CUDA0  nodes=   2 copy=  2620.0 us comp=   286.0 us  ffn_moe_up-11
+sched-prof:   split  37 CUDA0  nodes= 127 copy=  4005.0 us comp=  1100.0 us  ffn_moe_down-11
+sched-prof:   split  38 CUDA0  nodes=   1 copy=  2889.0 us comp=   283.0 us  ffn_moe_gate-12
+sched-prof:   split  39 CUDA0  nodes=   2 copy=  3002.0 us comp=   347.0 us  ffn_moe_up-12
+sched-prof:   split  40 CUDA0  nodes= 127 copy=  3882.0 us comp=  1072.0 us  ffn_moe_down-12
+sched-prof:   split  41 CUDA0  nodes=   1 copy=  2964.0 us comp=   365.0 us  ffn_moe_gate-13
+sched-prof:   split  42 CUDA0  nodes=   2 copy=  2700.0 us comp=   259.0 us  ffn_moe_up-13
+sched-prof:   split  43 CUDA0  nodes= 127 copy=  3930.0 us comp=  1024.0 us  ffn_moe_down-13
+sched-prof:   split  44 CUDA0  nodes=   1 copy=  2812.0 us comp=   295.0 us  ffn_moe_gate-14
+sched-prof:   split  45 CUDA0  nodes=   2 copy=  2799.0 us comp=   848.0 us  ffn_moe_up-14
+sched-prof:   split  46 CUDA0  nodes= 174 copy=  4052.0 us comp=  1208.0 us  ffn_moe_down-14
+sched-prof:   split  47 CUDA0  nodes=   1 copy=  2872.0 us comp=   289.0 us  ffn_moe_gate-15
+sched-prof:   split  48 CUDA0  nodes=   2 copy=  2827.0 us comp=   369.0 us  ffn_moe_up-15
+sched-prof:   split  49 CUDA0  nodes= 127 copy=  4005.0 us comp=  1308.0 us  ffn_moe_down-15
+sched-prof:   split  50 CUDA0  nodes=   1 copy=  2925.0 us comp=   281.0 us  ffn_moe_gate-16
+sched-prof:   split  51 CUDA0  nodes=   2 copy=  2680.0 us comp=   263.0 us  ffn_moe_up-16
+sched-prof:   split  52 CUDA0  nodes= 127 copy=  4231.0 us comp=  1100.0 us  ffn_moe_down-16
+sched-prof:   split  53 CUDA0  nodes=   1 copy=  2720.0 us comp=   277.0 us  ffn_moe_gate-17
+sched-prof:   split  54 CUDA0  nodes=   2 copy=  2785.0 us comp=   394.0 us  ffn_moe_up-17
+sched-prof:   split  55 CUDA0  nodes= 127 copy=  4404.0 us comp=   969.0 us  ffn_moe_down-17
+sched-prof:   split  56 CUDA0  nodes=   1 copy=  3221.0 us comp=   358.0 us  ffn_moe_gate-18
+sched-prof:   split  57 CUDA0  nodes=   2 copy=  2958.0 us comp=   318.0 us  ffn_moe_up-18
+sched-prof:   split  58 CUDA0  nodes= 174 copy=  4741.0 us comp=  1137.0 us  ffn_moe_down-18
+sched-prof:   split  59 CUDA0  nodes=   1 copy=  2899.0 us comp=   261.0 us  ffn_moe_gate-19
+sched-prof:   split  60 CUDA0  nodes=   2 copy=  2845.0 us comp=   390.0 us  ffn_moe_up-19
+sched-prof:   split  61 CUDA0  nodes= 127 copy=  4207.0 us comp=  1033.0 us  ffn_moe_down-19
+sched-prof:   split  62 CUDA0  nodes=   1 copy=  3138.0 us comp=   356.0 us  ffn_moe_gate-20
+sched-prof:   split  63 CUDA0  nodes=   2 copy=  2817.0 us comp=   264.0 us  ffn_moe_up-20
+sched-prof:   split  64 CUDA0  nodes= 127 copy=  4147.0 us comp=  1239.0 us  ffn_moe_down-20
+sched-prof:   split  65 CUDA0  nodes=   1 copy=  2818.0 us comp=   285.0 us  ffn_moe_gate-21
+sched-prof:   split  66 CUDA0  nodes=   2 copy=  3189.0 us comp=   652.0 us  ffn_moe_up-21
+sched-prof:   split  67 CUDA0  nodes= 127 copy=  4143.0 us comp=  1016.0 us  ffn_moe_down-21
+sched-prof:   split  68 CUDA0  nodes=   1 copy=  2859.0 us comp=   284.0 us  ffn_moe_gate-22
+sched-prof:   split  69 CUDA0  nodes=   2 copy=  2853.0 us comp=   385.0 us  ffn_moe_up-22
+sched-prof:   split  70 CUDA0  nodes= 174 copy=  4589.0 us comp=  2094.0 us  ffn_moe_down-22
+sched-prof:   split  71 CUDA0  nodes=   1 copy=  2903.0 us comp=   314.0 us  ffn_moe_gate-23
+sched-prof:   split  72 CUDA0  nodes=   2 copy=  2739.0 us comp=   269.0 us  ffn_moe_up-23
+sched-prof:   split  73 CUDA0  nodes= 127 copy=  4429.0 us comp=  1092.0 us  ffn_moe_down-23
+sched-prof:   split  74 CUDA0  nodes=   1 copy=  2866.0 us comp=   362.0 us  ffn_moe_gate-24
+sched-prof:   split  75 CUDA0  nodes=   2 copy=  2779.0 us comp=   281.0 us  ffn_moe_up-24
+sched-prof:   split  76 CUDA0  nodes= 127 copy=  4059.0 us comp=  1050.0 us  ffn_moe_down-24
+sched-prof:   split  77 CUDA0  nodes=   1 copy=  3180.0 us comp=   366.0 us  ffn_moe_gate-25
+sched-prof:   split  78 CUDA0  nodes=   2 copy=  3351.0 us comp=   316.0 us  ffn_moe_up-25
+sched-prof:   split  79 CUDA0  nodes= 127 copy=  4854.0 us comp=  1067.0 us  ffn_moe_down-25
+sched-prof:   split  80 CUDA0  nodes=   1 copy=  2998.0 us comp=   279.0 us  ffn_moe_gate-26
+sched-prof:   split  81 CUDA0  nodes=   2 copy=  3372.0 us comp=   361.0 us  ffn_moe_up-26
+sched-prof:   split  82 CUDA0  nodes= 174 copy=  4203.0 us comp=  1536.0 us  ffn_moe_down-26
+sched-prof:   split  83 CUDA0  nodes=   1 copy=  2787.0 us comp=   255.0 us  ffn_moe_gate-27
+sched-prof:   split  84 CUDA0  nodes=   2 copy=  2745.0 us comp=   267.0 us  ffn_moe_up-27
+sched-prof:   split  85 CUDA0  nodes= 694 copy=  4424.0 us comp=  4517.0 us  ffn_moe_down-27
+sched-prof:   split  86 CUDA0  nodes=   1 copy=  2878.0 us comp=   357.0 us  ffn_moe_gate-32
+sched-prof:   split  87 CUDA0  nodes=   2 copy=  2893.0 us comp=   279.0 us  ffn_moe_up-32
+sched-prof:   split  88 CUDA0  nodes= 127 copy=  5116.0 us comp=  1165.0 us  ffn_moe_down-32
+sched-prof:   split  89 CUDA0  nodes=   1 copy=  3480.0 us comp=   308.0 us  ffn_moe_gate-33
+sched-prof:   split  90 CUDA0  nodes=   2 copy=  3340.0 us comp=   395.0 us  ffn_moe_up-33
+sched-prof:   split  91 CUDA0  nodes= 127 copy=  4793.0 us comp=  1021.0 us  ffn_moe_down-33
+sched-prof:   split  92 CUDA0  nodes=   1 copy=  2940.0 us comp=   361.0 us  ffn_moe_gate-34
+sched-prof:   split  93 CUDA0  nodes=   2 copy=  3172.0 us comp=   296.0 us  ffn_moe_up-34
+sched-prof:   split  94 CUDA0  nodes= 174 copy=  4354.0 us comp=  1150.0 us  ffn_moe_down-34
+sched-prof:   split  95 CUDA0  nodes=   1 copy=  2972.0 us comp=   294.0 us  ffn_moe_gate-35
+sched-prof:   split  96 CUDA0  nodes=   2 copy=  2919.0 us comp=   367.0 us  ffn_moe_up-35
+sched-prof:   split  97 CUDA0  nodes= 127 copy=  4257.0 us comp=  1066.0 us  ffn_moe_down-35
+sched-prof:   split  98 CUDA0  nodes=   1 copy=  3359.0 us comp=   696.0 us  ffn_moe_gate-36
+sched-prof:   split  99 CUDA0  nodes=   2 copy=  2964.0 us comp=   324.0 us  ffn_moe_up-36
+sched-prof:   split 100 CUDA0  nodes= 127 copy=  4457.0 us comp=  1136.0 us  ffn_moe_down-36
+sched-prof:   split 101 CUDA0  nodes=   1 copy=  3488.0 us comp=   328.0 us  ffn_moe_gate-37
+sched-prof:   split 102 CUDA0  nodes=   2 copy=  3404.0 us comp=   398.0 us  ffn_moe_up-37
+sched-prof:   split 103 CUDA0  nodes= 127 copy=  4295.0 us comp=  1398.0 us  ffn_moe_down-37
+sched-prof:   split 104 CUDA0  nodes=   1 copy=  3500.0 us comp=   398.0 us  ffn_moe_gate-38
+sched-prof:   split 105 CUDA0  nodes=   2 copy=  3326.0 us comp=   303.0 us  ffn_moe_up-38
+sched-prof:   split 106 CUDA0  nodes= 174 copy=  4444.0 us comp=  1546.0 us  ffn_moe_down-38
+sched-prof:   split 107 CUDA0  nodes=   1 copy=  3030.0 us comp=   439.0 us  ffn_moe_gate-39
+sched-prof:   split 108 CUDA0  nodes=   2 copy=  2910.0 us comp=   300.0 us  ffn_moe_up-39
+sched-prof:   split 109 CUDA0  nodes= 127 copy=  4461.0 us comp=  1507.0 us  ffn_moe_down-39
+sched-prof:   split 110 CUDA0  nodes=   1 copy=  2886.0 us comp=   314.0 us  ffn_moe_gate-40
+sched-prof:   split 111 CUDA0  nodes=   2 copy=  2825.0 us comp=   304.0 us  ffn_moe_up-40
+sched-prof:   split 112 CUDA0  nodes= 127 copy=  4388.0 us comp=  1441.0 us  ffn_moe_down-40
+sched-prof:   split 113 CUDA0  nodes=   1 copy=  3156.0 us comp=   551.0 us  ffn_moe_gate-41
+sched-prof:   split 114 CUDA0  nodes=   2 copy=  3219.0 us comp=   375.0 us  ffn_moe_up-41
+sched-prof:   split 115 CUDA0  nodes= 127 copy=  4395.0 us comp=  1555.0 us  ffn_moe_down-41
+sched-prof:   split 116 CUDA0  nodes=   1 copy=  3268.0 us comp=   335.0 us  ffn_moe_gate-42
+sched-prof:   split 117 CUDA0  nodes=   2 copy=  3360.0 us comp=   329.0 us  ffn_moe_up-42
+sched-prof:   split 118 CUDA0  nodes= 174 copy=  4690.0 us comp=  1541.0 us  ffn_moe_down-42
+sched-prof:   split 119 CUDA0  nodes=   1 copy=  3170.0 us comp=   406.0 us  ffn_moe_gate-43
+sched-prof:   split 120 CUDA0  nodes=   2 copy=  3354.0 us comp=   341.0 us  ffn_moe_up-43
+sched-prof:   split 121 CUDA0  nodes= 127 copy=  4691.0 us comp=  1518.0 us  ffn_moe_down-43
+sched-prof:   split 122 CUDA0  nodes=   1 copy=  3029.0 us comp=   324.0 us  ffn_moe_gate-44
+sched-prof:   split 123 CUDA0  nodes=   2 copy=  3241.0 us comp=   456.0 us  ffn_moe_up-44
+sched-prof:   split 124 CUDA0  nodes= 127 copy=  4669.0 us comp=  2342.0 us  ffn_moe_down-44
+sched-prof:   split 125 CUDA0  nodes=   1 copy=  2922.0 us comp=   344.0 us  ffn_moe_gate-45
+sched-prof:   split 126 CUDA0  nodes=   2 copy=  2865.0 us comp=   284.0 us  ffn_moe_up-45
+sched-prof:   split 127 CUDA0  nodes= 127 copy=  4488.0 us comp=  1389.0 us  ffn_moe_down-45
+sched-prof:   split 128 CUDA0  nodes=   1 copy=  3225.0 us comp=   421.0 us  ffn_moe_gate-46
+sched-prof:   split 129 CUDA0  nodes=   2 copy=  2800.0 us comp=   286.0 us  ffn_moe_up-46
+sched-prof:   split 130 CUDA0  nodes= 179 copy=  6041.0 us comp=  1419.0 us  ffn_moe_down-46
+sched-prof:   split 131 CUDA0  nodes=   1 copy=  2913.0 us comp=   321.0 us  ffn_moe_gate-47
+sched-prof:   split 132 CUDA0  nodes=   2 copy=  2871.0 us comp=   444.0 us  ffn_moe_up-47
+sched-prof:   split 133 CUDA0  nodes=  54 copy=  5554.0 us comp=  5856.0 us  ffn_moe_down-47
+sched-prof: graph 0 total=629.96 ms splits=134 | CUDA0 n=133 nodes=6908 copy=488.63 comp=140.43 | CPU n=1 nodes=4 copy=0.00 comp=0.83
+llama-bench: benchmark 1/1: generation run 1/2
+sched-prof: graph 1 total=496.70 ms splits=134 | CUDA0 n=133 nodes=6908 copy=361.36 comp=135.22 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 2 total=397.59 ms splits=134 | CUDA0 n=133 nodes=6908 copy=314.33 comp=83.11 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 3 total=410.00 ms splits=134 | CUDA0 n=133 nodes=6908 copy=324.69 comp=85.19 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 4 total=394.87 ms splits=134 | CUDA0 n=133 nodes=6908 copy=324.98 comp=69.79 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 5 total=364.70 ms splits=134 | CUDA0 n=133 nodes=6908 copy=298.13 comp=66.47 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 6 total=297.43 ms splits=134 | CUDA0 n=133 nodes=6908 copy=234.40 comp=62.90 | CPU n=1 nodes=4 copy=0.00 comp=0.10
+sched-prof: graph 7 total=356.03 ms splits=134 | CUDA0 n=133 nodes=6908 copy=290.77 comp=65.13 | CPU n=1 nodes=4 copy=0.00 comp=0.09
+sched-prof: graph 8 total=346.10 ms splits=134 | CUDA0 n=133 nodes=6908 copy=283.39 comp=62.57 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 9 total=308.27 ms splits=134 | CUDA0 n=133 nodes=6908 copy=244.65 comp=63.50 | CPU n=1 nodes=4 copy=0.00 comp=0.09
+sched-prof: graph 10 total=337.70 ms splits=134 | CUDA0 n=133 nodes=6908 copy=274.72 comp=62.87 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 11 total=313.62 ms splits=134 | CUDA0 n=133 nodes=6908 copy=251.09 comp=62.43 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 12 total=318.98 ms splits=134 | CUDA0 n=133 nodes=6908 copy=253.81 comp=65.05 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 13 total=279.77 ms splits=134 | CUDA0 n=133 nodes=6908 copy=216.20 comp=63.45 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 14 total=285.95 ms splits=134 | CUDA0 n=133 nodes=6908 copy=223.28 comp=62.58 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 15 total=274.96 ms splits=134 | CUDA0 n=133 nodes=6908 copy=214.18 comp=60.69 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 16 total=266.23 ms splits=134 | CUDA0 n=133 nodes=6908 copy=203.24 comp=62.90 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 17 total=267.36 ms splits=134 | CUDA0 n=133 nodes=6908 copy=204.25 comp=62.99 | CPU n=1 nodes=4 copy=0.00 comp=0.09
+sched-prof: graph 18 total=288.37 ms splits=134 | CUDA0 n=133 nodes=6908 copy=226.40 comp=61.83 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 19 total=298.52 ms splits=134 | CUDA0 n=133 nodes=6908 copy=235.41 comp=63.01 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=    74.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes=  96 copy=    95.0 us comp=   532.0 us  hc_init
+sched-prof:   split   2 CUDA0  nodes=   1 copy=  1685.0 us comp=   285.0 us  ffn_moe_gate-0
+sched-prof:   split   3 CUDA0  nodes=   2 copy=  1511.0 us comp=   240.0 us  ffn_moe_up-0
+sched-prof:   split   4 CUDA0  nodes= 203 copy=  2562.0 us comp=   774.0 us  ffn_moe_down-0
+sched-prof:   split   5 CUDA0  nodes=   1 copy=  1402.0 us comp=   363.0 us  ffn_moe_gate-1
+sched-prof:   split   6 CUDA0  nodes=   2 copy=  1424.0 us comp=   305.0 us  ffn_moe_up-1
+sched-prof:   split   7 CUDA0  nodes= 127 copy=  2142.0 us comp=   651.0 us  ffn_moe_down-1
+sched-prof:   split   8 CUDA0  nodes=   1 copy=  3228.0 us comp=   301.0 us  ffn_moe_gate-2
+sched-prof:   split   9 CUDA0  nodes=   2 copy=  2950.0 us comp=   202.0 us  ffn_moe_up-2
+sched-prof:   split  10 CUDA0  nodes= 174 copy=  4397.0 us comp=   694.0 us  ffn_moe_down-2
+sched-prof:   split  11 CUDA0  nodes=   1 copy=  1509.0 us comp=   272.0 us  ffn_moe_gate-3
+sched-prof:   split  12 CUDA0  nodes=   2 copy=  1327.0 us comp=   238.0 us  ffn_moe_up-3
+sched-prof:   split  13 CUDA0  nodes= 127 copy=  2549.0 us comp=   688.0 us  ffn_moe_down-3
+sched-prof:   split  14 CUDA0  nodes=   1 copy=  1734.0 us comp=   333.0 us  ffn_moe_gate-4
+sched-prof:   split  15 CUDA0  nodes=   2 copy=  1579.0 us comp=   251.0 us  ffn_moe_up-4
+sched-prof:   split  16 CUDA0  nodes= 127 copy=  3071.0 us comp=   786.0 us  ffn_moe_down-4
+sched-prof:   split  17 CUDA0  nodes=   1 copy=  1925.0 us comp=   344.0 us  ffn_moe_gate-5
+sched-prof:   split  18 CUDA0  nodes=   2 copy=  1831.0 us comp=   254.0 us  ffn_moe_up-5
+sched-prof:   split  19 CUDA0  nodes= 127 copy=  3129.0 us comp=   715.0 us  ffn_moe_down-5
+sched-prof:   split  20 CUDA0  nodes=   1 copy=  1774.0 us comp=   317.0 us  ffn_moe_gate-6
+sched-prof:   split  21 CUDA0  nodes=   2 copy=  1714.0 us comp=   314.0 us  ffn_moe_up-6
+sched-prof:   split  22 CUDA0  nodes= 174 copy=  2931.0 us comp=   692.0 us  ffn_moe_down-6
+sched-prof:   split  23 CUDA0  nodes=   1 copy=  2396.0 us comp=   313.0 us  ffn_moe_gate-7
+sched-prof:   split  24 CUDA0  nodes=   2 copy=  2244.0 us comp=   249.0 us  ffn_moe_up-7
+sched-prof:   split  25 CUDA0  nodes= 127 copy=  2963.0 us comp=   664.0 us  ffn_moe_down-7
+sched-prof:   split  26 CUDA0  nodes=   1 copy=  1381.0 us comp=   344.0 us  ffn_moe_gate-8
+sched-prof:   split  27 CUDA0  nodes=   2 copy=  1313.0 us comp=   232.0 us  ffn_moe_up-8
+sched-prof:   split  28 CUDA0  nodes= 127 copy=  2106.0 us comp=   689.0 us  ffn_moe_down-8
+sched-prof:   split  29 CUDA0  nodes=   1 copy=  1762.0 us comp=   278.0 us  ffn_moe_gate-9
+sched-prof:   split  30 CUDA0  nodes=   2 copy=  1730.0 us comp=   302.0 us  ffn_moe_up-9
+sched-prof:   split  31 CUDA0  nodes= 127 copy=  2804.0 us comp=   711.0 us  ffn_moe_down-9
+sched-prof:   split  32 CUDA0  nodes=   1 copy=  1187.0 us comp=   256.0 us  ffn_moe_gate-10
+sched-prof:   split  33 CUDA0  nodes=   2 copy=  1152.0 us comp=   241.0 us  ffn_moe_up-10
+sched-prof:   split  34 CUDA0  nodes= 174 copy=  2062.0 us comp=   754.0 us  ffn_moe_down-10
+sched-prof:   split  35 CUDA0  nodes=   1 copy=  1527.0 us comp=   257.0 us  ffn_moe_gate-11
+sched-prof:   split  36 CUDA0  nodes=   2 copy=  1490.0 us comp=   240.0 us  ffn_moe_up-11
+sched-prof:   split  37 CUDA0  nodes= 127 copy=  2537.0 us comp=  1164.0 us  ffn_moe_down-11
+sched-prof:   split  38 CUDA0  nodes=   1 copy=  1386.0 us comp=   291.0 us  ffn_moe_gate-12
+sched-prof:   split  39 CUDA0  nodes=   2 copy=  1315.0 us comp=   238.0 us  ffn_moe_up-12
+sched-prof:   split  40 CUDA0  nodes= 127 copy=  1834.0 us comp=   675.0 us  ffn_moe_down-12
+sched-prof:   split  41 CUDA0  nodes=   1 copy=  1208.0 us comp=   256.0 us  ffn_moe_gate-13
+sched-prof:   split  42 CUDA0  nodes=   2 copy=  1312.0 us comp=   342.0 us  ffn_moe_up-13
+sched-prof:   split  43 CUDA0  nodes= 127 copy=  1977.0 us comp=   696.0 us  ffn_moe_down-13
+sched-prof:   split  44 CUDA0  nodes=   1 copy=  1216.0 us comp=   264.0 us  ffn_moe_gate-14
+sched-prof:   split  45 CUDA0  nodes=   2 copy=  1151.0 us comp=   260.0 us  ffn_moe_up-14
+sched-prof:   split  46 CUDA0  nodes= 174 copy=  2105.0 us comp=  1244.0 us  ffn_moe_down-14
+sched-prof:   split  47 CUDA0  nodes=   1 copy=  1214.0 us comp=   253.0 us  ffn_moe_gate-15
+sched-prof:   split  48 CUDA0  nodes=   2 copy=  1154.0 us comp=   242.0 us  ffn_moe_up-15
+sched-prof:   split  49 CUDA0  nodes= 127 copy=  1861.0 us comp=   678.0 us  ffn_moe_down-15
+sched-prof:   split  50 CUDA0  nodes=   1 copy=  1221.0 us comp=   253.0 us  ffn_moe_gate-16
+sched-prof:   split  51 CUDA0  nodes=   2 copy=  1183.0 us comp=   298.0 us  ffn_moe_up-16
+sched-prof:   split  52 CUDA0  nodes= 127 copy=  1888.0 us comp=   705.0 us  ffn_moe_down-16
+sched-prof:   split  53 CUDA0  nodes=   1 copy=  1034.0 us comp=   253.0 us  ffn_moe_gate-17
+sched-prof:   split  54 CUDA0  nodes=   2 copy=  1141.0 us comp=   246.0 us  ffn_moe_up-17
+sched-prof:   split  55 CUDA0  nodes= 127 copy=  1794.0 us comp=   736.0 us  ffn_moe_down-17
+sched-prof:   split  56 CUDA0  nodes=   1 copy=   989.0 us comp=   250.0 us  ffn_moe_gate-18
+sched-prof:   split  57 CUDA0  nodes=   2 copy=   944.0 us comp=   237.0 us  ffn_moe_up-18
+sched-prof:   split  58 CUDA0  nodes= 174 copy=  1582.0 us comp=   654.0 us  ffn_moe_down-18
+sched-prof:   split  59 CUDA0  nodes=   1 copy=  1205.0 us comp=   250.0 us  ffn_moe_gate-19
+sched-prof:   split  60 CUDA0  nodes=   2 copy=  1180.0 us comp=   239.0 us  ffn_moe_up-19
+sched-prof:   split  61 CUDA0  nodes= 127 copy=  1975.0 us comp=   761.0 us  ffn_moe_down-19
+sched-prof:   split  62 CUDA0  nodes=   1 copy=  2258.0 us comp=   274.0 us  ffn_moe_gate-20
+sched-prof:   split  63 CUDA0  nodes=   2 copy=  2119.0 us comp=   304.0 us  ffn_moe_up-20
+sched-prof:   split  64 CUDA0  nodes= 127 copy=  3186.0 us comp=   765.0 us  ffn_moe_down-20
+sched-prof:   split  65 CUDA0  nodes=   1 copy=  1405.0 us comp=   259.0 us  ffn_moe_gate-21
+sched-prof:   split  66 CUDA0  nodes=   2 copy=  1396.0 us comp=   241.0 us  ffn_moe_up-21
+sched-prof:   split  67 CUDA0  nodes= 127 copy=  2514.0 us comp=   776.0 us  ffn_moe_down-21
+sched-prof:   split  68 CUDA0  nodes=   1 copy=  1851.0 us comp=   318.0 us  ffn_moe_gate-22
+sched-prof:   split  69 CUDA0  nodes=   2 copy=  1585.0 us comp=   253.0 us  ffn_moe_up-22
+sched-prof:   split  70 CUDA0  nodes= 174 copy=  2460.0 us comp=  1095.0 us  ffn_moe_down-22
+sched-prof:   split  71 CUDA0  nodes=   1 copy=  1418.0 us comp=   264.0 us  ffn_moe_gate-23
+sched-prof:   split  72 CUDA0  nodes=   2 copy=  1330.0 us comp=   238.0 us  ffn_moe_up-23
+sched-prof:   split  73 CUDA0  nodes= 127 copy=  2152.0 us comp=   680.0 us  ffn_moe_down-23
+sched-prof:   split  74 CUDA0  nodes=   1 copy=  1283.0 us comp=   397.0 us  ffn_moe_gate-24
+sched-prof:   split  75 CUDA0  nodes=   2 copy=  1211.0 us comp=   407.0 us  ffn_moe_up-24
+sched-prof:   split  76 CUDA0  nodes= 127 copy=  2126.0 us comp=   739.0 us  ffn_moe_down-24
+sched-prof:   split  77 CUDA0  nodes=   1 copy=  1777.0 us comp=   273.0 us  ffn_moe_gate-25
+sched-prof:   split  78 CUDA0  nodes=   2 copy=  1863.0 us comp=   341.0 us  ffn_moe_up-25
+sched-prof:   split  79 CUDA0  nodes= 127 copy=  2353.0 us comp=   663.0 us  ffn_moe_down-25
+sched-prof:   split  80 CUDA0  nodes=   1 copy=  1566.0 us comp=   257.0 us  ffn_moe_gate-26
+sched-prof:   split  81 CUDA0  nodes=   2 copy=  1553.0 us comp=   233.0 us  ffn_moe_up-26
+sched-prof:   split  82 CUDA0  nodes= 174 copy=  2790.0 us comp=   739.0 us  ffn_moe_down-26
+sched-prof:   split  83 CUDA0  nodes=   1 copy=  1218.0 us comp=   264.0 us  ffn_moe_gate-27
+sched-prof:   split  84 CUDA0  nodes=   2 copy=  1215.0 us comp=   242.0 us  ffn_moe_up-27
+sched-prof:   split  85 CUDA0  nodes= 694 copy=  1978.0 us comp=  3767.0 us  ffn_moe_down-27
+sched-prof:   split  86 CUDA0  nodes=   1 copy=  1324.0 us comp=   274.0 us  ffn_moe_gate-32
+sched-prof:   split  87 CUDA0  nodes=   2 copy=  1195.0 us comp=   260.0 us  ffn_moe_up-32
+sched-prof:   split  88 CUDA0  nodes= 127 copy=  2249.0 us comp=   734.0 us  ffn_moe_down-32
+sched-prof:   split  89 CUDA0  nodes=   1 copy=  1291.0 us comp=   313.0 us  ffn_moe_gate-33
+sched-prof:   split  90 CUDA0  nodes=   2 copy=  1178.0 us comp=   256.0 us  ffn_moe_up-33
+sched-prof:   split  91 CUDA0  nodes= 127 copy=  2019.0 us comp=   673.0 us  ffn_moe_down-33
+sched-prof:   split  92 CUDA0  nodes=   1 copy=  1255.0 us comp=   363.0 us  ffn_moe_gate-34
+sched-prof:   split  93 CUDA0  nodes=   2 copy=  1255.0 us comp=   309.0 us  ffn_moe_up-34
+sched-prof:   split  94 CUDA0  nodes= 174 copy=  1864.0 us comp=   641.0 us  ffn_moe_down-34
+sched-prof:   split  95 CUDA0  nodes=   1 copy=  1154.0 us comp=   247.0 us  ffn_moe_gate-35
+sched-prof:   split  96 CUDA0  nodes=   2 copy=  1195.0 us comp=   249.0 us  ffn_moe_up-35
+sched-prof:   split  97 CUDA0  nodes= 127 copy=  2263.0 us comp=   755.0 us  ffn_moe_down-35
+sched-prof:   split  98 CUDA0  nodes=   1 copy=  1575.0 us comp=   258.0 us  ffn_moe_gate-36
+sched-prof:   split  99 CUDA0  nodes=   2 copy=  1537.0 us comp=   244.0 us  ffn_moe_up-36
+sched-prof:   split 100 CUDA0  nodes= 127 copy=  2544.0 us comp=  1225.0 us  ffn_moe_down-36
+sched-prof:   split 101 CUDA0  nodes=   1 copy=  1239.0 us comp=   269.0 us  ffn_moe_gate-37
+sched-prof:   split 102 CUDA0  nodes=   2 copy=  1188.0 us comp=   243.0 us  ffn_moe_up-37
+sched-prof:   split 103 CUDA0  nodes= 127 copy=  2149.0 us comp=   717.0 us  ffn_moe_down-37
+sched-prof:   split 104 CUDA0  nodes=   1 copy=  1418.0 us comp=   291.0 us  ffn_moe_gate-38
+sched-prof:   split 105 CUDA0  nodes=   2 copy=  1460.0 us comp=   318.0 us  ffn_moe_up-38
+sched-prof:   split 106 CUDA0  nodes= 174 copy=  2237.0 us comp=   643.0 us  ffn_moe_down-38
+sched-prof:   split 107 CUDA0  nodes=   1 copy=  1982.0 us comp=   272.0 us  ffn_moe_gate-39
+sched-prof:   split 108 CUDA0  nodes=   2 copy=  1952.0 us comp=   324.0 us  ffn_moe_up-39
+sched-prof:   split 109 CUDA0  nodes= 127 copy=  2991.0 us comp=   720.0 us  ffn_moe_down-39
+sched-prof:   split 110 CUDA0  nodes=   1 copy=  1468.0 us comp=   257.0 us  ffn_moe_gate-40
+sched-prof:   split 111 CUDA0  nodes=   2 copy=  1348.0 us comp=   220.0 us  ffn_moe_up-40
+sched-prof:   split 112 CUDA0  nodes= 127 copy=  2313.0 us comp=   761.0 us  ffn_moe_down-40
+sched-prof:   split 113 CUDA0  nodes=   1 copy=  1369.0 us comp=   247.0 us  ffn_moe_gate-41
+sched-prof:   split 114 CUDA0  nodes=   2 copy=  1411.0 us comp=   251.0 us  ffn_moe_up-41
+sched-prof:   split 115 CUDA0  nodes= 127 copy=  2240.0 us comp=  1236.0 us  ffn_moe_down-41
+sched-prof:   split 116 CUDA0  nodes=   1 copy=  1085.0 us comp=   254.0 us  ffn_moe_gate-42
+sched-prof:   split 117 CUDA0  nodes=   2 copy=  1019.0 us comp=   231.0 us  ffn_moe_up-42
+sched-prof:   split 118 CUDA0  nodes= 174 copy=  1793.0 us comp=   606.0 us  ffn_moe_down-42
+sched-prof:   split 119 CUDA0  nodes=   1 copy=  1023.0 us comp=   272.0 us  ffn_moe_gate-43
+sched-prof:   split 120 CUDA0  nodes=   2 copy=   941.0 us comp=   239.0 us  ffn_moe_up-43
+sched-prof:   split 121 CUDA0  nodes= 127 copy=  1698.0 us comp=   758.0 us  ffn_moe_down-43
+sched-prof:   split 122 CUDA0  nodes=   1 copy=  1173.0 us comp=   262.0 us  ffn_moe_gate-44
+sched-prof:   split 123 CUDA0  nodes=   2 copy=  1261.0 us comp=   232.0 us  ffn_moe_up-44
+sched-prof:   split 124 CUDA0  nodes= 127 copy=  1946.0 us comp=   677.0 us  ffn_moe_down-44
+sched-prof:   split 125 CUDA0  nodes=   1 copy=  1481.0 us comp=   300.0 us  ffn_moe_gate-45
+sched-prof:   split 126 CUDA0  nodes=   2 copy=  1513.0 us comp=   231.0 us  ffn_moe_up-45
+sched-prof:   split 127 CUDA0  nodes= 127 copy=  2091.0 us comp=   662.0 us  ffn_moe_down-45
+sched-prof:   split 128 CUDA0  nodes=   1 copy=  1174.0 us comp=   249.0 us  ffn_moe_gate-46
+sched-prof:   split 129 CUDA0  nodes=   2 copy=  1178.0 us comp=   420.0 us  ffn_moe_up-46
+sched-prof:   split 130 CUDA0  nodes= 179 copy=  2590.0 us comp=   639.0 us  ffn_moe_down-46
+sched-prof:   split 131 CUDA0  nodes=   1 copy=  1259.0 us comp=   247.0 us  ffn_moe_gate-47
+sched-prof:   split 132 CUDA0  nodes=   2 copy=  1235.0 us comp=   243.0 us  ffn_moe_up-47
+sched-prof:   split 133 CUDA0  nodes=  54 copy=  2726.0 us comp=  2974.0 us  ffn_moe_down-47
+sched-prof: graph 20 total=295.01 ms splits=134 | CUDA0 n=133 nodes=6908 copy=231.45 comp=63.42 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 21 total=280.34 ms splits=134 | CUDA0 n=133 nodes=6908 copy=216.12 comp=64.13 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 22 total=315.19 ms splits=134 | CUDA0 n=133 nodes=6908 copy=251.69 comp=63.39 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 23 total=263.17 ms splits=134 | CUDA0 n=133 nodes=6908 copy=201.53 comp=61.53 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 24 total=329.93 ms splits=134 | CUDA0 n=133 nodes=6908 copy=264.25 comp=65.54 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 25 total=276.51 ms splits=134 | CUDA0 n=133 nodes=6908 copy=214.93 comp=61.49 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 26 total=285.59 ms splits=134 | CUDA0 n=133 nodes=6908 copy=223.04 comp=62.38 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 27 total=277.04 ms splits=134 | CUDA0 n=133 nodes=6908 copy=213.79 comp=63.15 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 28 total=278.91 ms splits=134 | CUDA0 n=133 nodes=6908 copy=215.41 comp=63.37 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 29 total=262.85 ms splits=134 | CUDA0 n=133 nodes=6908 copy=200.29 comp=62.47 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 30 total=259.30 ms splits=134 | CUDA0 n=133 nodes=6908 copy=196.44 comp=62.72 | CPU n=1 nodes=4 copy=0.00 comp=0.09
+sched-prof: graph 31 total=248.41 ms splits=134 | CUDA0 n=133 nodes=6908 copy=185.86 comp=62.46 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 32 total=249.17 ms splits=134 | CUDA0 n=133 nodes=6908 copy=187.41 comp=61.66 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+llama-bench: benchmark 1/1: generation run 2/2
+sched-prof: graph 33 total=338.20 ms splits=134 | CUDA0 n=133 nodes=6908 copy=262.16 comp=73.97 | CPU n=1 nodes=4 copy=0.00 comp=2.03
+sched-prof: graph 34 total=349.86 ms splits=134 | CUDA0 n=133 nodes=6908 copy=277.68 comp=70.91 | CPU n=1 nodes=4 copy=0.00 comp=1.25
+sched-prof: graph 35 total=340.14 ms splits=134 | CUDA0 n=133 nodes=6908 copy=267.28 comp=72.76 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 36 total=285.98 ms splits=134 | CUDA0 n=133 nodes=6908 copy=224.16 comp=61.72 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 37 total=329.15 ms splits=134 | CUDA0 n=133 nodes=6908 copy=264.24 comp=64.79 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 38 total=343.68 ms splits=134 | CUDA0 n=133 nodes=6908 copy=279.17 comp=64.39 | CPU n=1 nodes=4 copy=0.00 comp=0.10
+sched-prof: graph 39 total=263.77 ms splits=134 | CUDA0 n=133 nodes=6908 copy=201.89 comp=61.79 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=    71.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes=  96 copy=    73.0 us comp=   447.0 us  hc_init
+sched-prof:   split   2 CUDA0  nodes=   1 copy=  1204.0 us comp=   276.0 us  ffn_moe_gate-0
+sched-prof:   split   3 CUDA0  nodes=   2 copy=  1185.0 us comp=   239.0 us  ffn_moe_up-0
+sched-prof:   split   4 CUDA0  nodes= 203 copy=  2458.0 us comp=   873.0 us  ffn_moe_down-0
+sched-prof:   split   5 CUDA0  nodes=   1 copy=  1157.0 us comp=   243.0 us  ffn_moe_gate-1
+sched-prof:   split   6 CUDA0  nodes=   2 copy=  1197.0 us comp=   229.0 us  ffn_moe_up-1
+sched-prof:   split   7 CUDA0  nodes= 127 copy=  1823.0 us comp=   620.0 us  ffn_moe_down-1
+sched-prof:   split   8 CUDA0  nodes=   1 copy=  1873.0 us comp=   275.0 us  ffn_moe_gate-2
+sched-prof:   split   9 CUDA0  nodes=   2 copy=  1904.0 us comp=   188.0 us  ffn_moe_up-2
+sched-prof:   split  10 CUDA0  nodes= 174 copy=  2917.0 us comp=   578.0 us  ffn_moe_down-2
+sched-prof:   split  11 CUDA0  nodes=   1 copy=  1462.0 us comp=   284.0 us  ffn_moe_gate-3
+sched-prof:   split  12 CUDA0  nodes=   2 copy=  1249.0 us comp=   320.0 us  ffn_moe_up-3
+sched-prof:   split  13 CUDA0  nodes= 127 copy=  2049.0 us comp=   646.0 us  ffn_moe_down-3
+sched-prof:   split  14 CUDA0  nodes=   1 copy=  1471.0 us comp=   247.0 us  ffn_moe_gate-4
+sched-prof:   split  15 CUDA0  nodes=   2 copy=  1479.0 us comp=   263.0 us  ffn_moe_up-4
+sched-prof:   split  16 CUDA0  nodes= 127 copy=  3071.0 us comp=   818.0 us  ffn_moe_down-4
+sched-prof:   split  17 CUDA0  nodes=   1 copy=  1179.0 us comp=   252.0 us  ffn_moe_gate-5
+sched-prof:   split  18 CUDA0  nodes=   2 copy=  1446.0 us comp=   254.0 us  ffn_moe_up-5
+sched-prof:   split  19 CUDA0  nodes= 127 copy=  1949.0 us comp=  1256.0 us  ffn_moe_down-5
+sched-prof:   split  20 CUDA0  nodes=   1 copy=   995.0 us comp=   266.0 us  ffn_moe_gate-6
+sched-prof:   split  21 CUDA0  nodes=   2 copy=   948.0 us comp=   229.0 us  ffn_moe_up-6
+sched-prof:   split  22 CUDA0  nodes= 174 copy=  1616.0 us comp=   655.0 us  ffn_moe_down-6
+sched-prof:   split  23 CUDA0  nodes=   1 copy=  1013.0 us comp=   255.0 us  ffn_moe_gate-7
+sched-prof:   split  24 CUDA0  nodes=   2 copy=   949.0 us comp=   250.0 us  ffn_moe_up-7
+sched-prof:   split  25 CUDA0  nodes= 127 copy=  1772.0 us comp=   710.0 us  ffn_moe_down-7
+sched-prof:   split  26 CUDA0  nodes=   1 copy=  1248.0 us comp=   256.0 us  ffn_moe_gate-8
+sched-prof:   split  27 CUDA0  nodes=   2 copy=  1417.0 us comp=   268.0 us  ffn_moe_up-8
+sched-prof:   split  28 CUDA0  nodes= 127 copy=  1875.0 us comp=   671.0 us  ffn_moe_down-8
+sched-prof:   split  29 CUDA0  nodes=   1 copy=  1081.0 us comp=   309.0 us  ffn_moe_gate-9
+sched-prof:   split  30 CUDA0  nodes=   2 copy=   968.0 us comp=   232.0 us  ffn_moe_up-9
+sched-prof:   split  31 CUDA0  nodes= 127 copy=  1634.0 us comp=   728.0 us  ffn_moe_down-9
+sched-prof:   split  32 CUDA0  nodes=   1 copy=  1345.0 us comp=   250.0 us  ffn_moe_gate-10
+sched-prof:   split  33 CUDA0  nodes=   2 copy=  1351.0 us comp=   252.0 us  ffn_moe_up-10
+sched-prof:   split  34 CUDA0  nodes= 174 copy=  2395.0 us comp=   688.0 us  ffn_moe_down-10
+sched-prof:   split  35 CUDA0  nodes=   1 copy=  1307.0 us comp=   286.0 us  ffn_moe_gate-11
+sched-prof:   split  36 CUDA0  nodes=   2 copy=  1009.0 us comp=   268.0 us  ffn_moe_up-11
+sched-prof:   split  37 CUDA0  nodes= 127 copy=  1793.0 us comp=   681.0 us  ffn_moe_down-11
+sched-prof:   split  38 CUDA0  nodes=   1 copy=  1734.0 us comp=   372.0 us  ffn_moe_gate-12
+sched-prof:   split  39 CUDA0  nodes=   2 copy=  1828.0 us comp=   276.0 us  ffn_moe_up-12
+sched-prof:   split  40 CUDA0  nodes= 127 copy=  2675.0 us comp=   734.0 us  ffn_moe_down-12
+sched-prof:   split  41 CUDA0  nodes=   1 copy=  1308.0 us comp=   295.0 us  ffn_moe_gate-13
+sched-prof:   split  42 CUDA0  nodes=   2 copy=  1238.0 us comp=   318.0 us  ffn_moe_up-13
+sched-prof:   split  43 CUDA0  nodes= 127 copy=  1707.0 us comp=   735.0 us  ffn_moe_down-13
+sched-prof:   split  44 CUDA0  nodes=   1 copy=  1727.0 us comp=   291.0 us  ffn_moe_gate-14
+sched-prof:   split  45 CUDA0  nodes=   2 copy=  1689.0 us comp=   272.0 us  ffn_moe_up-14
+sched-prof:   split  46 CUDA0  nodes= 174 copy=  2549.0 us comp=   761.0 us  ffn_moe_down-14
+sched-prof:   split  47 CUDA0  nodes=   1 copy=  1189.0 us comp=   261.0 us  ffn_moe_gate-15
+sched-prof:   split  48 CUDA0  nodes=   2 copy=  1123.0 us comp=   236.0 us  ffn_moe_up-15
+sched-prof:   split  49 CUDA0  nodes= 127 copy=  1967.0 us comp=  1094.0 us  ffn_moe_down-15
+sched-prof:   split  50 CUDA0  nodes=   1 copy=  1376.0 us comp=   274.0 us  ffn_moe_gate-16
+sched-prof:   split  51 CUDA0  nodes=   2 copy=  1449.0 us comp=   238.0 us  ffn_moe_up-16
+sched-prof:   split  52 CUDA0  nodes= 127 copy=  2152.0 us comp=   678.0 us  ffn_moe_down-16
+sched-prof:   split  53 CUDA0  nodes=   1 copy=  1887.0 us comp=   347.0 us  ffn_moe_gate-17
+sched-prof:   split  54 CUDA0  nodes=   2 copy=  1620.0 us comp=   262.0 us  ffn_moe_up-17
+sched-prof:   split  55 CUDA0  nodes= 127 copy=  2504.0 us comp=   718.0 us  ffn_moe_down-17
+sched-prof:   split  56 CUDA0  nodes=   1 copy=  1682.0 us comp=   323.0 us  ffn_moe_gate-18
+sched-prof:   split  57 CUDA0  nodes=   2 copy=  1507.0 us comp=   284.0 us  ffn_moe_up-18
+sched-prof:   split  58 CUDA0  nodes= 174 copy=  2198.0 us comp=   632.0 us  ffn_moe_down-18
+sched-prof:   split  59 CUDA0  nodes=   1 copy=  1183.0 us comp=   259.0 us  ffn_moe_gate-19
+sched-prof:   split  60 CUDA0  nodes=   2 copy=  1280.0 us comp=   257.0 us  ffn_moe_up-19
+sched-prof:   split  61 CUDA0  nodes= 127 copy=  1939.0 us comp=   823.0 us  ffn_moe_down-19
+sched-prof:   split  62 CUDA0  nodes=   1 copy=  1513.0 us comp=   340.0 us  ffn_moe_gate-20
+sched-prof:   split  63 CUDA0  nodes=   2 copy=  1564.0 us comp=   283.0 us  ffn_moe_up-20
+sched-prof:   split  64 CUDA0  nodes= 127 copy=  2674.0 us comp=   998.0 us  ffn_moe_down-20
+sched-prof:   split  65 CUDA0  nodes=   1 copy=  1559.0 us comp=   356.0 us  ffn_moe_gate-21
+sched-prof:   split  66 CUDA0  nodes=   2 copy=  1201.0 us comp=   257.0 us  ffn_moe_up-21
+sched-prof:   split  67 CUDA0  nodes= 127 copy=  2183.0 us comp=   735.0 us  ffn_moe_down-21
+sched-prof:   split  68 CUDA0  nodes=   1 copy=  1102.0 us comp=   276.0 us  ffn_moe_gate-22
+sched-prof:   split  69 CUDA0  nodes=   2 copy=  1159.0 us comp=   266.0 us  ffn_moe_up-22
+sched-prof:   split  70 CUDA0  nodes= 174 copy=  2146.0 us comp=   764.0 us  ffn_moe_down-22
+sched-prof:   split  71 CUDA0  nodes=   1 copy=  1611.0 us comp=   284.0 us  ffn_moe_gate-23
+sched-prof:   split  72 CUDA0  nodes=   2 copy=  1431.0 us comp=   266.0 us  ffn_moe_up-23
+sched-prof:   split  73 CUDA0  nodes= 127 copy=  2549.0 us comp=   693.0 us  ffn_moe_down-23
+sched-prof:   split  74 CUDA0  nodes=   1 copy=  1489.0 us comp=   269.0 us  ffn_moe_gate-24
+sched-prof:   split  75 CUDA0  nodes=   2 copy=  1477.0 us comp=   272.0 us  ffn_moe_up-24
+sched-prof:   split  76 CUDA0  nodes= 127 copy=  2325.0 us comp=  1178.0 us  ffn_moe_down-24
+sched-prof:   split  77 CUDA0  nodes=   1 copy=  1908.0 us comp=   338.0 us  ffn_moe_gate-25
+sched-prof:   split  78 CUDA0  nodes=   2 copy=  1450.0 us comp=   257.0 us  ffn_moe_up-25
+sched-prof:   split  79 CUDA0  nodes= 127 copy=  2704.0 us comp=  1092.0 us  ffn_moe_down-25
+sched-prof:   split  80 CUDA0  nodes=   1 copy=  1381.0 us comp=   286.0 us  ffn_moe_gate-26
+sched-prof:   split  81 CUDA0  nodes=   2 copy=  1242.0 us comp=   249.0 us  ffn_moe_up-26
+sched-prof:   split  82 CUDA0  nodes= 174 copy=  1969.0 us comp=   704.0 us  ffn_moe_down-26
+sched-prof:   split  83 CUDA0  nodes=   1 copy=  1053.0 us comp=   284.0 us  ffn_moe_gate-27
+sched-prof:   split  84 CUDA0  nodes=   2 copy=  1313.0 us comp=   361.0 us  ffn_moe_up-27
+sched-prof:   split  85 CUDA0  nodes= 694 copy=  1638.0 us comp=  3066.0 us  ffn_moe_down-27
+sched-prof:   split  86 CUDA0  nodes=   1 copy=  1182.0 us comp=   264.0 us  ffn_moe_gate-32
+sched-prof:   split  87 CUDA0  nodes=   2 copy=  1264.0 us comp=   318.0 us  ffn_moe_up-32
+sched-prof:   split  88 CUDA0  nodes= 127 copy=  1896.0 us comp=   712.0 us  ffn_moe_down-32
+sched-prof:   split  89 CUDA0  nodes=   1 copy=  1116.0 us comp=   260.0 us  ffn_moe_gate-33
+sched-prof:   split  90 CUDA0  nodes=   2 copy=   983.0 us comp=   233.0 us  ffn_moe_up-33
+sched-prof:   split  91 CUDA0  nodes= 127 copy=  2087.0 us comp=  1180.0 us  ffn_moe_down-33
+sched-prof:   split  92 CUDA0  nodes=   1 copy=  1250.0 us comp=   259.0 us  ffn_moe_gate-34
+sched-prof:   split  93 CUDA0  nodes=   2 copy=  1192.0 us comp=   234.0 us  ffn_moe_up-34
+sched-prof:   split  94 CUDA0  nodes= 174 copy=  1823.0 us comp=   645.0 us  ffn_moe_down-34
+sched-prof:   split  95 CUDA0  nodes=   1 copy=   980.0 us comp=   238.0 us  ffn_moe_gate-35
+sched-prof:   split  96 CUDA0  nodes=   2 copy=  1017.0 us comp=   328.0 us  ffn_moe_up-35
+sched-prof:   split  97 CUDA0  nodes= 127 copy=  1684.0 us comp=   663.0 us  ffn_moe_down-35
+sched-prof:   split  98 CUDA0  nodes=   1 copy=  1079.0 us comp=   261.0 us  ffn_moe_gate-36
+sched-prof:   split  99 CUDA0  nodes=   2 copy=  1005.0 us comp=   240.0 us  ffn_moe_up-36
+sched-prof:   split 100 CUDA0  nodes= 127 copy=  2102.0 us comp=   837.0 us  ffn_moe_down-36
+sched-prof:   split 101 CUDA0  nodes=   1 copy=  1054.0 us comp=   298.0 us  ffn_moe_gate-37
+sched-prof:   split 102 CUDA0  nodes=   2 copy=   972.0 us comp=   231.0 us  ffn_moe_up-37
+sched-prof:   split 103 CUDA0  nodes= 127 copy=  1687.0 us comp=   723.0 us  ffn_moe_down-37
+sched-prof:   split 104 CUDA0  nodes=   1 copy=  1048.0 us comp=   272.0 us  ffn_moe_gate-38
+sched-prof:   split 105 CUDA0  nodes=   2 copy=  1019.0 us comp=   293.0 us  ffn_moe_up-38
+sched-prof:   split 106 CUDA0  nodes= 174 copy=  1874.0 us comp=   733.0 us  ffn_moe_down-38
+sched-prof:   split 107 CUDA0  nodes=   1 copy=  1430.0 us comp=   258.0 us  ffn_moe_gate-39
+sched-prof:   split 108 CUDA0  nodes=   2 copy=  1497.0 us comp=   272.0 us  ffn_moe_up-39
+sched-prof:   split 109 CUDA0  nodes= 127 copy=  2316.0 us comp=  1220.0 us  ffn_moe_down-39
+sched-prof:   split 110 CUDA0  nodes=   1 copy=  1401.0 us comp=   267.0 us  ffn_moe_gate-40
+sched-prof:   split 111 CUDA0  nodes=   2 copy=  1352.0 us comp=   230.0 us  ffn_moe_up-40
+sched-prof:   split 112 CUDA0  nodes= 127 copy=  2133.0 us comp=   632.0 us  ffn_moe_down-40
+sched-prof:   split 113 CUDA0  nodes=   1 copy=  1550.0 us comp=   398.0 us  ffn_moe_gate-41
+sched-prof:   split 114 CUDA0  nodes=   2 copy=  1731.0 us comp=   299.0 us  ffn_moe_up-41
+sched-prof:   split 115 CUDA0  nodes= 127 copy=  2704.0 us comp=   719.0 us  ffn_moe_down-41
+sched-prof:   split 116 CUDA0  nodes=   1 copy=  1268.0 us comp=   258.0 us  ffn_moe_gate-42
+sched-prof:   split 117 CUDA0  nodes=   2 copy=  1297.0 us comp=   334.0 us  ffn_moe_up-42
+sched-prof:   split 118 CUDA0  nodes= 174 copy=  1945.0 us comp=   700.0 us  ffn_moe_down-42
+sched-prof:   split 119 CUDA0  nodes=   1 copy=  1146.0 us comp=   252.0 us  ffn_moe_gate-43
+sched-prof:   split 120 CUDA0  nodes=   2 copy=  1147.0 us comp=   223.0 us  ffn_moe_up-43
+sched-prof:   split 121 CUDA0  nodes= 127 copy=  1855.0 us comp=   946.0 us  ffn_moe_down-43
+sched-prof:   split 122 CUDA0  nodes=   1 copy=  1397.0 us comp=   315.0 us  ffn_moe_gate-44
+sched-prof:   split 123 CUDA0  nodes=   2 copy=  1724.0 us comp=   257.0 us  ffn_moe_up-44
+sched-prof:   split 124 CUDA0  nodes= 127 copy=  2251.0 us comp=   709.0 us  ffn_moe_down-44
+sched-prof:   split 125 CUDA0  nodes=   1 copy=  1098.0 us comp=   372.0 us  ffn_moe_gate-45
+sched-prof:   split 126 CUDA0  nodes=   2 copy=   996.0 us comp=   237.0 us  ffn_moe_up-45
+sched-prof:   split 127 CUDA0  nodes= 127 copy=  1632.0 us comp=   663.0 us  ffn_moe_down-45
+sched-prof:   split 128 CUDA0  nodes=   1 copy=  1062.0 us comp=   253.0 us  ffn_moe_gate-46
+sched-prof:   split 129 CUDA0  nodes=   2 copy=  1105.0 us comp=   236.0 us  ffn_moe_up-46
+sched-prof:   split 130 CUDA0  nodes= 179 copy=  2203.0 us comp=   706.0 us  ffn_moe_down-46
+sched-prof:   split 131 CUDA0  nodes=   1 copy=  1512.0 us comp=   254.0 us  ffn_moe_gate-47
+sched-prof:   split 132 CUDA0  nodes=   2 copy=  1188.0 us comp=   226.0 us  ffn_moe_up-47
+sched-prof:   split 133 CUDA0  nodes=  54 copy=  2337.0 us comp=  3643.0 us  ffn_moe_down-47
+sched-prof: graph 40 total=274.02 ms splits=134 | CUDA0 n=133 nodes=6908 copy=209.60 comp=64.28 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 41 total=263.20 ms splits=134 | CUDA0 n=133 nodes=6908 copy=200.21 comp=62.89 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 42 total=279.73 ms splits=134 | CUDA0 n=133 nodes=6908 copy=216.12 comp=63.51 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 43 total=250.38 ms splits=134 | CUDA0 n=133 nodes=6908 copy=189.28 comp=61.01 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 44 total=259.71 ms splits=134 | CUDA0 n=133 nodes=6908 copy=196.34 comp=63.25 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 45 total=245.19 ms splits=134 | CUDA0 n=133 nodes=6908 copy=182.63 comp=62.46 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 46 total=262.75 ms splits=134 | CUDA0 n=133 nodes=6908 copy=200.31 comp=62.27 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 47 total=263.83 ms splits=134 | CUDA0 n=133 nodes=6908 copy=200.60 comp=63.07 | CPU n=1 nodes=4 copy=0.00 comp=0.09
+sched-prof: graph 48 total=265.75 ms splits=134 | CUDA0 n=133 nodes=6908 copy=201.67 comp=63.95 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 49 total=260.27 ms splits=134 | CUDA0 n=133 nodes=6908 copy=197.86 comp=62.32 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 50 total=255.80 ms splits=134 | CUDA0 n=133 nodes=6908 copy=194.38 comp=61.31 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 51 total=261.07 ms splits=134 | CUDA0 n=133 nodes=6908 copy=199.18 comp=61.76 | CPU n=1 nodes=4 copy=0.00 comp=0.09
+sched-prof: graph 52 total=260.25 ms splits=134 | CUDA0 n=133 nodes=6908 copy=196.28 comp=63.87 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 53 total=246.81 ms splits=134 | CUDA0 n=133 nodes=6908 copy=186.53 comp=60.19 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 54 total=235.19 ms splits=134 | CUDA0 n=133 nodes=6908 copy=172.99 comp=62.10 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 55 total=245.62 ms splits=134 | CUDA0 n=133 nodes=6908 copy=183.65 comp=61.80 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 56 total=257.87 ms splits=134 | CUDA0 n=133 nodes=6908 copy=194.54 comp=63.23 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 57 total=247.33 ms splits=134 | CUDA0 n=133 nodes=6908 copy=184.83 comp=62.40 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 58 total=235.24 ms splits=134 | CUDA0 n=133 nodes=6908 copy=174.09 comp=61.06 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 59 total=254.06 ms splits=134 | CUDA0 n=133 nodes=6908 copy=194.00 comp=59.94 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=    73.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes=  96 copy=   167.0 us comp=   528.0 us  hc_init
+sched-prof:   split   2 CUDA0  nodes=   1 copy=  1329.0 us comp=   269.0 us  ffn_moe_gate-0
+sched-prof:   split   3 CUDA0  nodes=   2 copy=  1438.0 us comp=   254.0 us  ffn_moe_up-0
+sched-prof:   split   4 CUDA0  nodes= 203 copy=  2063.0 us comp=   771.0 us  ffn_moe_down-0
+sched-prof:   split   5 CUDA0  nodes=   1 copy=  1379.0 us comp=   324.0 us  ffn_moe_gate-1
+sched-prof:   split   6 CUDA0  nodes=   2 copy=  1326.0 us comp=   240.0 us  ffn_moe_up-1
+sched-prof:   split   7 CUDA0  nodes= 127 copy=  2088.0 us comp=   724.0 us  ffn_moe_down-1
+sched-prof:   split   8 CUDA0  nodes=   1 copy=  1746.0 us comp=   183.0 us  ffn_moe_gate-2
+sched-prof:   split   9 CUDA0  nodes=   2 copy=  1802.0 us comp=   375.0 us  ffn_moe_up-2
+sched-prof:   split  10 CUDA0  nodes= 174 copy=  2999.0 us comp=   574.0 us  ffn_moe_down-2
+sched-prof:   split  11 CUDA0  nodes=   1 copy=  1144.0 us comp=   265.0 us  ffn_moe_gate-3
+sched-prof:   split  12 CUDA0  nodes=   2 copy=  1050.0 us comp=   240.0 us  ffn_moe_up-3
+sched-prof:   split  13 CUDA0  nodes= 127 copy=  1859.0 us comp=   761.0 us  ffn_moe_down-3
+sched-prof:   split  14 CUDA0  nodes=   1 copy=  1190.0 us comp=   251.0 us  ffn_moe_gate-4
+sched-prof:   split  15 CUDA0  nodes=   2 copy=  1147.0 us comp=   246.0 us  ffn_moe_up-4
+sched-prof:   split  16 CUDA0  nodes= 127 copy=  2423.0 us comp=   742.0 us  ffn_moe_down-4
+sched-prof:   split  17 CUDA0  nodes=   1 copy=  1287.0 us comp=   360.0 us  ffn_moe_gate-5
+sched-prof:   split  18 CUDA0  nodes=   2 copy=  1297.0 us comp=   310.0 us  ffn_moe_up-5
+sched-prof:   split  19 CUDA0  nodes= 127 copy=  1870.0 us comp=   724.0 us  ffn_moe_down-5
+sched-prof:   split  20 CUDA0  nodes=   1 copy=  1201.0 us comp=   256.0 us  ffn_moe_gate-6
+sched-prof:   split  21 CUDA0  nodes=   2 copy=  1165.0 us comp=   395.0 us  ffn_moe_up-6
+sched-prof:   split  22 CUDA0  nodes= 174 copy=  1934.0 us comp=   750.0 us  ffn_moe_down-6
+sched-prof:   split  23 CUDA0  nodes=   1 copy=   976.0 us comp=   245.0 us  ffn_moe_gate-7
+sched-prof:   split  24 CUDA0  nodes=   2 copy=   940.0 us comp=   228.0 us  ffn_moe_up-7
+sched-prof:   split  25 CUDA0  nodes= 127 copy=  1562.0 us comp=   668.0 us  ffn_moe_down-7
+sched-prof:   split  26 CUDA0  nodes=   1 copy=  1006.0 us comp=   263.0 us  ffn_moe_gate-8
+sched-prof:   split  27 CUDA0  nodes=   2 copy=  1233.0 us comp=   329.0 us  ffn_moe_up-8
+sched-prof:   split  28 CUDA0  nodes= 127 copy=  1715.0 us comp=   660.0 us  ffn_moe_down-8
+sched-prof:   split  29 CUDA0  nodes=   1 copy=  1347.0 us comp=   262.0 us  ffn_moe_gate-9
+sched-prof:   split  30 CUDA0  nodes=   2 copy=  1315.0 us comp=   247.0 us  ffn_moe_up-9
+sched-prof:   split  31 CUDA0  nodes= 127 copy=  2193.0 us comp=   757.0 us  ffn_moe_down-9
+sched-prof:   split  32 CUDA0  nodes=   1 copy=   981.0 us comp=   240.0 us  ffn_moe_gate-10
+sched-prof:   split  33 CUDA0  nodes=   2 copy=   945.0 us comp=   237.0 us  ffn_moe_up-10
+sched-prof:   split  34 CUDA0  nodes= 174 copy=  1628.0 us comp=   645.0 us  ffn_moe_down-10
+sched-prof:   split  35 CUDA0  nodes=   1 copy=  1154.0 us comp=   325.0 us  ffn_moe_gate-11
+sched-prof:   split  36 CUDA0  nodes=   2 copy=  1412.0 us comp=   432.0 us  ffn_moe_up-11
+sched-prof:   split  37 CUDA0  nodes= 127 copy=  1940.0 us comp=   706.0 us  ffn_moe_down-11
+sched-prof:   split  38 CUDA0  nodes=   1 copy=  1057.0 us comp=   255.0 us  ffn_moe_gate-12
+sched-prof:   split  39 CUDA0  nodes=   2 copy=  1099.0 us comp=   279.0 us  ffn_moe_up-12
+sched-prof:   split  40 CUDA0  nodes= 127 copy=  1729.0 us comp=  1109.0 us  ffn_moe_down-12
+sched-prof:   split  41 CUDA0  nodes=   1 copy=   981.0 us comp=   275.0 us  ffn_moe_gate-13
+sched-prof:   split  42 CUDA0  nodes=   2 copy=   980.0 us comp=   251.0 us  ffn_moe_up-13
+sched-prof:   split  43 CUDA0  nodes= 127 copy=  1571.0 us comp=   659.0 us  ffn_moe_down-13
+sched-prof:   split  44 CUDA0  nodes=   1 copy=  1271.0 us comp=   257.0 us  ffn_moe_gate-14
+sched-prof:   split  45 CUDA0  nodes=   2 copy=  1079.0 us comp=   248.0 us  ffn_moe_up-14
+sched-prof:   split  46 CUDA0  nodes= 174 copy=  1727.0 us comp=   730.0 us  ffn_moe_down-14
+sched-prof:   split  47 CUDA0  nodes=   1 copy=  1238.0 us comp=   250.0 us  ffn_moe_gate-15
+sched-prof:   split  48 CUDA0  nodes=   2 copy=  1205.0 us comp=   217.0 us  ffn_moe_up-15
+sched-prof:   split  49 CUDA0  nodes= 127 copy=  1963.0 us comp=  1211.0 us  ffn_moe_down-15
+sched-prof:   split  50 CUDA0  nodes=   1 copy=  1121.0 us comp=   277.0 us  ffn_moe_gate-16
+sched-prof:   split  51 CUDA0  nodes=   2 copy=  1007.0 us comp=   231.0 us  ffn_moe_up-16
+sched-prof:   split  52 CUDA0  nodes= 127 copy=  1595.0 us comp=   698.0 us  ffn_moe_down-16
+sched-prof:   split  53 CUDA0  nodes=   1 copy=  1027.0 us comp=   253.0 us  ffn_moe_gate-17
+sched-prof:   split  54 CUDA0  nodes=   2 copy=   985.0 us comp=   228.0 us  ffn_moe_up-17
+sched-prof:   split  55 CUDA0  nodes= 127 copy=  1797.0 us comp=   809.0 us  ffn_moe_down-17
+sched-prof:   split  56 CUDA0  nodes=   1 copy=  1039.0 us comp=   292.0 us  ffn_moe_gate-18
+sched-prof:   split  57 CUDA0  nodes=   2 copy=  1166.0 us comp=   262.0 us  ffn_moe_up-18
+sched-prof:   split  58 CUDA0  nodes= 174 copy=  1801.0 us comp=   669.0 us  ffn_moe_down-18
+sched-prof:   split  59 CUDA0  nodes=   1 copy=  1259.0 us comp=   581.0 us  ffn_moe_gate-19
+sched-prof:   split  60 CUDA0  nodes=   2 copy=  1130.0 us comp=   222.0 us  ffn_moe_up-19
+sched-prof:   split  61 CUDA0  nodes= 127 copy=  2120.0 us comp=   720.0 us  ffn_moe_down-19
+sched-prof:   split  62 CUDA0  nodes=   1 copy=  1022.0 us comp=   252.0 us  ffn_moe_gate-20
+sched-prof:   split  63 CUDA0  nodes=   2 copy=   971.0 us comp=   230.0 us  ffn_moe_up-20
+sched-prof:   split  64 CUDA0  nodes= 127 copy=  1761.0 us comp=   754.0 us  ffn_moe_down-20
+sched-prof:   split  65 CUDA0  nodes=   1 copy=  1216.0 us comp=   264.0 us  ffn_moe_gate-21
+sched-prof:   split  66 CUDA0  nodes=   2 copy=  1169.0 us comp=   237.0 us  ffn_moe_up-21
+sched-prof:   split  67 CUDA0  nodes= 127 copy=  1928.0 us comp=   689.0 us  ffn_moe_down-21
+sched-prof:   split  68 CUDA0  nodes=   1 copy=  1068.0 us comp=   411.0 us  ffn_moe_gate-22
+sched-prof:   split  69 CUDA0  nodes=   2 copy=   978.0 us comp=   232.0 us  ffn_moe_up-22
+sched-prof:   split  70 CUDA0  nodes= 174 copy=  1767.0 us comp=   675.0 us  ffn_moe_down-22
+sched-prof:   split  71 CUDA0  nodes=   1 copy=   976.0 us comp=   264.0 us  ffn_moe_gate-23
+sched-prof:   split  72 CUDA0  nodes=   2 copy=   932.0 us comp=   229.0 us  ffn_moe_up-23
+sched-prof:   split  73 CUDA0  nodes= 127 copy=  1652.0 us comp=   714.0 us  ffn_moe_down-23
+sched-prof:   split  74 CUDA0  nodes=   1 copy=  1363.0 us comp=   313.0 us  ffn_moe_gate-24
+sched-prof:   split  75 CUDA0  nodes=   2 copy=  1192.0 us comp=   235.0 us  ffn_moe_up-24
+sched-prof:   split  76 CUDA0  nodes= 127 copy=  1964.0 us comp=   724.0 us  ffn_moe_down-24
+sched-prof:   split  77 CUDA0  nodes=   1 copy=  1348.0 us comp=   264.0 us  ffn_moe_gate-25
+sched-prof:   split  78 CUDA0  nodes=   2 copy=  1179.0 us comp=   321.0 us  ffn_moe_up-25
+sched-prof:   split  79 CUDA0  nodes= 127 copy=  2060.0 us comp=   661.0 us  ffn_moe_down-25
+sched-prof:   split  80 CUDA0  nodes=   1 copy=  1179.0 us comp=   239.0 us  ffn_moe_gate-26
+sched-prof:   split  81 CUDA0  nodes=   2 copy=  1166.0 us comp=   232.0 us  ffn_moe_up-26
+sched-prof:   split  82 CUDA0  nodes= 174 copy=  1824.0 us comp=  1083.0 us  ffn_moe_down-26
+sched-prof:   split  83 CUDA0  nodes=   1 copy=  1035.0 us comp=   266.0 us  ffn_moe_gate-27
+sched-prof:   split  84 CUDA0  nodes=   2 copy=   961.0 us comp=   246.0 us  ffn_moe_up-27
+sched-prof:   split  85 CUDA0  nodes= 694 copy=  1909.0 us comp=  3816.0 us  ffn_moe_down-27
+sched-prof:   split  86 CUDA0  nodes=   1 copy=  1228.0 us comp=   262.0 us  ffn_moe_gate-32
+sched-prof:   split  87 CUDA0  nodes=   2 copy=  1155.0 us comp=   239.0 us  ffn_moe_up-32
+sched-prof:   split  88 CUDA0  nodes= 127 copy=  1909.0 us comp=   682.0 us  ffn_moe_down-32
+sched-prof:   split  89 CUDA0  nodes=   1 copy=   976.0 us comp=   245.0 us  ffn_moe_gate-33
+sched-prof:   split  90 CUDA0  nodes=   2 copy=   998.0 us comp=   413.0 us  ffn_moe_up-33
+sched-prof:   split  91 CUDA0  nodes= 127 copy=  1641.0 us comp=   664.0 us  ffn_moe_down-33
+sched-prof:   split  92 CUDA0  nodes=   1 copy=  1187.0 us comp=   251.0 us  ffn_moe_gate-34
+sched-prof:   split  93 CUDA0  nodes=   2 copy=  1192.0 us comp=   238.0 us  ffn_moe_up-34
+sched-prof:   split  94 CUDA0  nodes= 174 copy=  2177.0 us comp=   914.0 us  ffn_moe_down-34
+sched-prof:   split  95 CUDA0  nodes=   1 copy=  1272.0 us comp=   247.0 us  ffn_moe_gate-35
+sched-prof:   split  96 CUDA0  nodes=   2 copy=  1200.0 us comp=   222.0 us  ffn_moe_up-35
+sched-prof:   split  97 CUDA0  nodes= 127 copy=  1896.0 us comp=   671.0 us  ffn_moe_down-35
+sched-prof:   split  98 CUDA0  nodes=   1 copy=  1014.0 us comp=   254.0 us  ffn_moe_gate-36
+sched-prof:   split  99 CUDA0  nodes=   2 copy=  1075.0 us comp=   365.0 us  ffn_moe_up-36
+sched-prof:   split 100 CUDA0  nodes= 127 copy=  1867.0 us comp=   763.0 us  ffn_moe_down-36
+sched-prof:   split 101 CUDA0  nodes=   1 copy=  1246.0 us comp=   259.0 us  ffn_moe_gate-37
+sched-prof:   split 102 CUDA0  nodes=   2 copy=  1156.0 us comp=   268.0 us  ffn_moe_up-37
+sched-prof:   split 103 CUDA0  nodes= 127 copy=  2227.0 us comp=   683.0 us  ffn_moe_down-37
+sched-prof:   split 104 CUDA0  nodes=   1 copy=  1078.0 us comp=   303.0 us  ffn_moe_gate-38
+sched-prof:   split 105 CUDA0  nodes=   2 copy=  1006.0 us comp=   260.0 us  ffn_moe_up-38
+sched-prof:   split 106 CUDA0  nodes= 174 copy=  1588.0 us comp=   673.0 us  ffn_moe_down-38
+sched-prof:   split 107 CUDA0  nodes=   1 copy=   992.0 us comp=   248.0 us  ffn_moe_gate-39
+sched-prof:   split 108 CUDA0  nodes=   2 copy=   965.0 us comp=   265.0 us  ffn_moe_up-39
+sched-prof:   split 109 CUDA0  nodes= 127 copy=  1787.0 us comp=   707.0 us  ffn_moe_down-39
+sched-prof:   split 110 CUDA0  nodes=   1 copy=  1211.0 us comp=   258.0 us  ffn_moe_gate-40
+sched-prof:   split 111 CUDA0  nodes=   2 copy=  1439.0 us comp=   261.0 us  ffn_moe_up-40
+sched-prof:   split 112 CUDA0  nodes= 127 copy=  2026.0 us comp=   683.0 us  ffn_moe_down-40
+sched-prof:   split 113 CUDA0  nodes=   1 copy=  1061.0 us comp=   304.0 us  ffn_moe_gate-41
+sched-prof:   split 114 CUDA0  nodes=   2 copy=   952.0 us comp=   230.0 us  ffn_moe_up-41
+sched-prof:   split 115 CUDA0  nodes= 127 copy=  1630.0 us comp=   720.0 us  ffn_moe_down-41
+sched-prof:   split 116 CUDA0  nodes=   1 copy=  1191.0 us comp=   278.0 us  ffn_moe_gate-42
+sched-prof:   split 117 CUDA0  nodes=   2 copy=  1244.0 us comp=   239.0 us  ffn_moe_up-42
+sched-prof:   split 118 CUDA0  nodes= 174 copy=  2042.0 us comp=   737.0 us  ffn_moe_down-42
+sched-prof:   split 119 CUDA0  nodes=   1 copy=  1365.0 us comp=   271.0 us  ffn_moe_gate-43
+sched-prof:   split 120 CUDA0  nodes=   2 copy=  1161.0 us comp=   251.0 us  ffn_moe_up-43
+sched-prof:   split 121 CUDA0  nodes= 127 copy=  1864.0 us comp=   625.0 us  ffn_moe_down-43
+sched-prof:   split 122 CUDA0  nodes=   1 copy=  1283.0 us comp=   261.0 us  ffn_moe_gate-44
+sched-prof:   split 123 CUDA0  nodes=   2 copy=  1225.0 us comp=   313.0 us  ffn_moe_up-44
+sched-prof:   split 124 CUDA0  nodes= 127 copy=  1915.0 us comp=   705.0 us  ffn_moe_down-44
+sched-prof:   split 125 CUDA0  nodes=   1 copy=  1027.0 us comp=   246.0 us  ffn_moe_gate-45
+sched-prof:   split 126 CUDA0  nodes=   2 copy=  1026.0 us comp=   237.0 us  ffn_moe_up-45
+sched-prof:   split 127 CUDA0  nodes= 127 copy=  1793.0 us comp=   762.0 us  ffn_moe_down-45
+sched-prof:   split 128 CUDA0  nodes=   1 copy=  1461.0 us comp=   302.0 us  ffn_moe_gate-46
+sched-prof:   split 129 CUDA0  nodes=   2 copy=  1158.0 us comp=   262.0 us  ffn_moe_up-46
+sched-prof:   split 130 CUDA0  nodes= 179 copy=  2612.0 us comp=   893.0 us  ffn_moe_down-46
+sched-prof:   split 131 CUDA0  nodes=   1 copy=  1054.0 us comp=   306.0 us  ffn_moe_gate-47
+sched-prof:   split 132 CUDA0  nodes=   2 copy=   947.0 us comp=   228.0 us  ffn_moe_up-47
+sched-prof:   split 133 CUDA0  nodes=  54 copy=  1937.0 us comp=  2882.0 us  ffn_moe_down-47
+sched-prof: graph 60 total=248.88 ms splits=134 | CUDA0 n=133 nodes=6908 copy=186.27 comp=62.47 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 61 total=257.28 ms splits=134 | CUDA0 n=133 nodes=6908 copy=194.04 comp=63.12 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+sched-prof: graph 62 total=252.32 ms splits=134 | CUDA0 n=133 nodes=6908 copy=188.80 comp=63.35 | CPU n=1 nodes=4 copy=0.00 comp=0.10
+sched-prof: graph 63 total=243.50 ms splits=134 | CUDA0 n=133 nodes=6908 copy=181.49 comp=61.91 | CPU n=1 nodes=4 copy=0.00 comp=0.08
+sched-prof: graph 64 total=242.42 ms splits=134 | CUDA0 n=133 nodes=6908 copy=181.24 comp=61.06 | CPU n=1 nodes=4 copy=0.00 comp=0.07
+cpu-prof: 65 graph computes, 7.72 ms in graphs, ops: comp 7.68 ms + wait 0.01 ms
+cpu-prof: op               src0     cls      count      comp ms      wait ms     avg us     GB/s
+cpu-prof: GET_ROWS         iq4_nl   0           65         7.02         0.00      108.0     0.00
+cpu-prof: GET_ROWS         q8_0     0           65         0.67         0.00       10.3     0.00

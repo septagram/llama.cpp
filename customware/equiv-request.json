@@ -1,0 +1,1 @@
+{"model": "m", "stream": false, "max_tokens": 64, "temperature": 0, "top_k": 1, "seed": 1, "messages": [{"role": "user", "content": "Write a C function that reverses a string in place, then explain it in two sentences. Do not think, answer directly."}]}

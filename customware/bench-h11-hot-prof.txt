@@ -1,0 +1,537 @@
+ggml_cuda_init: found 2 CUDA devices (Total VRAM: 24571 MiB):
+  Device 0: NVIDIA GeForce RTX 4060 Ti, compute capability 8.9, VMM: yes, VRAM: 16379 MiB
+  Device 1: NVIDIA GeForce RTX 2060 SUPER, compute capability 7.5, VMM: yes, VRAM: 8191 MiB
+llama-bench: benchmark 1/1: starting
+llama-bench: benchmark 1/1: warmup generation run
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=   877.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes= 110 copy= 74327.0 us comp= 49810.0 us  hc_init
+sched-prof:   split   2 CPU    nodes=   4 copy=    71.0 us comp= 10528.0 us  node_114
+sched-prof:   split   3 CUDA0  nodes= 218 copy=   163.0 us comp=  3813.0 us  node_118
+sched-prof:   split   4 CPU    nodes=   4 copy=    87.0 us comp=  3715.0 us  node_336
+sched-prof:   split   5 CUDA0  nodes= 142 copy=    69.0 us comp=  1027.0 us  node_340
+sched-prof:   split   6 CPU    nodes=   4 copy=    69.0 us comp=  6529.0 us  node_482
+sched-prof:   split   7 CUDA0  nodes= 189 copy=   566.0 us comp= 17250.0 us  node_486
+sched-prof:   split   8 CPU    nodes=   4 copy=    74.0 us comp=  4536.0 us  node_675
+sched-prof:   split   9 CUDA0  nodes= 142 copy=    76.0 us comp=  1027.0 us  node_679
+sched-prof:   split  10 CPU    nodes=   4 copy=    63.0 us comp=  4910.0 us  node_821
+sched-prof:   split  11 CUDA0  nodes= 142 copy=    85.0 us comp=  1596.0 us  node_825
+sched-prof:   split  12 CPU    nodes=   4 copy=   104.0 us comp=  4671.0 us  node_967
+sched-prof:   split  13 CUDA0  nodes= 142 copy=    84.0 us comp=   902.0 us  node_971
+sched-prof:   split  14 CPU    nodes=   4 copy=    65.0 us comp=  3313.0 us  node_1113
+sched-prof:   split  15 CUDA0  nodes= 189 copy=    63.0 us comp=  1098.0 us  node_1117
+sched-prof:   split  16 CPU    nodes=   4 copy=    71.0 us comp=  4178.0 us  node_1306
+sched-prof:   split  17 CUDA0  nodes= 142 copy=    84.0 us comp=   938.0 us  node_1310
+sched-prof:   split  18 CPU    nodes=   4 copy=    96.0 us comp=  4278.0 us  node_1452
+sched-prof:   split  19 CUDA0  nodes= 142 copy=    85.0 us comp=  1041.0 us  node_1456
+sched-prof:   split  20 CPU    nodes=   4 copy=    73.0 us comp=  5128.0 us  node_1598
+sched-prof:   split  21 CUDA0  nodes= 142 copy=    77.0 us comp=   983.0 us  node_1602
+sched-prof:   split  22 CPU    nodes=   4 copy=    77.0 us comp=  5275.0 us  node_1744
+sched-prof:   split  23 CUDA0  nodes= 189 copy=   104.0 us comp=  1013.0 us  node_1748
+sched-prof:   split  24 CPU    nodes=   4 copy=    80.0 us comp=  4566.0 us  node_1937
+sched-prof:   split  25 CUDA0  nodes= 142 copy=    76.0 us comp=   989.0 us  node_1941
+sched-prof:   split  26 CPU    nodes=   4 copy=    62.0 us comp=  4483.0 us  node_2083
+sched-prof:   split  27 CUDA0  nodes= 142 copy=    84.0 us comp=   973.0 us  node_2087
+sched-prof:   split  28 CPU    nodes=   4 copy=    69.0 us comp=  4757.0 us  node_2229
+sched-prof:   split  29 CUDA0  nodes= 142 copy=   103.0 us comp=   885.0 us  node_2233
+sched-prof:   split  30 CPU    nodes=   4 copy=   131.0 us comp=  4631.0 us  node_2375
+sched-prof:   split  31 CUDA0  nodes= 189 copy=    89.0 us comp=  1069.0 us  node_2379
+sched-prof:   split  32 CPU    nodes=   4 copy=    63.0 us comp=  4861.0 us  node_2568
+sched-prof:   split  33 CUDA0  nodes= 142 copy=    97.0 us comp=  1001.0 us  node_2572
+sched-prof:   split  34 CPU    nodes=   4 copy=    66.0 us comp=  4121.0 us  node_2714
+sched-prof:   split  35 CUDA0  nodes= 142 copy=    95.0 us comp=  1015.0 us  node_2718
+sched-prof:   split  36 CPU    nodes=   4 copy=    71.0 us comp=  4383.0 us  node_2860
+sched-prof:   split  37 CUDA0  nodes= 142 copy=   108.0 us comp=   913.0 us  node_2864
+sched-prof:   split  38 CPU    nodes=   4 copy=    65.0 us comp=  4458.0 us  node_3006
+sched-prof:   split  39 CUDA0  nodes= 189 copy=   112.0 us comp=  1150.0 us  node_3010
+sched-prof:   split  40 CPU    nodes=   4 copy=    81.0 us comp=  4147.0 us  node_3199
+sched-prof:   split  41 CUDA0  nodes= 142 copy=    90.0 us comp=  1645.0 us  node_3203
+sched-prof:   split  42 CPU    nodes=   4 copy=    74.0 us comp=  4479.0 us  node_3345
+sched-prof:   split  43 CUDA0  nodes= 142 copy=    84.0 us comp=   907.0 us  node_3349
+sched-prof:   split  44 CPU    nodes=   4 copy=    81.0 us comp=  5104.0 us  node_3491
+sched-prof:   split  45 CUDA0  nodes= 142 copy=    99.0 us comp=  1033.0 us  node_3495
+sched-prof:   split  46 CPU    nodes=   4 copy=    69.0 us comp=  4511.0 us  node_3637
+sched-prof:   split  47 CUDA0  nodes= 189 copy=    82.0 us comp=  1082.0 us  node_3641
+sched-prof:   split  48 CPU    nodes=   4 copy=    70.0 us comp=  4075.0 us  node_3830
+sched-prof:   split  49 CUDA0  nodes= 142 copy=    79.0 us comp=  1010.0 us  node_3834
+sched-prof:   split  50 CPU    nodes=   4 copy=    81.0 us comp=  4169.0 us  node_3976
+sched-prof:   split  51 CUDA0  nodes= 142 copy=   112.0 us comp=  1004.0 us  node_3980
+sched-prof:   split  52 CPU    nodes=   4 copy=    72.0 us comp=  4929.0 us  node_4122
+sched-prof:   split  53 CUDA0  nodes= 142 copy=    55.0 us comp=   965.0 us  node_4126
+sched-prof:   split  54 CPU    nodes=   4 copy=    65.0 us comp=  4436.0 us  node_4268
+sched-prof:   split  55 CUDA0  nodes= 189 copy=    91.0 us comp=  1237.0 us  node_4272
+sched-prof:   split  56 CPU    nodes=   4 copy=    71.0 us comp=  5026.0 us  node_4461
+sched-prof:   split  57 CUDA0  nodes= 128 copy=    85.0 us comp=   922.0 us  node_4465
+sched-prof:   split  58 CPU    nodes=   4 copy=    64.0 us comp=  4919.0 us  ffn_moe_gate-28
+sched-prof:   split  59 CUDA0  nodes= 126 copy=    80.0 us comp=  1350.0 us  ffn_moe_weighted-28
+sched-prof:   split  60 CPU    nodes=   4 copy=    86.0 us comp=  5095.0 us  ffn_moe_gate-29
+sched-prof:   split  61 CUDA0  nodes= 126 copy=    83.0 us comp=   860.0 us  ffn_moe_weighted-29
+sched-prof:   split  62 CPU    nodes=   4 copy=    72.0 us comp=  5891.0 us  ffn_moe_gate-30
+sched-prof:   split  63 CUDA0  nodes= 173 copy=    50.0 us comp=  1438.0 us  ffn_moe_weighted-30
+sched-prof:   split  64 CPU    nodes=   4 copy=    62.0 us comp=  4970.0 us  ffn_moe_gate-31
+sched-prof:   split  65 CUDA0  nodes= 140 copy=    96.0 us comp=   945.0 us  ffn_moe_weighted-31
+sched-prof:   split  66 CPU    nodes=   4 copy=    77.0 us comp=  3077.0 us  node_5174
+sched-prof:   split  67 CUDA0  nodes= 142 copy=    79.0 us comp=  1002.0 us  node_5178
+sched-prof:   split  68 CPU    nodes=   4 copy=    65.0 us comp=  4226.0 us  node_5320
+sched-prof:   split  69 CUDA0  nodes= 142 copy=    88.0 us comp=  1579.0 us  node_5324
+sched-prof:   split  70 CPU    nodes=   4 copy=    72.0 us comp=  4373.0 us  node_5466
+sched-prof:   split  71 CUDA0  nodes= 189 copy=    76.0 us comp=  1117.0 us  node_5470
+sched-prof:   split  72 CPU    nodes=   4 copy=    82.0 us comp=  3800.0 us  node_5659
+sched-prof:   split  73 CUDA0  nodes= 142 copy=    82.0 us comp=   998.0 us  node_5663
+sched-prof:   split  74 CPU    nodes=   4 copy=    66.0 us comp=  4132.0 us  node_5805
+sched-prof:   split  75 CUDA0  nodes= 142 copy=   125.0 us comp=   979.0 us  node_5809
+sched-prof:   split  76 CPU    nodes=   4 copy=    80.0 us comp=  4779.0 us  node_5951
+sched-prof:   split  77 CUDA0  nodes= 142 copy=    98.0 us comp=   950.0 us  node_5955
+sched-prof:   split  78 CPU    nodes=   4 copy=    72.0 us comp=  4009.0 us  node_6097
+sched-prof:   split  79 CUDA0  nodes= 189 copy=    85.0 us comp=  1110.0 us  node_6101
+sched-prof:   split  80 CPU    nodes=   4 copy=    89.0 us comp=  2957.0 us  node_6290
+sched-prof:   split  81 CUDA0  nodes= 142 copy=    79.0 us comp=   943.0 us  node_6294
+sched-prof:   split  82 CPU    nodes=   4 copy=    76.0 us comp=  3102.0 us  node_6436
+sched-prof:   split  83 CUDA0  nodes= 142 copy=    74.0 us comp=  1027.0 us  node_6440
+sched-prof:   split  84 CPU    nodes=   4 copy=   101.0 us comp=  2844.0 us  node_6582
+sched-prof:   split  85 CUDA0  nodes= 142 copy=    60.0 us comp=   878.0 us  node_6586
+sched-prof:   split  86 CPU    nodes=   4 copy=    77.0 us comp=  4786.0 us  node_6728
+sched-prof:   split  87 CUDA0  nodes= 189 copy=    82.0 us comp=  1063.0 us  node_6732
+sched-prof:   split  88 CPU    nodes=   4 copy=   117.0 us comp=  4398.0 us  node_6921
+sched-prof:   split  89 CUDA0  nodes= 142 copy=    88.0 us comp=  1028.0 us  node_6925
+sched-prof:   split  90 CPU    nodes=   4 copy=    65.0 us comp=  3919.0 us  node_7067
+sched-prof:   split  91 CUDA0  nodes= 142 copy=    77.0 us comp=  1012.0 us  node_7071
+sched-prof:   split  92 CPU    nodes=   4 copy=    74.0 us comp=  3699.0 us  node_7213
+sched-prof:   split  93 CUDA0  nodes= 142 copy=    86.0 us comp=  1036.0 us  node_7217
+sched-prof:   split  94 CPU    nodes=   4 copy=    83.0 us comp=  4549.0 us  node_7359
+sched-prof:   split  95 CUDA0  nodes= 194 copy=   128.0 us comp=  1119.0 us  node_7363
+sched-prof:   split  96 CPU    nodes=   4 copy=    70.0 us comp=  4875.0 us  node_7557
+sched-prof:   split  97 CUDA0  nodes=  55 copy=    80.0 us comp=  3426.0 us  node_7561
+sched-prof: graph 0 total=424.38 ms splits=98 | CUDA0 n=49 nodes=7420 copy=79.02 comp=122.16 | CPU n=49 nodes=196 copy=3.67 comp=219.47
+llama-bench: benchmark 1/1: generation run 1/2
+sched-prof: graph 1 total=265.63 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.78 comp=83.57 | CPU n=49 nodes=196 copy=3.93 comp=173.31
+sched-prof: graph 2 total=228.65 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.69 comp=47.95 | CPU n=49 nodes=196 copy=4.41 comp=170.58
+sched-prof: graph 3 total=208.38 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.98 comp=59.47 | CPU n=49 nodes=196 copy=4.25 comp=139.64
+sched-prof: graph 4 total=186.02 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.64 comp=38.26 | CPU n=49 nodes=196 copy=4.41 comp=138.68
+sched-prof: graph 5 total=160.94 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.42 comp=35.91 | CPU n=49 nodes=196 copy=4.18 comp=116.42
+sched-prof: graph 6 total=131.10 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.00 comp=35.29 | CPU n=49 nodes=196 copy=4.37 comp=86.41
+sched-prof: graph 7 total=142.36 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.46 comp=34.77 | CPU n=49 nodes=196 copy=3.99 comp=99.13
+sched-prof: graph 8 total=170.86 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.79 comp=37.46 | CPU n=49 nodes=196 copy=4.15 comp=124.43
+sched-prof: graph 9 total=137.03 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.39 comp=39.27 | CPU n=49 nodes=196 copy=4.19 comp=89.15
+sched-prof: graph 10 total=160.71 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.16 comp=42.80 | CPU n=49 nodes=196 copy=4.70 comp=108.02
+sched-prof: graph 11 total=150.69 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.22 comp=40.13 | CPU n=49 nodes=196 copy=4.67 comp=100.65
+sched-prof: graph 12 total=144.22 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.35 comp=47.13 | CPU n=49 nodes=196 copy=4.28 comp=88.43
+sched-prof: graph 13 total=134.10 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.52 comp=58.93 | CPU n=49 nodes=196 copy=4.45 comp=66.18
+sched-prof: graph 14 total=114.25 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.57 comp=40.87 | CPU n=49 nodes=196 copy=4.29 comp=64.50
+sched-prof: graph 15 total=134.55 ms splits=98 | CUDA0 n=49 nodes=7420 copy=6.30 comp=38.99 | CPU n=49 nodes=196 copy=5.01 comp=84.18
+sched-prof: graph 16 total=119.74 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.65 comp=37.60 | CPU n=49 nodes=196 copy=4.33 comp=73.12
+sched-prof: graph 17 total=101.92 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.25 comp=38.86 | CPU n=49 nodes=196 copy=4.46 comp=54.32
+sched-prof: graph 18 total=104.97 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.25 comp=37.78 | CPU n=49 nodes=196 copy=4.09 comp=58.83
+sched-prof: graph 19 total=127.60 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.60 comp=39.25 | CPU n=49 nodes=196 copy=4.47 comp=79.26
+sched-prof: graph 20 total=126.73 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.83 comp=37.80 | CPU n=49 nodes=196 copy=4.71 comp=79.38
+sched-prof: graph 21 total=114.73 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.45 comp=40.77 | CPU n=49 nodes=196 copy=4.67 comp=64.81
+sched-prof: graph 22 total=149.22 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.69 comp=40.29 | CPU n=49 nodes=196 copy=4.38 comp=99.83
+sched-prof: graph 23 total=109.30 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.62 comp=37.05 | CPU n=49 nodes=196 copy=4.50 comp=63.10
+sched-prof: graph 24 total=151.12 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.58 comp=40.76 | CPU n=49 nodes=196 copy=4.72 comp=101.02
+sched-prof: graph 25 total=115.93 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.26 comp=38.59 | CPU n=49 nodes=196 copy=4.30 comp=68.77
+sched-prof: graph 26 total=125.02 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.62 comp=39.27 | CPU n=49 nodes=196 copy=4.38 comp=76.73
+sched-prof: graph 27 total=116.21 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.18 comp=38.73 | CPU n=49 nodes=196 copy=4.21 comp=69.07
+sched-prof: graph 28 total=117.55 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.90 comp=41.21 | CPU n=49 nodes=196 copy=4.84 comp=66.57
+sched-prof: graph 29 total=126.25 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.65 comp=58.61 | CPU n=49 nodes=196 copy=4.93 comp=58.03
+sched-prof: graph 30 total=113.85 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.60 comp=49.40 | CPU n=49 nodes=196 copy=4.93 comp=54.90
+sched-prof: graph 31 total=106.26 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.62 comp=38.64 | CPU n=49 nodes=196 copy=4.44 comp=58.53
+sched-prof: graph 32 total=105.60 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.41 comp=37.99 | CPU n=49 nodes=196 copy=4.71 comp=58.47
+sched-prof: graph 33 total=107.01 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.85 comp=38.89 | CPU n=49 nodes=196 copy=4.63 comp=58.61
+sched-prof: graph 34 total=105.08 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.47 comp=37.86 | CPU n=49 nodes=196 copy=4.09 comp=58.63
+sched-prof: graph 35 total=100.96 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.34 comp=37.40 | CPU n=49 nodes=196 copy=4.36 comp=54.84
+sched-prof: graph 36 total=102.20 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.23 comp=38.69 | CPU n=49 nodes=196 copy=4.57 comp=54.69
+sched-prof: graph 37 total=89.41 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.19 comp=37.00 | CPU n=49 nodes=196 copy=4.08 comp=44.13
+sched-prof: graph 38 total=101.92 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.48 comp=38.94 | CPU n=49 nodes=196 copy=4.29 comp=54.19
+sched-prof: graph 39 total=129.75 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.83 comp=38.51 | CPU n=49 nodes=196 copy=4.61 comp=81.78
+sched-prof: graph 40 total=105.77 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.90 comp=39.60 | CPU n=49 nodes=196 copy=4.69 comp=56.57
+sched-prof: graph 41 total=118.65 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.86 comp=37.14 | CPU n=49 nodes=196 copy=4.65 comp=71.97
+sched-prof: graph 42 total=104.66 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.58 comp=39.40 | CPU n=49 nodes=196 copy=4.61 comp=56.05
+sched-prof: graph 43 total=119.35 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.69 comp=40.27 | CPU n=49 nodes=196 copy=4.66 comp=69.71
+sched-prof: graph 44 total=107.17 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.44 comp=39.02 | CPU n=49 nodes=196 copy=4.63 comp=59.06
+sched-prof: graph 45 total=98.40 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.40 comp=37.69 | CPU n=49 nodes=196 copy=4.39 comp=51.90
+sched-prof: graph 46 total=94.07 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.19 comp=37.91 | CPU n=49 nodes=196 copy=4.05 comp=47.90
+sched-prof: graph 47 total=90.05 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.05 comp=37.48 | CPU n=49 nodes=196 copy=4.08 comp=44.42
+sched-prof: graph 48 total=98.10 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.24 comp=38.11 | CPU n=49 nodes=196 copy=4.23 comp=51.49
+sched-prof: graph 49 total=96.83 ms splits=98 | CUDA0 n=49 nodes=7420 copy=3.94 comp=37.45 | CPU n=49 nodes=196 copy=4.37 comp=51.05
+sched-prof:   split   0 CPU    nodes=   4 copy=     1.0 us comp=    81.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes= 110 copy=    79.0 us comp=   607.0 us  hc_init
+sched-prof:   split   2 CPU    nodes=   4 copy=    93.0 us comp=   829.0 us  node_114
+sched-prof:   split   3 CUDA0  nodes= 218 copy=   121.0 us comp=   915.0 us  node_118
+sched-prof:   split   4 CPU    nodes=   4 copy=    98.0 us comp=  1530.0 us  node_336
+sched-prof:   split   5 CUDA0  nodes= 142 copy=    72.0 us comp=   669.0 us  node_340
+sched-prof:   split   6 CPU    nodes=   4 copy=    90.0 us comp=   873.0 us  node_482
+sched-prof:   split   7 CUDA0  nodes= 189 copy=   579.0 us comp=   634.0 us  node_486
+sched-prof:   split   8 CPU    nodes=   4 copy=    87.0 us comp=   779.0 us  node_675
+sched-prof:   split   9 CUDA0  nodes= 142 copy=    71.0 us comp=   742.0 us  node_679
+sched-prof:   split  10 CPU    nodes=   4 copy=    84.0 us comp=  1026.0 us  node_821
+sched-prof:   split  11 CUDA0  nodes= 142 copy=    75.0 us comp=   655.0 us  node_825
+sched-prof:   split  12 CPU    nodes=   4 copy=    84.0 us comp=   798.0 us  node_967
+sched-prof:   split  13 CUDA0  nodes= 142 copy=    76.0 us comp=   656.0 us  node_971
+sched-prof:   split  14 CPU    nodes=   4 copy=    76.0 us comp=  1504.0 us  node_1113
+sched-prof:   split  15 CUDA0  nodes= 189 copy=   119.0 us comp=   655.0 us  node_1117
+sched-prof:   split  16 CPU    nodes=   4 copy=    93.0 us comp=  1014.0 us  node_1306
+sched-prof:   split  17 CUDA0  nodes= 142 copy=    85.0 us comp=   647.0 us  node_1310
+sched-prof:   split  18 CPU    nodes=   4 copy=   114.0 us comp=   774.0 us  node_1452
+sched-prof:   split  19 CUDA0  nodes= 142 copy=    78.0 us comp=   902.0 us  node_1456
+sched-prof:   split  20 CPU    nodes=   4 copy=   107.0 us comp=  1426.0 us  node_1598
+sched-prof:   split  21 CUDA0  nodes= 142 copy=    85.0 us comp=   760.0 us  node_1602
+sched-prof:   split  22 CPU    nodes=   4 copy=    81.0 us comp=   851.0 us  node_1744
+sched-prof:   split  23 CUDA0  nodes= 189 copy=    61.0 us comp=   619.0 us  node_1748
+sched-prof:   split  24 CPU    nodes=   4 copy=   112.0 us comp=   937.0 us  node_1937
+sched-prof:   split  25 CUDA0  nodes= 142 copy=    64.0 us comp=  1080.0 us  node_1941
+sched-prof:   split  26 CPU    nodes=   4 copy=    97.0 us comp=   632.0 us  node_2083
+sched-prof:   split  27 CUDA0  nodes= 142 copy=    56.0 us comp=   643.0 us  node_2087
+sched-prof:   split  28 CPU    nodes=   4 copy=   102.0 us comp=   961.0 us  node_2229
+sched-prof:   split  29 CUDA0  nodes= 142 copy=    59.0 us comp=   688.0 us  node_2233
+sched-prof:   split  30 CPU    nodes=   4 copy=   122.0 us comp=   819.0 us  node_2375
+sched-prof:   split  31 CUDA0  nodes= 189 copy=    61.0 us comp=   684.0 us  node_2379
+sched-prof:   split  32 CPU    nodes=   4 copy=   130.0 us comp=   744.0 us  node_2568
+sched-prof:   split  33 CUDA0  nodes= 142 copy=    82.0 us comp=   700.0 us  node_2572
+sched-prof:   split  34 CPU    nodes=   4 copy=    93.0 us comp=   654.0 us  node_2714
+sched-prof:   split  35 CUDA0  nodes= 142 copy=    72.0 us comp=   644.0 us  node_2718
+sched-prof:   split  36 CPU    nodes=   4 copy=    85.0 us comp=   858.0 us  node_2860
+sched-prof:   split  37 CUDA0  nodes= 142 copy=    72.0 us comp=   652.0 us  node_2864
+sched-prof:   split  38 CPU    nodes=   4 copy=    94.0 us comp=  1426.0 us  node_3006
+sched-prof:   split  39 CUDA0  nodes= 189 copy=    81.0 us comp=   741.0 us  node_3010
+sched-prof:   split  40 CPU    nodes=   4 copy=   110.0 us comp=   844.0 us  node_3199
+sched-prof:   split  41 CUDA0  nodes= 142 copy=    54.0 us comp=   663.0 us  node_3203
+sched-prof:   split  42 CPU    nodes=   4 copy=   118.0 us comp=  1434.0 us  node_3345
+sched-prof:   split  43 CUDA0  nodes= 142 copy=    87.0 us comp=  1014.0 us  node_3349
+sched-prof:   split  44 CPU    nodes=   4 copy=   128.0 us comp=   779.0 us  node_3491
+sched-prof:   split  45 CUDA0  nodes= 142 copy=    82.0 us comp=   776.0 us  node_3495
+sched-prof:   split  46 CPU    nodes=   4 copy=    99.0 us comp=   728.0 us  node_3637
+sched-prof:   split  47 CUDA0  nodes= 189 copy=    55.0 us comp=   663.0 us  node_3641
+sched-prof:   split  48 CPU    nodes=   4 copy=   111.0 us comp=  1773.0 us  node_3830
+sched-prof:   split  49 CUDA0  nodes= 142 copy=    79.0 us comp=   658.0 us  node_3834
+sched-prof:   split  50 CPU    nodes=   4 copy=    80.0 us comp=   895.0 us  node_3976
+sched-prof:   split  51 CUDA0  nodes= 142 copy=    65.0 us comp=   678.0 us  node_3980
+sched-prof:   split  52 CPU    nodes=   4 copy=   130.0 us comp=   676.0 us  node_4122
+sched-prof:   split  53 CUDA0  nodes= 142 copy=    70.0 us comp=   639.0 us  node_4126
+sched-prof:   split  54 CPU    nodes=   4 copy=   169.0 us comp=  1478.0 us  node_4268
+sched-prof:   split  55 CUDA0  nodes= 189 copy=    71.0 us comp=   738.0 us  node_4272
+sched-prof:   split  56 CPU    nodes=   4 copy=    88.0 us comp=  1244.0 us  node_4461
+sched-prof:   split  57 CUDA0  nodes= 128 copy=    62.0 us comp=   543.0 us  node_4465
+sched-prof:   split  58 CPU    nodes=   4 copy=    76.0 us comp=  1508.0 us  ffn_moe_gate-28
+sched-prof:   split  59 CUDA0  nodes= 126 copy=    93.0 us comp=  1034.0 us  ffn_moe_weighted-28
+sched-prof:   split  60 CPU    nodes=   4 copy=    94.0 us comp=  1576.0 us  ffn_moe_gate-29
+sched-prof:   split  61 CUDA0  nodes= 126 copy=    88.0 us comp=   577.0 us  ffn_moe_weighted-29
+sched-prof:   split  62 CPU    nodes=   4 copy=    91.0 us comp=  2148.0 us  ffn_moe_gate-30
+sched-prof:   split  63 CUDA0  nodes= 173 copy=   115.0 us comp=   541.0 us  ffn_moe_weighted-30
+sched-prof:   split  64 CPU    nodes=   4 copy=    76.0 us comp=  1055.0 us  ffn_moe_gate-31
+sched-prof:   split  65 CUDA0  nodes= 140 copy=    81.0 us comp=   688.0 us  ffn_moe_weighted-31
+sched-prof:   split  66 CPU    nodes=   4 copy=    83.0 us comp=   563.0 us  node_5174
+sched-prof:   split  67 CUDA0  nodes= 142 copy=    39.0 us comp=   881.0 us  node_5178
+sched-prof:   split  68 CPU    nodes=   4 copy=    81.0 us comp=   843.0 us  node_5320
+sched-prof:   split  69 CUDA0  nodes= 142 copy=    69.0 us comp=   767.0 us  node_5324
+sched-prof:   split  70 CPU    nodes=   4 copy=   107.0 us comp=  1133.0 us  node_5466
+sched-prof:   split  71 CUDA0  nodes= 189 copy=    61.0 us comp=   634.0 us  node_5470
+sched-prof:   split  72 CPU    nodes=   4 copy=    75.0 us comp=  1363.0 us  node_5659
+sched-prof:   split  73 CUDA0  nodes= 142 copy=    83.0 us comp=   659.0 us  node_5663
+sched-prof:   split  74 CPU    nodes=   4 copy=   104.0 us comp=  1953.0 us  node_5805
+sched-prof:   split  75 CUDA0  nodes= 142 copy=    75.0 us comp=   740.0 us  node_5809
+sched-prof:   split  76 CPU    nodes=   4 copy=    99.0 us comp=  1863.0 us  node_5951
+sched-prof:   split  77 CUDA0  nodes= 142 copy=   110.0 us comp=   673.0 us  node_5955
+sched-prof:   split  78 CPU    nodes=   4 copy=   114.0 us comp=   845.0 us  node_6097
+sched-prof:   split  79 CUDA0  nodes= 189 copy=    84.0 us comp=   683.0 us  node_6101
+sched-prof:   split  80 CPU    nodes=   4 copy=    98.0 us comp=  1421.0 us  node_6290
+sched-prof:   split  81 CUDA0  nodes= 142 copy=    82.0 us comp=   653.0 us  node_6294
+sched-prof:   split  82 CPU    nodes=   4 copy=   103.0 us comp=  1482.0 us  node_6436
+sched-prof:   split  83 CUDA0  nodes= 142 copy=    69.0 us comp=   653.0 us  node_6440
+sched-prof:   split  84 CPU    nodes=   4 copy=   120.0 us comp=  2037.0 us  node_6582
+sched-prof:   split  85 CUDA0  nodes= 142 copy=   103.0 us comp=   762.0 us  node_6586
+sched-prof:   split  86 CPU    nodes=   4 copy=    89.0 us comp=   640.0 us  node_6728
+sched-prof:   split  87 CUDA0  nodes= 189 copy=    70.0 us comp=   645.0 us  node_6732
+sched-prof:   split  88 CPU    nodes=   4 copy=    87.0 us comp=  2410.0 us  node_6921
+sched-prof:   split  89 CUDA0  nodes= 142 copy=    99.0 us comp=   747.0 us  node_6925
+sched-prof:   split  90 CPU    nodes=   4 copy=    90.0 us comp=  1982.0 us  node_7067
+sched-prof:   split  91 CUDA0  nodes= 142 copy=    93.0 us comp=   662.0 us  node_7071
+sched-prof:   split  92 CPU    nodes=   4 copy=   101.0 us comp=  1635.0 us  node_7213
+sched-prof:   split  93 CUDA0  nodes= 142 copy=   100.0 us comp=   667.0 us  node_7217
+sched-prof:   split  94 CPU    nodes=   4 copy=    89.0 us comp=   976.0 us  node_7359
+sched-prof:   split  95 CUDA0  nodes= 194 copy=   157.0 us comp=   684.0 us  node_7363
+sched-prof:   split  96 CPU    nodes=   4 copy=   150.0 us comp=  2051.0 us  node_7557
+sched-prof:   split  97 CUDA0  nodes=  55 copy=   122.0 us comp=  2961.0 us  node_7561
+sched-prof: graph 50 total=104.15 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.47 comp=36.98 | CPU n=49 nodes=196 copy=4.80 comp=57.85
+sched-prof: graph 51 total=110.06 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.32 comp=38.16 | CPU n=49 nodes=196 copy=4.34 comp=63.22
+sched-prof: graph 52 total=103.39 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.43 comp=38.32 | CPU n=49 nodes=196 copy=4.71 comp=55.90
+sched-prof: graph 53 total=100.55 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.22 comp=38.20 | CPU n=49 nodes=196 copy=4.58 comp=52.53
+sched-prof: graph 54 total=95.83 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.11 comp=37.30 | CPU n=49 nodes=196 copy=4.45 comp=49.96
+sched-prof: graph 55 total=88.73 ms splits=98 | CUDA0 n=49 nodes=7420 copy=3.90 comp=36.74 | CPU n=49 nodes=196 copy=4.23 comp=43.84
+sched-prof: graph 56 total=96.71 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.04 comp=38.72 | CPU n=49 nodes=196 copy=4.22 comp=49.71
+sched-prof: graph 57 total=101.29 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.40 comp=37.28 | CPU n=49 nodes=196 copy=4.38 comp=55.20
+sched-prof: graph 58 total=95.71 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.55 comp=36.99 | CPU n=49 nodes=196 copy=4.71 comp=49.39
+sched-prof: graph 59 total=95.63 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.79 comp=37.27 | CPU n=49 nodes=196 copy=5.00 comp=48.56
+sched-prof: graph 60 total=106.99 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.78 comp=38.27 | CPU n=49 nodes=196 copy=4.47 comp=59.43
+sched-prof: graph 61 total=102.60 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.84 comp=37.56 | CPU n=49 nodes=196 copy=4.50 comp=55.68
+sched-prof: graph 62 total=98.33 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.59 comp=39.51 | CPU n=49 nodes=196 copy=4.57 comp=49.65
+sched-prof: graph 63 total=95.90 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.39 comp=38.62 | CPU n=49 nodes=196 copy=4.24 comp=48.63
+sched-prof: graph 64 total=92.05 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.32 comp=37.77 | CPU n=49 nodes=196 copy=4.51 comp=45.43
+llama-bench: benchmark 1/1: generation run 2/2
+sched-prof: graph 65 total=125.80 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.17 comp=47.42 | CPU n=49 nodes=196 copy=3.75 comp=70.42
+sched-prof: graph 66 total=131.73 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.29 comp=48.26 | CPU n=49 nodes=196 copy=3.92 comp=75.24
+sched-prof: graph 67 total=146.76 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.41 comp=51.59 | CPU n=49 nodes=196 copy=4.16 comp=86.58
+sched-prof: graph 68 total=115.47 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.24 comp=38.72 | CPU n=49 nodes=196 copy=4.43 comp=68.06
+sched-prof: graph 69 total=147.30 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.72 comp=40.19 | CPU n=49 nodes=196 copy=4.59 comp=97.78
+sched-prof: graph 70 total=114.45 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.51 comp=40.60 | CPU n=49 nodes=196 copy=4.67 comp=64.66
+sched-prof: graph 71 total=119.82 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.68 comp=40.68 | CPU n=49 nodes=196 copy=5.53 comp=67.90
+sched-prof: graph 72 total=91.89 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.18 comp=38.23 | CPU n=49 nodes=196 copy=4.80 comp=44.65
+sched-prof: graph 73 total=96.84 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.10 comp=37.34 | CPU n=49 nodes=196 copy=4.18 comp=51.19
+sched-prof: graph 74 total=97.95 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.11 comp=39.35 | CPU n=49 nodes=196 copy=4.28 comp=50.19
+sched-prof: graph 75 total=103.30 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.10 comp=36.53 | CPU n=49 nodes=196 copy=4.31 comp=58.34
+sched-prof: graph 76 total=97.33 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.17 comp=39.88 | CPU n=49 nodes=196 copy=4.23 comp=49.03
+sched-prof: graph 77 total=96.06 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.28 comp=39.11 | CPU n=49 nodes=196 copy=4.36 comp=48.30
+sched-prof: graph 78 total=95.27 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.46 comp=38.31 | CPU n=49 nodes=196 copy=4.55 comp=47.93
+sched-prof: graph 79 total=119.01 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.47 comp=38.43 | CPU n=49 nodes=196 copy=4.28 comp=71.83
+sched-prof: graph 80 total=101.12 ms splits=98 | CUDA0 n=49 nodes=7420 copy=3.95 comp=38.44 | CPU n=49 nodes=196 copy=4.13 comp=54.57
+sched-prof: graph 81 total=106.11 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.56 comp=40.72 | CPU n=49 nodes=196 copy=4.77 comp=56.04
+sched-prof: graph 82 total=103.35 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.01 comp=42.47 | CPU n=49 nodes=196 copy=4.95 comp=50.90
+sched-prof: graph 83 total=97.92 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.52 comp=38.94 | CPU n=49 nodes=196 copy=4.64 comp=49.80
+sched-prof: graph 84 total=100.67 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.49 comp=40.69 | CPU n=49 nodes=196 copy=4.24 comp=51.23
+sched-prof: graph 85 total=87.57 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.27 comp=37.34 | CPU n=49 nodes=196 copy=4.21 comp=41.73
+sched-prof: graph 86 total=86.89 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.13 comp=37.37 | CPU n=49 nodes=196 copy=4.04 comp=41.33
+sched-prof: graph 87 total=91.62 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.40 comp=38.60 | CPU n=49 nodes=196 copy=4.63 comp=43.98
+sched-prof: graph 88 total=97.28 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.67 comp=38.00 | CPU n=49 nodes=196 copy=4.67 comp=49.91
+sched-prof: graph 89 total=88.62 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.09 comp=37.66 | CPU n=49 nodes=196 copy=4.39 comp=42.46
+sched-prof: graph 90 total=92.44 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.30 comp=35.87 | CPU n=49 nodes=196 copy=4.20 comp=48.04
+sched-prof: graph 91 total=88.04 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.11 comp=38.91 | CPU n=49 nodes=196 copy=4.17 comp=40.84
+sched-prof: graph 92 total=85.38 ms splits=98 | CUDA0 n=49 nodes=7420 copy=3.90 comp=35.88 | CPU n=49 nodes=196 copy=4.35 comp=41.24
+sched-prof: graph 93 total=97.56 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.84 comp=38.71 | CPU n=49 nodes=196 copy=4.93 comp=49.05
+sched-prof: graph 94 total=103.20 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.53 comp=37.51 | CPU n=49 nodes=196 copy=4.97 comp=56.16
+sched-prof: graph 95 total=94.46 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.27 comp=37.54 | CPU n=49 nodes=196 copy=4.33 comp=48.30
+sched-prof: graph 96 total=90.56 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.44 comp=36.78 | CPU n=49 nodes=196 copy=4.47 comp=44.85
+sched-prof: graph 97 total=97.00 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.31 comp=36.07 | CPU n=49 nodes=196 copy=4.41 comp=52.19
+sched-prof: graph 98 total=94.75 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.49 comp=39.01 | CPU n=49 nodes=196 copy=4.57 comp=46.67
+sched-prof: graph 99 total=96.47 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.79 comp=35.90 | CPU n=49 nodes=196 copy=4.62 comp=51.13
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=    85.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes= 110 copy=    73.0 us comp=  1449.0 us  hc_init
+sched-prof:   split   2 CPU    nodes=   4 copy=    78.0 us comp=  1733.0 us  node_114
+sched-prof:   split   3 CUDA0  nodes= 218 copy=   130.0 us comp=   947.0 us  node_118
+sched-prof:   split   4 CPU    nodes=   4 copy=    95.0 us comp=  1719.0 us  node_336
+sched-prof:   split   5 CUDA0  nodes= 142 copy=    76.0 us comp=   637.0 us  node_340
+sched-prof:   split   6 CPU    nodes=   4 copy=   146.0 us comp=  2462.0 us  node_482
+sched-prof:   split   7 CUDA0  nodes= 189 copy=   497.0 us comp=   720.0 us  node_486
+sched-prof:   split   8 CPU    nodes=   4 copy=    85.0 us comp=  1729.0 us  node_675
+sched-prof:   split   9 CUDA0  nodes= 142 copy=    80.0 us comp=   662.0 us  node_679
+sched-prof:   split  10 CPU    nodes=   4 copy=    80.0 us comp=  2050.0 us  node_821
+sched-prof:   split  11 CUDA0  nodes= 142 copy=   100.0 us comp=   658.0 us  node_825
+sched-prof:   split  12 CPU    nodes=   4 copy=    77.0 us comp=  1969.0 us  node_967
+sched-prof:   split  13 CUDA0  nodes= 142 copy=    76.0 us comp=   729.0 us  node_971
+sched-prof:   split  14 CPU    nodes=   4 copy=    76.0 us comp=  2050.0 us  node_1113
+sched-prof:   split  15 CUDA0  nodes= 189 copy=    93.0 us comp=   624.0 us  node_1117
+sched-prof:   split  16 CPU    nodes=   4 copy=    71.0 us comp=  2328.0 us  node_1306
+sched-prof:   split  17 CUDA0  nodes= 142 copy=    95.0 us comp=   658.0 us  node_1310
+sched-prof:   split  18 CPU    nodes=   4 copy=   124.0 us comp=   901.0 us  node_1452
+sched-prof:   split  19 CUDA0  nodes= 142 copy=    49.0 us comp=   739.0 us  node_1456
+sched-prof:   split  20 CPU    nodes=   4 copy=   100.0 us comp=   819.0 us  node_1598
+sched-prof:   split  21 CUDA0  nodes= 142 copy=    47.0 us comp=   649.0 us  node_1602
+sched-prof:   split  22 CPU    nodes=   4 copy=    97.0 us comp=   779.0 us  node_1744
+sched-prof:   split  23 CUDA0  nodes= 189 copy=    42.0 us comp=   633.0 us  node_1748
+sched-prof:   split  24 CPU    nodes=   4 copy=    94.0 us comp=   801.0 us  node_1937
+sched-prof:   split  25 CUDA0  nodes= 142 copy=    70.0 us comp=   632.0 us  node_1941
+sched-prof:   split  26 CPU    nodes=   4 copy=    91.0 us comp=   738.0 us  node_2083
+sched-prof:   split  27 CUDA0  nodes= 142 copy=    63.0 us comp=   621.0 us  node_2087
+sched-prof:   split  28 CPU    nodes=   4 copy=   131.0 us comp=   885.0 us  node_2229
+sched-prof:   split  29 CUDA0  nodes= 142 copy=   125.0 us comp=   665.0 us  node_2233
+sched-prof:   split  30 CPU    nodes=   4 copy=    85.0 us comp=   861.0 us  node_2375
+sched-prof:   split  31 CUDA0  nodes= 189 copy=    86.0 us comp=   655.0 us  node_2379
+sched-prof:   split  32 CPU    nodes=   4 copy=    92.0 us comp=   396.0 us  node_2568
+sched-prof:   split  33 CUDA0  nodes= 142 copy=    37.0 us comp=   663.0 us  node_2572
+sched-prof:   split  34 CPU    nodes=   4 copy=    85.0 us comp=   359.0 us  node_2714
+sched-prof:   split  35 CUDA0  nodes= 142 copy=    33.0 us comp=   636.0 us  node_2718
+sched-prof:   split  36 CPU    nodes=   4 copy=   112.0 us comp=   717.0 us  node_2860
+sched-prof:   split  37 CUDA0  nodes= 142 copy=    91.0 us comp=   726.0 us  node_2864
+sched-prof:   split  38 CPU    nodes=   4 copy=    87.0 us comp=   904.0 us  node_3006
+sched-prof:   split  39 CUDA0  nodes= 189 copy=    92.0 us comp=  1074.0 us  node_3010
+sched-prof:   split  40 CPU    nodes=   4 copy=    89.0 us comp=   689.0 us  node_3199
+sched-prof:   split  41 CUDA0  nodes= 142 copy=    79.0 us comp=   683.0 us  node_3203
+sched-prof:   split  42 CPU    nodes=   4 copy=   182.0 us comp=  1296.0 us  node_3345
+sched-prof:   split  43 CUDA0  nodes= 142 copy=    69.0 us comp=   659.0 us  node_3349
+sched-prof:   split  44 CPU    nodes=   4 copy=    78.0 us comp=  1107.0 us  node_3491
+sched-prof:   split  45 CUDA0  nodes= 142 copy=    96.0 us comp=   639.0 us  node_3495
+sched-prof:   split  46 CPU    nodes=   4 copy=    92.0 us comp=  1476.0 us  node_3637
+sched-prof:   split  47 CUDA0  nodes= 189 copy=    93.0 us comp=   651.0 us  node_3641
+sched-prof:   split  48 CPU    nodes=   4 copy=   113.0 us comp=  1149.0 us  node_3830
+sched-prof:   split  49 CUDA0  nodes= 142 copy=    84.0 us comp=   628.0 us  node_3834
+sched-prof:   split  50 CPU    nodes=   4 copy=    72.0 us comp=   927.0 us  node_3976
+sched-prof:   split  51 CUDA0  nodes= 142 copy=    64.0 us comp=   754.0 us  node_3980
+sched-prof:   split  52 CPU    nodes=   4 copy=    98.0 us comp=   792.0 us  node_4122
+sched-prof:   split  53 CUDA0  nodes= 142 copy=    96.0 us comp=   633.0 us  node_4126
+sched-prof:   split  54 CPU    nodes=   4 copy=    92.0 us comp=   732.0 us  node_4268
+sched-prof:   split  55 CUDA0  nodes= 189 copy=    80.0 us comp=   752.0 us  node_4272
+sched-prof:   split  56 CPU    nodes=   4 copy=    83.0 us comp=  1361.0 us  node_4461
+sched-prof:   split  57 CUDA0  nodes= 128 copy=    77.0 us comp=   640.0 us  node_4465
+sched-prof:   split  58 CPU    nodes=   4 copy=    85.0 us comp=   974.0 us  ffn_moe_gate-28
+sched-prof:   split  59 CUDA0  nodes= 126 copy=    80.0 us comp=   533.0 us  ffn_moe_weighted-28
+sched-prof:   split  60 CPU    nodes=   4 copy=    78.0 us comp=   890.0 us  ffn_moe_gate-29
+sched-prof:   split  61 CUDA0  nodes= 126 copy=    77.0 us comp=   546.0 us  ffn_moe_weighted-29
+sched-prof:   split  62 CPU    nodes=   4 copy=    85.0 us comp=   952.0 us  ffn_moe_gate-30
+sched-prof:   split  63 CUDA0  nodes= 173 copy=    72.0 us comp=   530.0 us  ffn_moe_weighted-30
+sched-prof:   split  64 CPU    nodes=   4 copy=    85.0 us comp=   880.0 us  ffn_moe_gate-31
+sched-prof:   split  65 CUDA0  nodes= 140 copy=    74.0 us comp=   661.0 us  ffn_moe_weighted-31
+sched-prof:   split  66 CPU    nodes=   4 copy=    88.0 us comp=   413.0 us  node_5174
+sched-prof:   split  67 CUDA0  nodes= 142 copy=    46.0 us comp=   630.0 us  node_5178
+sched-prof:   split  68 CPU    nodes=   4 copy=    73.0 us comp=   850.0 us  node_5320
+sched-prof:   split  69 CUDA0  nodes= 142 copy=    65.0 us comp=   634.0 us  node_5324
+sched-prof:   split  70 CPU    nodes=   4 copy=    82.0 us comp=   891.0 us  node_5466
+sched-prof:   split  71 CUDA0  nodes= 189 copy=    73.0 us comp=   859.0 us  node_5470
+sched-prof:   split  72 CPU    nodes=   4 copy=    74.0 us comp=   845.0 us  node_5659
+sched-prof:   split  73 CUDA0  nodes= 142 copy=    71.0 us comp=   639.0 us  node_5663
+sched-prof:   split  74 CPU    nodes=   4 copy=    71.0 us comp=  1376.0 us  node_5805
+sched-prof:   split  75 CUDA0  nodes= 142 copy=    72.0 us comp=   660.0 us  node_5809
+sched-prof:   split  76 CPU    nodes=   4 copy=    98.0 us comp=  1250.0 us  node_5951
+sched-prof:   split  77 CUDA0  nodes= 142 copy=    79.0 us comp=   743.0 us  node_5955
+sched-prof:   split  78 CPU    nodes=   4 copy=    79.0 us comp=  1753.0 us  node_6097
+sched-prof:   split  79 CUDA0  nodes= 189 copy=    80.0 us comp=   633.0 us  node_6101
+sched-prof:   split  80 CPU    nodes=   4 copy=    71.0 us comp=   660.0 us  node_6290
+sched-prof:   split  81 CUDA0  nodes= 142 copy=    56.0 us comp=   622.0 us  node_6294
+sched-prof:   split  82 CPU    nodes=   4 copy=   158.0 us comp=  1133.0 us  node_6436
+sched-prof:   split  83 CUDA0  nodes= 142 copy=   102.0 us comp=   668.0 us  node_6440
+sched-prof:   split  84 CPU    nodes=   4 copy=    86.0 us comp=   770.0 us  node_6582
+sched-prof:   split  85 CUDA0  nodes= 142 copy=    59.0 us comp=  1330.0 us  node_6586
+sched-prof:   split  86 CPU    nodes=   4 copy=    93.0 us comp=   746.0 us  node_6728
+sched-prof:   split  87 CUDA0  nodes= 189 copy=    63.0 us comp=   625.0 us  node_6732
+sched-prof:   split  88 CPU    nodes=   4 copy=    84.0 us comp=   657.0 us  node_6921
+sched-prof:   split  89 CUDA0  nodes= 142 copy=    67.0 us comp=   628.0 us  node_6925
+sched-prof:   split  90 CPU    nodes=   4 copy=    82.0 us comp=   755.0 us  node_7067
+sched-prof:   split  91 CUDA0  nodes= 142 copy=    66.0 us comp=   634.0 us  node_7071
+sched-prof:   split  92 CPU    nodes=   4 copy=    96.0 us comp=   754.0 us  node_7213
+sched-prof:   split  93 CUDA0  nodes= 142 copy=    75.0 us comp=   653.0 us  node_7217
+sched-prof:   split  94 CPU    nodes=   4 copy=   132.0 us comp=   999.0 us  node_7359
+sched-prof:   split  95 CUDA0  nodes= 194 copy=   107.0 us comp=   725.0 us  node_7363
+sched-prof:   split  96 CPU    nodes=   4 copy=    72.0 us comp=   939.0 us  node_7557
+sched-prof:   split  97 CUDA0  nodes=  55 copy=    80.0 us comp=  2662.0 us  node_7561
+sched-prof: graph 100 total=97.43 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.16 comp=36.43 | CPU n=49 nodes=196 copy=4.48 comp=52.30
+sched-prof: graph 101 total=90.40 ms splits=98 | CUDA0 n=49 nodes=7420 copy=3.88 comp=36.12 | CPU n=49 nodes=196 copy=4.12 comp=46.27
+sched-prof: graph 102 total=108.73 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.34 comp=36.20 | CPU n=49 nodes=196 copy=4.31 comp=63.85
+sched-prof: graph 103 total=102.20 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.78 comp=38.35 | CPU n=49 nodes=196 copy=4.71 comp=54.33
+sched-prof: graph 104 total=88.75 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.32 comp=35.03 | CPU n=49 nodes=196 copy=4.19 comp=45.19
+sched-prof: graph 105 total=87.70 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.14 comp=36.40 | CPU n=49 nodes=196 copy=4.39 comp=42.75
+sched-prof: graph 106 total=90.02 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.30 comp=35.70 | CPU n=49 nodes=196 copy=4.47 comp=45.53
+sched-prof: graph 107 total=85.42 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.01 comp=36.77 | CPU n=49 nodes=196 copy=4.13 comp=40.48
+sched-prof: graph 108 total=110.71 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.36 comp=36.68 | CPU n=49 nodes=196 copy=4.33 comp=65.32
+sched-prof: graph 109 total=99.50 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.53 comp=37.04 | CPU n=49 nodes=196 copy=4.48 comp=53.43
+sched-prof: graph 110 total=96.36 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.54 comp=38.33 | CPU n=49 nodes=196 copy=4.40 comp=49.07
+sched-prof: graph 111 total=91.27 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.03 comp=36.62 | CPU n=49 nodes=196 copy=4.56 comp=46.04
+sched-prof: graph 112 total=91.41 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.42 comp=38.92 | CPU n=49 nodes=196 copy=4.15 comp=43.89
+sched-prof: graph 113 total=89.81 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.00 comp=35.66 | CPU n=49 nodes=196 copy=4.29 comp=45.87
+sched-prof: graph 114 total=88.86 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.26 comp=35.39 | CPU n=49 nodes=196 copy=4.03 comp=45.16
+sched-prof: graph 115 total=96.25 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.74 comp=37.55 | CPU n=49 nodes=196 copy=4.99 comp=48.95
+sched-prof: graph 116 total=91.41 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.34 comp=38.06 | CPU n=49 nodes=196 copy=4.28 comp=44.72
+sched-prof: graph 117 total=93.93 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.86 comp=35.93 | CPU n=49 nodes=196 copy=4.83 comp=48.29
+sched-prof: graph 118 total=100.65 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.49 comp=36.49 | CPU n=49 nodes=196 copy=4.56 comp=55.09
+sched-prof: graph 119 total=96.41 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.48 comp=38.37 | CPU n=49 nodes=196 copy=4.39 comp=49.14
+sched-prof: graph 120 total=102.83 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.50 comp=35.60 | CPU n=49 nodes=196 copy=4.56 comp=58.16
+sched-prof: graph 121 total=96.97 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.71 comp=38.32 | CPU n=49 nodes=196 copy=4.97 comp=48.95
+sched-prof: graph 122 total=92.89 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.10 comp=37.44 | CPU n=49 nodes=196 copy=4.31 comp=47.02
+sched-prof: graph 123 total=96.82 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.76 comp=38.05 | CPU n=49 nodes=196 copy=4.44 comp=49.55
+sched-prof: graph 124 total=109.70 ms splits=98 | CUDA0 n=49 nodes=7420 copy=5.08 comp=39.07 | CPU n=49 nodes=196 copy=4.47 comp=61.04
+sched-prof: graph 125 total=91.72 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.34 comp=37.52 | CPU n=49 nodes=196 copy=4.68 comp=45.16
+sched-prof: graph 126 total=91.67 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.04 comp=36.38 | CPU n=49 nodes=196 copy=4.25 comp=46.98
+sched-prof: graph 127 total=88.66 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.08 comp=37.31 | CPU n=49 nodes=196 copy=4.24 comp=43.02
+sched-prof: graph 128 total=86.69 ms splits=98 | CUDA0 n=49 nodes=7420 copy=4.17 comp=36.17 | CPU n=49 nodes=196 copy=4.23 comp=42.10
+cpu-prof: 6321 graph computes, 7940.54 ms in graphs, ops: comp 7400.28 ms + wait 477.04 ms
+cpu-prof: op               src0     cls      count      comp ms      wait ms     avg us     GB/s
+cpu-prof: MUL_MAT_ID       q4_K     0        12126      3826.51       446.98      352.4    29.20
+cpu-prof: MUL_MAT_ID       q5_1     0         5547      2917.66         0.31      526.0    23.36
+cpu-prof: MUL_MAT_ID       q8_0     0          645       507.44         0.03      786.8    22.13
+cpu-prof: MUL_MAT_ID       q5_K     0          258       125.06        17.82      553.8    23.24
+cpu-prof: GLU              f32      0         6192         8.91        11.89        3.4     0.00
+cpu-prof: GET_ROWS         iq4_nl   0          129        13.08         0.01      101.5     0.00
+cpu-prof: GET_ROWS         q8_0     0          129         1.61         0.00       12.5     0.00
+cpu-prof: expert usage per layer: share of routed slots taken by the top 5% / 10% / 20% of experts
+cpu-prof:   layer   0:   206 used of  512, top5= 35.9% top10= 56.9% top20= 83.7% (n=3519)
+cpu-prof:   layer   1:   189 used of  512, top5= 56.6% top10= 72.8% top20= 89.4% (n=3372)
+cpu-prof:   layer   2:   207 used of  512, top5= 47.2% top10= 66.1% top20= 86.0% (n=3669)
+cpu-prof:   layer   3:   170 used of  512, top5= 64.5% top10= 80.3% top20= 93.3% (n=3339)
+cpu-prof:   layer   4:   181 used of  512, top5= 63.4% top10= 79.3% top20= 92.3% (n=3375)
+cpu-prof:   layer   5:   207 used of  512, top5= 61.3% top10= 75.1% top20= 89.4% (n=3390)
+cpu-prof:   layer   6:   226 used of  512, top5= 50.6% top10= 66.0% top20= 83.6% (n=3399)
+cpu-prof:   layer   7:   208 used of  512, top5= 54.1% top10= 71.3% top20= 88.0% (n=3513)
+cpu-prof:   layer   8:   138 used of  512, top5= 78.8% top10= 89.3% top20= 97.0% (n=3576)
+cpu-prof:   layer   9:   139 used of  512, top5= 73.4% top10= 87.7% top20= 96.8% (n=3438)
+cpu-prof:   layer  10:   114 used of  512, top5= 79.8% top10= 92.8% top20= 99.0% (n=3750)
+cpu-prof:   layer  11:   120 used of  512, top5= 80.5% top10= 92.7% top20= 98.5% (n=3717)
+cpu-prof:   layer  12:   130 used of  512, top5= 76.6% top10= 89.0% top20= 97.5% (n=3381)
+cpu-prof:   layer  13:    87 used of  512, top5= 87.3% top10= 96.5% top20=100.0% (n=3810)
+cpu-prof:   layer  14:   139 used of  512, top5= 67.9% top10= 85.9% top20= 96.7% (n=3411)
+cpu-prof:   layer  15:   137 used of  512, top5= 73.2% top10= 86.0% top20= 96.4% (n=2937)
+cpu-prof:   layer  16:   128 used of  512, top5= 77.6% top10= 88.9% top20= 96.9% (n=2541)
+cpu-prof:   layer  17:    92 used of  512, top5= 88.3% top10= 95.8% top20=100.0% (n=3660)
+cpu-prof:   layer  18:    99 used of  512, top5= 87.2% top10= 94.8% top20=100.0% (n=3648)
+cpu-prof:   layer  19:    79 used of  512, top5= 87.8% top10= 96.8% top20=100.0% (n=3522)
+cpu-prof:   layer  20:   137 used of  512, top5= 69.9% top10= 85.3% top20= 97.1% (n=3675)
+cpu-prof:   layer  21:   102 used of  512, top5= 85.6% top10= 94.9% top20=100.0% (n=3600)
+cpu-prof:   layer  22:   153 used of  512, top5= 68.0% top10= 82.8% top20= 95.6% (n=3717)
+cpu-prof:   layer  23:   191 used of  512, top5= 63.9% top10= 78.1% top20= 90.9% (n=3342)
+cpu-prof:   layer  24:    97 used of  512, top5= 90.2% top10= 96.1% top20=100.0% (n=3690)
+cpu-prof:   layer  25:   143 used of  512, top5= 72.9% top10= 87.4% top20= 96.6% (n=3618)
+cpu-prof:   layer  26:    80 used of  512, top5= 85.2% top10= 96.4% top20=100.0% (n=3759)
+cpu-prof:   layer  27:    95 used of  512, top5= 88.6% top10= 95.4% top20=100.0% (n=3660)
+cpu-prof:   layer  28:   102 used of  512, top5= 84.0% top10= 95.1% top20=100.0% (n=3870)
+cpu-prof:   layer  29:    79 used of  512, top5= 88.4% top10= 97.4% top20=100.0% (n=3870)
+cpu-prof:   layer  30:   135 used of  512, top5= 69.7% top10= 85.8% top20= 97.4% (n=3870)
+cpu-prof:   layer  31:   134 used of  512, top5= 76.4% top10= 88.9% top20= 97.5% (n=3870)
+cpu-prof:   layer  32:    83 used of  512, top5= 88.8% top10= 96.0% top20=100.0% (n=2379)
+cpu-prof:   layer  33:    77 used of  512, top5= 93.4% top10= 97.9% top20=100.0% (n=3795)
+cpu-prof:   layer  34:    78 used of  512, top5= 91.3% top10= 97.7% top20=100.0% (n=3501)
+cpu-prof:   layer  35:    77 used of  512, top5= 90.8% top10= 97.8% top20=100.0% (n=3786)
+cpu-prof:   layer  36:   102 used of  512, top5= 81.8% top10= 92.2% top20=100.0% (n=2961)
+cpu-prof:   layer  37:    74 used of  512, top5= 93.1% top10= 98.1% top20=100.0% (n=3663)
+cpu-prof:   layer  38:   135 used of  512, top5= 76.5% top10= 88.9% top20= 97.4% (n=3747)
+cpu-prof:   layer  39:   111 used of  512, top5= 81.0% top10= 90.7% top20= 99.0% (n=2709)
+cpu-prof:   layer  40:   121 used of  512, top5= 82.3% top10= 91.5% top20= 98.4% (n=3519)
+cpu-prof:   layer  41:   132 used of  512, top5= 76.3% top10= 88.1% top20= 97.2% (n=3189)
+cpu-prof:   layer  42:    98 used of  512, top5= 86.9% top10= 94.8% top20=100.0% (n=3063)
+cpu-prof:   layer  43:   130 used of  512, top5= 81.6% top10= 90.3% top20= 97.4% (n=3201)
+cpu-prof:   layer  44:   136 used of  512, top5= 79.1% top10= 90.2% top20= 97.1% (n=3507)
+cpu-prof:   layer  45:   132 used of  512, top5= 74.7% top10= 89.3% top20= 97.2% (n=3264)
+cpu-prof:   layer  46:   130 used of  512, top5= 79.2% top10= 90.0% top20= 97.5% (n=3315)
+cpu-prof:   layer  47:   108 used of  512, top5= 88.0% top10= 94.8% top20= 99.5% (n=3519)
+cpu-prof:   all 48 layers: top5= 76.7% top10= 88.3% top20= 96.7%
+cpu-prof-experts: 0 0 3 9 0 0 3 0 93 3 15 39 0 21 0 9 69 30 0 0 0 0 3 0 0 39 0 15 0 3 0 15 3 0 9 0 9 0 75 6 12 0 6 6 3 0 0 0 0 9 27 0 0 21 30 21 0 0 0 3 0 0 15 9 18 24 9 30 30 27 3 3 0 0 21 0 0 0 0 0 6 15 0 0 0 0 3 0 0 0 18 0 21 42 0 3 72 0 30 33 27 27 0 6 0 0 54 0 0 6 0 3 0 0 27 0 0 3 0 9 39 33 0 3 6 0 0 0 0 3 21 0 0 0 21 9 0 3 0 15 27 0 0 0 0 3 12 0 18 0 0 0 0 0 0 0 0 0 3 0 0 0 33 0 66 18 0 3 24 0 0 0 0 0 21 36 30 30 0 0 12 3 0 0 0 6 0 3 0 6 24 0 0 0 0 0 0 6 18 0 3 0 0 0 3 0 0 3 3 0 0 0 18 0 0 0 6 0 0 0 0 3 9 24 6 0 0 15 0 0 0 0 0 30 12 0 0 0 6 9 3 9 0 18 0 0 0 0 30 0 0 0 0 0 27 45 0 0 0 6 0 0 0 0 0 0 0 3 0 0 3 39 0 0 0 0 0 0 3 0 0 12 0 0 0 0 0 0 0 0 18 6 12 0 0 0 0 0 0 0 0 0 0 9 0 33 0 0 0 33 3 0 0 0 0 0 0 0 6 0 0 6 0 63 3 0 0 30 0 39 0 0 0 0 0 12 0 0 3 0 33 27 12 27 0 0 0 0 27 27 0 36 0 39 6 6 0 0 0 0 15 0 0 0 3 0 0 12 54 15 0 15 0 0 3 0 0 0 27 3 0 0 3 0 15 0 0 30 0 3 0 0 0 9 3 12 0 0 0 36 15 12 0 0 48 0 0 0 0 0 0 0 0 0 0 15 9 0 0 3 0 0 0 0 0 0 36 0 6 6 0 0 0 60 0 24 0 0 0 0 0 15 12 9 3 0 3 0 0 6 6 0 0 0 0 0 0 0 0 6 15 6 9 6 3 6 0 12 0 6 0 0 21 0 0 0 0 3 0 0 42 0 0 0 3 0 0 0 0 0 9 0 0 30 0 3 6 3 6 0 0 27 36 0 27 9 6 0 18 33 0 0 0
+cpu-prof-experts: 1 0 120 6 0 0 6 9 0 6 0 18 18 21 6 3 0 0 0 0 147 39 30 3 0 0 0 3 15 0 9 6 0 0 3 0 0 0 0 0 3 0 3 9 0 78 0 0 3 0 0 9 0 0 9 87 0 9 0 0 0 3 0 0 0 0 3 0 132 3 0 0 0 0 0 0 0 0 0 33 0 0 3 24 3 0 0 84 0 0 42 3 18 0 0 0 57 0 0 6 3 0 9 0 27 0 0 6 0 0 0 0 0 0 6 12 0 0 27 0 24 9 3 6 0 0 0 0 9 0 3 0 69 0 0 6 0 6 0 30 0 0 9 0 9 9 0 0 0 0 12 9 30 0 6 6 0 0 0 0 0 0 0 0 9 0 24 0 6 93 81 0 0 0 0 3 0 3 0 0 0 0 3 15 9 0 0 0 0 3 3 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 3 0 12 0 0 15 0 3 0 30 3 0 0 3 9 15 12 0 9 0 0 0 0 6 3 0 0 3 0 0 0 0 0 9 0 0 0 0 0 0 0 0 18 3 12 0 0 0 21 0 0 0 3 3 6 3 0 0 48 0 15 9 3 3 3 3 0 0 0 0 0 0 0 0 24 0 0 3 0 0 0 30 3 0 15 0 0 3 0 15 0 30 18 27 9 0 0 9 0 0 0 9 3 0 0 6 0 0 6 21 0 0 6 0 21 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 33 0 0 0 0 9 0 3 15 0 0 66 27 0 0 0 0 0 0 3 0 27 0 0 0 0 3 0 0 0 6 0 9 3 144 45 0 0 0 0 0 3 0 9 45 3 0 0 0 0 12 0 3 6 0 0 15 0 0 0 0 3 0 0 6 0 0 0 0 6 0 0 15 0 9 3 0 12 0 0 0 0 0 0 12 0 0 0 6 15 0 0 18 15 18 0 0 3 0 0 3 0 0 0 33 0 0 0 0 0 3 12 0 0 0 12 3 0 0 6 0 12 0 0 0 0 3 0 0 0 0 0 0 3 0 0 9 0 0 9 0 0 15 0 12 0 0 0 0 15 0 0 0 3 0 0 0 0 0 183 0 6 0 129 6 0 0 3 6 0 0 9 0 0 0
+cpu-prof-experts: 2 3 0 0 15 0 0 0 0 12 3 0 0 24 69 0 0 33 0 3 6 0 0 207 0 0 0 0 0 0 9 3 0 15 36 0 18 15 0 0 3 0 6 96 0 0 30 3 0 9 6 0 9 0 0 0 15 0 9 0 0 3 39 0 3 18 3 12 0 3 66 36 3 12 3 3 252 45 0 0 0 0 0 9 0 0 0 3 3 18 0 0 0 39 0 0 0 0 0 0 0 15 0 48 18 3 0 3 0 3 0 3 0 0 3 0 0 0 36 0 0 0 0 0 9 6 0 0 6 0 0 0 0 0 15 0 0 0 0 6 12 9 63 0 0 0 30 0 0 12 3 15 9 36 0 18 3 0 0 0 0 6 15 0 12 0 45 3 0 3 27 21 0 0 18 0 15 0 9 6 6 12 18 0 0 0 0 0 0 0 0 0 15 24 9 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 3 0 0 0 3 0 0 0 6 12 3 12 0 3 0 0 0 0 0 0 0 21 30 0 0 51 42 0 0 0 0 0 0 0 0 0 0 0 36 0 0 0 15 27 0 0 3 0 0 36 3 12 0 0 0 0 3 0 0 0 0 0 0 9 33 0 0 3 0 0 0 6 0 0 51 0 6 6 6 0 9 12 9 15 3 0 0 18 0 0 0 3 3 15 0 3 3 0 0 0 0 0 3 0 12 0 0 24 36 0 0 0 0 0 0 0 0 0 9 0 0 0 6 0 0 0 3 3 0 0 6 0 15 0 6 0 0 3 6 6 0 6 27 3 0 0 42 33 0 0 0 15 0 3 3 15 0 6 0 3 36 0 24 0 0 0 18 6 0 0 3 0 0 9 0 3 39 0 0 39 0 0 0 3 0 21 0 0 0 0 3 0 0 12 15 0 3 0 3 15 0 63 0 0 0 0 12 0 0 12 0 0 21 0 0 0 0 0 18 0 0 18 96 0 15 6 12 0 0 0 3 9 0 0 3 0 75 21 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 12 0 0 3 6 0 0 6 0 12 0 12 3 9 12 3 0 0 27 3 51 9 0 0 0 0 15 0 0 0 0 0 9 0 6 0 6 9 0 60 45 0 0 0 0 0
+cpu-prof-experts: 3 0 0 0 0 0 3 6 0 3 0 0 0 0 0 0 0 0 153 3 0 0 0 0 0 6 0 0 6 0 0 27 0 9 0 3 3 6 0 0 0 27 0 3 0 3 0 0 21 0 0 0 66 3 0 0 0 0 0 39 0 0 0 3 0 0 0 12 0 9 21 12 0 0 0 0 0 0 0 0 0 0 0 6 3 3 0 0 0 12 0 6 12 0 0 0 3 39 0 0 6 0 240 6 6 18 0 6 0 0 0 0 0 0 0 0 0 0 21 3 0 0 0 6 0 3 0 0 6 0 0 0 0 0 0 0 0 0 0 3 0 0 6 0 9 12 12 6 0 0 3 0 9 30 3 3 0 21 0 0 3 0 0 0 0 0 0 0 0 3 18 0 0 3 60 0 0 18 0 0 0 0 3 0 3 0 3 0 0 0 39 222 51 0 9 0 0 0 0 6 0 45 3 0 0 0 0 6 0 3 0 3 0 0 0 12 0 0 12 15 9 66 0 0 9 0 0 0 0 0 0 3 72 3 0 0 0 0 0 0 0 15 0 0 3 0 0 0 6 0 0 3 3 0 6 3 3 0 3 0 0 6 9 0 0 0 0 0 6 0 0 0 21 0 3 0 9 18 0 0 0 0 0 0 0 0 3 6 0 3 45 6 0 0 0 6 0 0 12 0 0 0 0 9 129 0 0 21 69 0 0 0 0 0 33 0 3 0 24 6 0 3 0 0 0 75 63 0 0 3 0 0 0 0 24 0 0 0 3 0 51 0 0 0 3 0 0 0 0 0 0 0 0 3 3 0 0 30 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21 0 9 6 12 3 3 0 24 0 0 0 3 0 0 0 3 0 0 9 0 0 0 0 48 0 0 0 0 0 0 0 0 12 6 0 0 0 0 78 12 0 0 0 0 0 21 3 0 0 69 0 90 3 0 0 0 0 0 0 0 15 0 0 0 0 0 3 6 12 0 0 3 3 27 0 0 153 0 9 0 0 0 0 0 0 0 3 0 0 0 0 3 0 0 6 0 12 0 0 0 0 0 0 18 9 0 0 0 0 3 0 0 3 3 0 9 0 3 0 0 6 9 0 0 0 0 0 0 3 0 0 108 0 0 0 0 51 0 0
+cpu-prof-experts: 4 30 24 3 3 0 3 0 0 18 12 0 0 12 0 0 0 9 0 3 0 0 165 18 3 0 0 15 0 0 0 0 0 0 0 0 0 0 0 3 42 0 153 27 0 9 0 0 0 0 0 3 0 0 12 3 15 0 0 0 3 3 0 33 3 0 0 0 18 15 0 0 6 6 0 0 0 0 0 0 0 0 0 0 9 0 0 3 0 0 0 24 27 0 0 0 0 3 0 0 0 9 0 0 0 9 9 45 3 0 0 0 57 3 15 0 3 0 0 6 0 0 21 0 3 0 0 0 0 3 0 0 0 12 9 24 0 24 0 6 0 3 0 0 0 18 3 0 0 3 0 18 3 0 3 0 0 0 0 0 3 0 0 0 0 0 0 6 0 0 0 0 0 3 0 15 0 3 27 0 3 0 0 0 0 0 0 3 6 0 0 3 6 3 0 0 0 0 0 0 0 6 0 0 0 3 3 0 3 0 0 0 0 0 3 48 0 0 0 0 0 6 0 0 3 0 9 0 0 0 0 0 27 6 0 0 0 0 0 0 24 33 0 0 0 6 0 0 0 0 3 0 3 0 3 0 0 6 0 0 24 0 0 0 3 30 0 9 6 0 3 0 0 0 0 9 0 0 12 0 0 6 0 69 6 9 0 0 0 0 3 0 0 6 0 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0 348 0 0 57 0 0 0 0 3 0 0 15 0 0 27 3 9 0 3 0 0 3 0 0 3 0 0 0 39 30 6 0 0 0 3 0 66 0 21 0 0 0 36 0 0 6 0 0 0 0 0 0 3 0 0 3 0 6 30 0 0 0 0 0 0 3 108 30 0 12 0 0 0 6 0 0 0 0 0 0 0 0 0 3 6 0 0 3 6 30 0 0 3 0 0 3 0 0 9 0 0 63 0 6 0 6 0 3 0 3 0 0 3 9 9 3 144 0 0 0 0 0 3 0 9 0 0 0 0 0 0 0 0 0 0 18 9 0 6 6 0 0 0 0 60 0 24 0 0 6 0 0 0 0 3 3 0 0 3 0 0 0 3 3 0 0 24 0 0 0 9 3 0 0 3 0 9 0 0 0 0 3 3 0 0 3 0 15 0 6 0 279 9 0 0 114 0 0 0 6 0 3 3
+cpu-prof-experts: 5 0 0 3 0 3 3 3 33 0 0 0 0 9 0 3 0 3 3 3 27 0 24 3 0 6 6 0 0 15 0 0 3 3 12 12 0 30 0 189 12 3 3 12 3 9 0 0 0 0 0 0 0 3 0 0 0 0 6 9 0 21 3 0 0 0 0 0 6 0 3 9 3 0 6 0 0 0 0 6 6 3 9 3 0 0 6 3 0 0 3 3 0 0 3 0 6 0 0 18 0 0 3 48 0 237 0 0 0 0 3 0 0 0 3 3 6 0 3 3 15 0 0 18 3 57 0 27 0 6 0 6 0 3 0 0 0 9 0 0 0 144 0 0 9 0 0 3 12 0 3 0 0 21 0 0 0 0 12 0 0 0 0 0 0 3 3 6 3 0 96 3 0 3 0 3 21 0 0 0 3 3 3 12 0 0 0 3 0 0 3 0 0 27 15 0 0 0 0 0 0 0 0 9 3 21 9 3 0 0 0 0 6 0 6 18 0 12 0 12 0 0 0 0 0 21 0 0 0 0 0 12 0 21 0 48 0 0 0 0 75 3 0 0 3 0 12 3 0 0 0 0 0 3 6 6 0 18 3 0 0 0 0 0 0 0 0 9 3 3 0 0 0 0 0 6 3 0 0 0 0 0 0 0 0 0 0 0 0 48 0 0 342 0 0 0 3 3 0 0 0 0 0 3 0 0 0 24 0 0 0 0 3 0 0 69 0 0 9 3 0 0 0 0 3 3 0 9 27 72 0 0 0 0 12 0 12 3 0 3 0 3 0 9 0 63 0 0 12 0 0 0 6 12 3 0 0 3 24 6 0 12 0 0 0 21 15 3 3 3 0 0 9 0 0 3 0 0 0 0 0 24 0 6 0 0 0 0 0 0 0 96 0 3 15 9 9 0 0 3 0 0 0 12 0 0 0 0 0 0 0 3 0 0 6 0 0 0 9 36 0 42 0 0 0 0 9 0 6 0 93 0 36 0 0 0 0 0 0 0 0 0 15 3 12 0 0 6 3 0 0 0 0 0 3 3 3 0 0 0 3 0 0 0 0 15 3 3 0 15 6 12 6 81 0 0 0 15 0 3 3 0 0 0 6 3 3 18 0 0 0 0 0 0 0 0 0 3 12 3 0 9 0 36 0 0 0 0 0 0 3 0 3
+cpu-prof-experts: 6 21 0 21 3 0 0 0 6 0 6 0 0 9 0 0 0 3 0 9 0 12 0 3 0 0 0 0 0 0 3 9 6 3 0 0 6 6 36 6 0 87 6 0 15 0 15 12 0 0 0 0 3 0 0 0 0 0 0 0 12 6 0 3 3 0 0 3 12 0 24 0 9 0 0 6 0 3 90 3 0 0 0 3 0 0 3 6 0 21 24 24 138 21 0 6 36 0 6 0 0 0 6 6 9 0 12 0 6 0 0 0 0 0 6 54 0 15 9 0 0 12 9 0 180 0 0 0 36 0 9 0 0 6 0 0 0 0 0 0 33 0 6 0 0 3 9 3 0 6 3 3 3 45 0 0 18 0 0 0 33 0 0 3 63 0 0 0 0 0 15 6 81 33 0 18 0 0 0 0 0 0 0 0 12 75 0 0 0 6 0 0 0 0 30 0 0 3 9 0 0 0 3 3 0 0 0 9 0 0 18 0 0 3 6 6 15 0 0 0 0 0 39 0 12 0 3 3 6 6 0 6 0 3 0 0 3 6 0 42 0 0 6 0 0 24 9 0 0 0 27 0 15 0 0 0 0 9 0 0 0 0 0 6 0 0 0 0 9 0 0 6 0 3 3 0 0 0 0 0 9 0 6 9 0 3 0 6 0 0 0 0 12 0 3 9 156 0 0 3 9 0 0 0 0 0 12 33 0 3 3 0 3 6 0 3 12 3 0 6 0 0 0 0 12 0 0 3 0 12 3 0 0 0 3 15 0 0 0 0 0 0 0 0 0 12 0 24 3 27 3 0 0 3 15 0 0 3 0 18 6 0 0 0 0 18 9 6 0 9 0 0 3 0 0 9 6 0 0 0 0 12 3 0 0 6 0 0 39 0 6 3 0 6 15 15 12 3 0 18 0 3 0 3 3 12 0 3 0 57 18 0 30 0 78 0 0 3 0 0 0 0 6 3 9 0 3 3 0 12 3 3 24 24 15 0 0 0 3 48 6 3 3 0 3 0 0 0 0 0 3 12 3 0 0 12 3 0 0 0 0 0 0 0 3 6 0 0 3 0 6 0 0 0 6 12 0 0 0 0 3 15 9 0 0 0 12 12 0 0 0 0 12 102 0 6 6 18 0 0 6 0 15 0 75 0 0 0 0 3 15 0 0
+cpu-prof-experts: 7 0 0 0 0 0 0 0 0 24 0 0 3 15 0 3 0 0 0 3 0 9 0 15 0 6 0 3 9 6 15 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 72 0 0 42 0 6 0 0 6 0 0 0 0 0 27 6 0 0 0 0 0 0 6 30 6 0 0 0 3 0 0 3 0 0 0 0 27 0 0 6 21 0 3 0 0 0 0 0 3 0 3 0 3 3 3 3 18 27 0 0 0 0 0 6 0 0 0 12 0 30 0 3 3 0 0 0 0 9 0 0 0 0 3 12 6 6 0 0 0 0 0 0 0 3 0 0 15 0 9 3 21 0 0 0 21 0 0 0 0 6 3 0 57 3 0 6 0 0 18 0 3 0 21 0 0 0 18 0 3 0 0 9 45 0 3 0 6 0 0 3 3 21 0 9 3 0 78 216 0 0 0 9 0 0 9 0 6 0 0 0 6 3 33 6 0 0 0 9 0 0 3 0 0 3 0 0 12 9 0 0 18 0 0 0 0 0 0 0 0 0 12 0 0 0 0 27 6 15 3 12 3 0 0 0 0 24 0 0 0 3 0 0 0 6 0 0 0 0 6 6 0 0 0 0 0 6 0 0 3 0 3 0 0 0 3 0 0 3 15 30 0 0 0 0 0 0 0 54 0 51 6 6 0 0 27 0 0 0 0 33 3 0 12 0 0 24 0 21 3 0 3 6 0 3 0 0 0 3 6 0 0 3 6 0 0 3 0 0 0 15 0 54 0 81 3 0 9 18 0 15 0 36 0 0 0 0 3 9 21 0 0 144 21 0 0 0 6 0 3 0 36 45 87 0 0 0 3 0 3 0 6 3 0 0 6 0 0 0 0 3 3 0 48 0 0 15 6 6 0 72 0 0 0 0 3 15 96 3 0 0 3 0 0 0 159 0 3 3 0 0 0 6 0 0 0 0 0 0 0 9 9 3 9 3 63 3 3 0 6 0 0 0 0 3 0 3 6 6 21 6 0 12 0 0 3 0 3 0 147 21 3 9 9 0 6 18 0 39 0 0 0 3 0 0 0 18 3 0 0 0 0 6 0 0 0 66 0 0 0 39 0 0 0 0 0 3 3 3 0 0 24 42 0 0 21 9 0 15 6 15 0 0 3 3 9
+cpu-prof-experts: 8 0 0 0 0 3 0 0 0 0 3 0 0 0 0 3 0 0 27 0 0 3 0 6 0 0 3 0 0 12 3 0 6 0 0 0 3 60 3 0 0 0 0 0 0 18 0 120 0 0 0 6 9 0 0 0 0 0 6 0 0 0 3 9 18 3 0 9 3 0 0 6 0 0 6 0 0 0 0 0 6 0 0 9 0 0 0 0 0 0 3 0 0 3 0 3 0 0 0 0 36 0 0 0 0 0 60 0 0 18 9 0 0 0 0 9 3 0 0 0 0 0 6 0 0 9 0 0 18 0 6 0 3 3 3 159 0 0 3 0 0 0 0 0 0 3 0 9 0 0 0 48 0 0 0 0 0 0 0 3 0 0 0 0 0 30 0 0 3 0 0 0 0 3 0 0 0 3 0 0 21 0 36 0 63 0 0 0 15 0 0 0 0 3 0 0 0 0 21 0 0 0 0 0 0 78 0 0 3 24 0 0 0 12 0 0 0 0 0 186 42 0 0 0 21 0 0 0 0 0 0 0 48 0 0 0 0 0 3 0 0 0 3 0 0 6 0 0 0 0 0 93 3 0 0 0 0 0 0 6 0 6 3 0 372 78 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 6 0 0 0 6 9 3 0 0 0 12 0 0 0 27 0 0 0 39 0 0 0 0 0 0 3 15 0 96 0 0 0 6 6 0 3 0 0 6 0 9 3 0 0 0 3 0 0 0 0 0 0 0 3 0 0 0 0 0 6 0 0 0 0 0 15 0 0 0 0 0 3 0 0 36 0 0 0 0 15 321 0 3 0 3 0 0 3 0 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 0 0 333 3 0 3 0 0 18 0 24 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 6 0 0 0 0 6 0 0 15 0 0 0 3 0 0 150 3 6 0 0 0 3 0 0 0 6 0 0 0 0 0 255 0 3 0 0 0 0 0 0 0 0 6 0 0 3 0 0 0 3 0 0 0 0 0 0 0 9 0 0 0 3 3 0 0 0 0 12 0 18 3 0 0 0 0 0 9 15 0 0 0
+cpu-prof-experts: 9 0 0 0 0 0 0 0 0 6 0 0 30 3 9 0 0 3 0 3 0 0 3 3 42 0 0 93 0 0 0 0 0 3 0 0 0 0 0 6 0 0 3 0 0 9 0 0 0 0 6 0 0 3 0 9 0 0 3 0 81 0 0 0 0 0 0 0 0 0 9 21 3 0 18 0 3 0 0 0 3 0 0 0 0 0 0 0 6 0 3 0 0 0 0 0 0 9 0 0 0 0 0 0 45 9 0 0 12 0 24 0 0 0 12 9 3 0 3 0 0 0 3 0 0 0 54 24 6 3 0 0 3 0 3 15 0 0 0 0 0 0 0 36 0 0 0 0 0 0 0 0 0 0 69 0 0 48 0 0 0 0 0 9 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 9 3 9 0 0 0 0 0 0 9 0 66 3 0 0 0 0 3 42 0 12 0 0 0 0 0 0 141 0 0 0 0 0 0 0 3 0 0 12 27 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 9 0 0 0 0 9 0 0 0 6 0 3 0 0 0 0 0 9 261 0 0 6 0 0 0 0 0 0 3 0 81 3 3 0 0 0 0 6 0 0 0 0 6 15 0 0 15 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 123 0 0 3 3 0 0 0 0 12 3 0 0 0 0 3 0 0 3 0 0 0 3 0 0 0 0 0 0 0 15 0 3 0 0 0 0 0 0 0 6 0 0 0 0 3 0 3 75 195 15 27 3 90 15 54 51 60 0 0 0 9 0 0 3 0 0 0 0 0 0 3 0 0 0 15 0 0 0 0 0 0 3 3 0 0 0 0 27 18 3 0 0 0 3 0 9 6 0 0 0 0 0 0 0 0 231 0 0 174 3 36 0 0 0 0 0 6 0 0 3 0 0 3 3 0 0 0 3 0 0 12 0 3 0 0 0 0 51 6 0 0 0 0 3 87 0 12 0 6 0 0 0 0 0 0 0 30 0 0 0 3 0 0 33 0 0 171 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 102
+cpu-prof-experts: 10 0 0 0 3 0 0 3 15 0 0 0 0 0 0 3 0 0 45 321 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0 0 225 24 0 0 0 60 0 0 0 9 0 0 0 0 6 0 0 0 0 0 0 0 0 18 0 0 0 0 102 3 0 0 0 0 234 15 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 9 0 0 0 0 3 0 3 3 342 0 9 9 0 0 0 0 0 0 9 0 0 0 0 0 0 6 0 0 3 0 0 0 15 0 9 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 39 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 96 0 0 0 0 3 0 0 0 0 0 3 0 18 0 0 0 0 0 0 0 0 0 42 0 0 0 0 15 0 0 0 0 0 0 15 0 0 3 0 0 0 3 0 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 15 0 0 3 42 0 0 3 0 0 0 3 0 0 0 0 0 3 0 0 3 60 3 3 0 0 3 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 9 0 0 0 0 0 0 186 0 0 0 3 0 0 3 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 75 0 0 0 0 0 0 0 0 0 0 3 0 0 0 39 66 6 30 0 0 12 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 12 0 3 0 0 3 0 0 0 0 6 0 3 3 96 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 123 9 0 0 0 0 45 0 0 0 0 81 0 0 63 0 3 0 0 0 0 6 0 3 0 0 0 0 0 0 6 99 0 39 0 3 0 0 0 0 0 3 0 30 165 0 12 0 0 0 21 0 0 0 0 0 0 0 0 12 12 0 0 0 3 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 12 0 24 0 0 0 0 0 213 0 0 60 0 0 0 0 0 0 0 0 0 3 3 0 0 0 0 0 0 3 0 6 0 0 0 0 0 0 0 0 0 0 54 3 0 0 0 3 0 0 0 6 0 0 0 33 57 0 0
+cpu-prof-experts: 11 0 0 0 0 0 0 0 9 12 0 6 0 0 3 0 0 0 0 0 0 0 0 0 36 0 0 0 0 0 0 3 0 3 0 3 54 18 0 0 0 0 0 0 0 0 0 0 0 81 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 135 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 6 3 0 6 0 3 0 0 0 0 0 0 0 147 42 0 0 0 0 0 6 0 0 0 171 0 0 0 3 0 3 0 0 0 0 0 51 0 0 0 45 0 0 0 0 0 3 0 0 0 0 0 0 6 3 3 0 3 0 0 12 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 69 3 51 0 0 0 0 6 6 0 0 0 0 0 0 0 3 3 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 12 0 0 0 0 0 0 0 0 0 24 0 3 0 3 0 0 0 6 3 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 18 3 0 24 0 0 0 18 3 0 0 0 9 12 0 0 126 0 0 0 0 0 0 0 147 0 0 0 0 0 0 42 0 0 0 0 0 129 3 0 0 0 0 0 0 0 0 3 12 87 0 0 0 0 3 6 6 0 0 0 0 6 0 0 0 0 0 0 0 0 3 0 3 0 3 0 0 0 9 3 3 0 0 0 18 0 360 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 114 0 3 0 0 0 0 24 0 0 126 6 0 0 0 0 3 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 36 3 33 3 0 0 0 0 3 3 0 0 0 45 0 3 3 0 0 0 0 12 63 0 0 0 0 0 0 111 0 0 0 3 369 0 0 0 0 0 3 0 0 0 0 0 21 0 0 0 24 0 0 225 0 0 0 0 0 0 3 0 0 0 0 0 0 3 3 0 0 0 0 69 18 9 0 0 0 0 3 0 0 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 0 0 0 0 0 21 0 39 0 0 0 0 0 0 0 3 0 0 0 3 12 0 12 93 0 0 0
+cpu-prof-experts: 12 156 21 66 3 0 0 0 0 0 9 0 0 0 3 0 0 21 0 0 0 0 9 0 3 0 0 0 3 9 9 0 0 0 0 0 0 12 0 0 0 0 0 0 57 0 27 0 0 0 0 6 3 357 0 54 0 0 0 0 0 0 0 0 0 0 0 27 6 0 0 0 0 0 0 0 0 6 6 0 0 0 6 0 6 3 0 54 0 0 0 0 0 0 0 3 0 0 3 0 6 0 0 0 0 0 0 0 0 0 0 48 0 0 0 0 0 0 0 0 0 24 0 0 0 0 0 0 0 0 0 84 0 0 129 3 0 6 0 0 96 0 69 0 0 3 0 0 6 0 0 9 0 0 3 0 0 3 0 0 0 0 9 3 0 0 9 0 27 0 0 3 0 48 0 0 0 0 0 0 0 6 9 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 15 9 0 0 0 0 0 12 0 6 0 0 0 0 12 45 15 0 0 87 0 0 0 0 3 0 0 0 0 84 0 0 0 6 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 3 18 0 0 0 0 0 0 0 0 0 0 3 0 33 0 0 0 0 0 144 0 6 0 0 9 0 0 0 3 0 0 0 3 6 0 3 6 0 0 0 0 3 0 3 0 6 0 15 0 0 0 0 0 0 3 0 0 0 0 0 0 12 6 3 0 3 0 0 0 0 0 0 0 0 0 21 0 0 0 0 0 0 0 0 0 0 0 0 327 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 198 0 0 0 0 0 0 0 0 0 0 0 0 42 0 3 0 0 21 0 0 6 15 3 3 6 0 0 0 0 0 0 0 0 0 0 6 0 0 0 27 0 0 0 0 0 0 0 0 0 9 0 3 78 18 0 0 6 3 0 0 0 45 0 0 147 0 0 6 0 0 0 6 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 45 0 3 0 0 0 0 0 0 0 12 12 0 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 6 0 69 0 0 0 0 0 0 6 3 18 0 0 0 0 18 3 0 0 3 6 3 0 6
+cpu-prof-experts: 13 0 0 6 0 0 0 0 0 0 0 0 48 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 108 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 3 3 9 0 0 0 0 0 0 0 0 0 0 0 0 24 0 0 0 3 0 0 0 0 0 225 0 57 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0 0 0 0 153 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 12 0 0 0 0 6 0 0 36 0 0 0 0 0 3 0 0 0 0 0 0 0 51 0 0 3 0 0 0 0 3 0 3 0 0 72 0 0 0 0 0 0 0 0 0 57 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 3 0 0 0 147 0 0 0 0 0 0 0 0 0 0 0 9 0 3 0 0 15 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 39 0 0 0 0 0 0 0 0 339 0 0 6 0 0 207 0 0 6 0 0 0 0 108 18 0 0 0 0 288 0 0 9 0 0 0 0 0 0 0 210 27 0 12 3 0 18 0 0 0 0 0 3 0 3 0 0 3 0 3 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 30 21 0 0 0 141 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 6 0 0 0 9 0 3 0 0 9 0 0 0 0 0 6 0 0 0 48 0 0 0 0 0 171 0 90 0 0 0 0 30 0 0 0 0 3 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 153 0 3 0 0 3 0 0 0 0 0 0 0 135 0 21 0 0 0 0 3 0 0 0 0 0 0 0 6 0 129 3 6 3 0 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21 0 0 0 9 0 0 0
+cpu-prof-experts: 14 0 3 27 0 0 0 0 3 0 42 0 3 6 0 0 0 0 0 0 0 0 0 3 0 0 0 0 6 0 75 0 0 0 0 0 0 3 0 0 0 183 0 0 0 0 0 0 0 0 36 0 0 0 0 0 0 0 0 0 0 0 0 0 0 30 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 21 6 6 0 33 0 0 0 0 0 0 0 0 102 0 0 0 9 6 0 0 0 0 0 9 0 15 0 0 18 0 3 0 3 0 12 0 3 0 0 0 0 0 3 0 0 15 9 0 0 0 0 0 18 21 3 123 0 0 0 0 0 0 0 0 0 18 0 0 48 0 3 9 3 0 0 0 0 0 0 9 0 0 15 0 0 48 0 3 3 0 39 0 3 54 0 0 0 69 9 0 0 0 3 3 0 0 0 0 3 0 0 30 0 0 0 0 3 9 0 0 0 0 18 0 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 0 3 6 0 0 6 0 0 0 0 0 0 48 0 0 0 15 0 0 0 0 12 138 0 0 0 0 0 0 0 9 0 0 0 0 12 0 6 30 0 0 0 0 0 105 0 0 0 0 3 0 0 0 0 0 0 0 0 111 0 9 0 3 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 6 3 0 0 63 0 0 0 0 0 15 0 0 0 0 0 9 0 6 0 0 0 6 21 3 0 0 63 3 0 87 84 0 18 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 0 12 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 84 15 0 0 0 0 0 0 9 0 6 0 0 0 6 0 0 0 0 3 0 93 3 3 0 9 0 9 0 0 75 0 126 0 0 0 0 15 3 0 3 0 0 0 0 0 0 3 3 0 0 0 0 24 9 0 0 3 0 0 0 0 0 0 0 3 3 0 3 0 0 0 0 0 0 0 0 0 0 0 6 0 0 3 0 0 0 0 0 0 0 0 0 6 81 0 84 0 0 0 0 0 0 0 0 3 0 0 0 0 0 36 0 0 3 33 0 0 60 3 0 39 0 96 30 6 3 0 3 174 0 0 0 9 0
+cpu-prof-experts: 15 0 0 0 0 3 0 0 0 0 6 0 0 108 0 0 0 0 0 66 0 0 3 0 3 0 0 6 3 0 0 12 9 0 0 0 0 0 0 9 0 0 0 0 3 0 6 0 0 0 0 183 0 0 12 0 0 3 0 0 3 3 0 0 0 0 0 0 0 0 0 0 9 0 0 6 0 30 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 78 0 81 0 51 6 0 9 3 9 0 3 0 18 0 0 0 0 0 0 0 0 6 0 3 3 3 0 6 6 0 0 0 0 0 12 0 0 45 0 15 0 0 0 0 0 0 0 0 0 12 0 6 0 0 0 0 6 3 0 21 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 3 258 0 0 18 6 3 3 0 0 0 3 3 3 0 9 0 0 0 60 0 0 0 0 0 0 0 3 0 0 0 126 0 12 42 0 0 0 0 3 6 0 9 0 0 12 15 12 0 3 12 0 0 0 0 3 0 0 0 0 12 3 0 0 0 0 0 0 6 0 0 0 0 0 0 0 3 21 0 0 0 0 0 0 0 0 0 0 0 0 33 0 0 0 0 0 12 3 0 3 0 0 0 0 6 0 0 9 78 0 48 0 0 3 0 45 24 9 24 0 0 0 0 0 0 0 0 0 3 0 210 0 3 0 0 0 0 3 0 0 0 15 0 0 0 87 0 3 3 0 0 3 0 0 6 0 0 6 0 3 0 0 0 0 0 0 0 3 0 12 0 0 0 0 12 3 0 3 24 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 51 0 0 9 6 0 87 18 0 0 0 0 0 0 0 0 0 0 0 6 0 0 3 0 75 0 3 0 0 0 0 0 0 27 3 0 0 0 15 0 0 0 0 0 0 0 0 6 0 0 51 0 0 0 0 0 0 0 0 3 0 3 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 9 0 12 0 0 0 6 0 0 0 0 0 6 0 0 0 0 138 0 0 6 0 3 0 0 0 6 69
+cpu-prof-experts: 16 0 0 18 0 6 0 0 0 0 3 3 12 0 3 0 0 0 0 0 0 0 0 0 0 3 9 0 0 0 0 0 0 30 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 3 69 3 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 12 0 0 0 0 0 0 3 12 9 0 0 0 0 0 0 42 0 0 9 3 0 0 3 0 0 102 0 0 0 6 0 0 99 3 3 0 3 3 0 0 0 0 0 0 0 3 0 0 0 0 0 6 3 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 45 0 0 0 0 27 0 0 0 0 0 15 3 3 3 3 15 0 0 0 0 0 0 0 3 0 0 0 6 0 0 18 0 0 0 0 0 387 3 0 0 3 0 0 3 3 3 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 12 0 3 0 0 3 27 3 0 144 6 0 0 9 0 0 27 0 351 0 3 0 0 6 15 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 12 0 0 6 0 0 0 6 0 0 0 3 0 3 0 21 0 0 9 0 0 0 0 3 0 0 27 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 3 0 0 0 3 0 0 0 0 0 0 15 0 15 6 0 3 0 3 3 0 0 0 0 0 0 0 9 0 3 0 3 0 0 0 0 0 0 0 0 6 0 3 27 60 0 6 0 0 0 6 0 66 3 0 0 0 0 0 0 3 18 0 0 0 0 0 0 3 0 3 24 0 0 24 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 6 0 0 0 0 0 0 0 0 36 0 0 0 0 6 3 48 0 3 0 0 0 6 0 0 0 0 18 0 0 0 3 0 0 3 6 3 12 0 0 0 36 0 0 0 0 0 0 0 126 0 90 0 0 0 6 0 3 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0
+cpu-prof-experts: 17 0 3 0 0 0 0 3 0 57 0 9 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 6 0 0 0 0 0 0 3 0 0 0 0 51 0 0 0 0 30 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 33 0 0 0 0 0 0 0 0 0 0 0 0 57 0 0 0 3 0 0 6 0 0 0 0 0 3 0 0 6 0 0 0 0 0 0 6 0 0 0 0 0 0 3 3 0 0 0 0 6 0 0 0 0 0 0 3 12 0 0 3 0 0 0 6 387 9 0 57 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 9 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 6 0 0 0 21 0 0 0 0 0 3 0 0 0 0 0 9 0 0 54 6 0 0 0 0 0 0 0 0 3 0 36 9 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 3 12 0 0 9 0 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 54 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 183 0 0 0 9 12 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 75 0 3 0 0 0 15 3 0 0 0 0 0 0 0 0 0 12 6 0 3 0 0 6 0 0 0 0 0 0 0 3 0 0 177 270 0 0 180 0 0 3 0 0 0 0 288 0 0 0 0 0 3 0 0 0 0 0 0 129 0 0 3 0 0 0 18 0 0 0 30 0 0 0 0 0 0 0 0 24 0 0 0 0 0 6 0 0 0 0 0 135 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 0 12 0 0 0 0 102 78 303 0 0 15 0 0 0 3 3 0 0 0 0 0 0 381 0 0 0 0 0 0 0 3 0 0 3 36 0 0 0 0 0 0 0 12 0 0 0 9 0
+cpu-prof-experts: 18 0 0 0 6 0 15 0 24 0 12 0 6 0 3 0 0 0 0 0 0 3 0 180 0 156 3 0 3 6 378 0 0 0 48 0 6 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 15 30 0 0 0 0 0 0 0 0 0 0 0 0 282 75 3 0 0 15 0 0 0 12 249 0 0 0 0 9 0 3 42 0 0 0 0 3 0 0 0 3 0 0 231 0 0 6 9 0 0 0 0 0 0 0 0 0 0 0 12 3 0 0 3 0 0 0 0 0 195 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 42 0 0 0 0 0 0 0 0 6 0 0 63 0 0 0 0 3 0 0 0 3 0 0 0 0 0 3 279 0 12 0 0 0 3 0 0 0 9 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 3 3 0 3 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 90 0 6 9 0 0 0 0 0 39 0 24 9 6 3 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 135 0 0 0 0 0 3 0 0 0 0 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 3 18 0 69 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 3 0 0 3 0 0 0 6 0 0 0 0 0 15 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 9 0 0 54 0 6 0 0 0 0 0 300 12 0 0 0 0 0 0 0 0 0 135 12 0 0 0 0 0 0 0 0 3 0 0 0 0 18 9 0 0 0 0 0 9 0 0 3 0 0 0 0 0 3 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0
+cpu-prof-experts: 19 0 0 3 138 3 36 0 0 0 69 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 6 0 12 249 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 27 0 0 0 252 0 0 0 0 0 0 0 75 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 12 0 0 0 0 6 0 0 0 3 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 36 0 0 0 0 0 0 0 0 0 0 0 0 0 0 105 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 240 18 3 0 0 0 0 0 3 15 0 12 51 0 0 0 0 0 0 0 144 0 9 0 0 0 0 3 0 0 0 0 57 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 3 255 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 18 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 0 12 0 0 0 0 0 0 0 0 0 9 0 0 0 135 0 3 0 0 0 0 0 0 0 0 0 0 9 0 0 6 0 45 0 0 0 0 0 282 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 6 0 0 0 9 0 0 0 0 9 0 66 0 0 0 9 0 0 0 42 0 0 204 0 42 0 0 0 0 0 0 0 75 0 0 0 0 0 0 0 0 3 0 0 33 0 0 0 0 0 9 0 0 3 0 0 0 0 0 0 18 0 0 0 0 0 0 6 0 9 0 0 0 15 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 18 42 0 0 0 0 0 0 3 0 0 0 0 0 0 0 9 0 369 0 3 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0
+cpu-prof-experts: 20 0 0 0 0 3 0 0 6 0 0 0 0 6 0 0 0 0 0 6 0 0 9 24 0 0 300 27 18 0 0 0 0 0 0 0 0 0 0 0 75 15 0 3 0 3 0 0 0 0 9 0 0 0 0 3 0 0 0 0 141 0 0 9 21 0 27 0 0 0 0 3 0 0 0 0 0 33 3 0 0 0 0 0 0 0 0 0 0 9 0 0 21 0 0 0 0 27 0 0 0 0 0 18 0 0 39 0 0 0 15 12 0 0 0 3 0 0 0 0 3 0 0 24 0 3 24 0 9 0 0 0 0 0 0 0 0 0 57 0 0 0 0 0 0 0 3 21 12 0 0 0 6 0 0 24 0 0 0 12 0 33 12 12 3 0 0 0 0 186 18 0 0 0 3 0 0 0 0 0 24 0 3 12 0 0 3 0 12 0 0 0 0 0 0 0 3 0 0 0 0 0 0 3 0 0 0 0 0 0 0 36 6 0 0 0 0 0 0 87 9 0 0 0 0 0 0 0 0 0 0 42 0 0 36 3 3 0 0 3 0 0 0 0 33 48 0 0 0 0 0 0 0 0 0 0 15 0 0 315 0 0 3 18 0 0 60 0 42 3 18 0 0 0 0 3 0 0 0 0 0 0 0 3 3 0 0 0 0 3 0 0 0 0 0 0 0 21 0 0 3 3 0 3 0 0 0 18 6 6 9 0 0 0 9 0 0 0 0 6 0 0 0 6 6 0 0 0 0 0 3 201 0 3 0 0 0 6 0 0 15 12 33 0 3 72 0 0 0 0 0 0 0 0 3 0 9 0 0 87 0 9 3 0 27 0 0 0 0 0 3 3 30 0 15 0 0 3 0 3 0 0 0 0 0 0 9 0 363 24 0 3 0 0 0 0 3 129 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 30 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 33 0 0 0 0 0 0 0 0 0 3 0 0 6 0 0 30 0 3 0 0 0 0 0 3 0 0 12 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 0 0 12 0 12 0 57 0 0 0 9 0 21 0 0 9 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+cpu-prof-experts: 21 3 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 333 0 0 0 0 0 78 3 3 0 15 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 30 0 0 0 324 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 33 0 0 0 63 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 342 0 0 0 0 0 0 0 0 0 264 0 0 69 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 3 0 0 0 0 18 0 0 0 0 3 0 3 0 0 0 0 0 21 0 0 0 0 0 0 0 0 0 9 0 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 12 3 0 0 75 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 3 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 0 0 33 0 0 0 0 0 33 69 0 0 3 0 24 0 0 0 123 3 0 0 0 0 0 0 0 3 3 0 0 0 3 0 0 0 0 0 9 0 0 0 0 0 0 3 0 3 6 0 0 6 0 0 0 0 3 0 15 0 135 0 6 6 0 0 0 114 0 3 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 3 15 0 0 0 0 0 0 0 0 0 0 0 0 0 186 0 0 0 3 0 6 0 0 0 0 0 0 3 6 0 24 0 0 0 0 0 6 354 0 12 18 12 0 0 0 0 0 42 0 0 0 0 0 33 0 0 0 3 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 6 0 0 0 39 6 9 0 0 0 0 0 0 0 30 0 0 0 0 0 0 3 0 0 0 0 0 0 0 108 0 0 0 0 0 3 0 0 3 0 0 0 0 6 3 6 0 9 0 3 0 3 0 0 0 3 0 0 0 0 0 0 36 3 0 15 0 0 0 0 0 0 33 0 0 0 0 6 3 6 0 0 0 0 51 81 0 0 0 0
+cpu-prof-experts: 22 0 0 6 0 0 0 0 12 3 0 0 0 0 132 6 6 0 0 3 0 0 0 0 0 0 0 0 6 0 0 0 0 12 18 0 3 0 0 0 3 0 0 0 0 0 0 0 30 0 3 216 21 0 0 0 0 3 0 0 0 0 3 0 0 0 3 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 57 15 0 0 0 6 3 0 0 0 0 0 0 51 0 0 0 0 0 0 3 6 0 0 0 0 0 0 12 0 6 0 0 48 15 0 0 0 0 0 3 45 0 0 0 0 0 0 0 0 0 3 45 0 0 0 3 0 0 0 3 0 0 0 0 69 0 0 0 0 6 0 0 0 0 0 0 6 0 0 3 234 0 0 0 0 0 3 0 0 12 0 0 0 0 0 0 0 0 18 6 0 0 0 42 135 0 12 0 0 0 6 0 0 0 0 0 0 0 0 0 3 12 21 0 0 0 6 0 0 0 0 3 9 0 0 12 3 3 0 0 0 0 21 0 0 0 0 0 45 0 0 3 0 0 0 15 0 24 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 12 3 0 0 0 6 0 120 0 0 3 0 0 0 0 0 0 99 0 0 0 126 0 0 3 0 0 24 0 3 0 0 0 18 3 0 0 0 0 3 0 0 21 42 12 0 0 60 42 0 9 27 9 0 6 0 0 0 0 0 6 0 0 0 6 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 3 3 12 0 3 0 6 15 3 3 0 3 6 18 0 0 39 0 0 9 3 15 0 0 0 0 27 0 12 0 0 0 18 3 0 0 3 3 0 0 0 9 0 0 0 3 0 0 0 18 18 0 0 0 18 63 0 18 0 0 15 12 0 18 0 0 0 0 0 9 0 0 9 0 0 0 0 0 0 0 0 0 0 0 3 0 54 0 0 0 0 0 0 3 0 0 0 0 0 156 6 0 0 3 3 0 9 0 0 0 0 0 0 0 0 78 0 6 9 0 0 174 0 12 0 9 0 0 0 0 0 0 0 3 0 0 0 0 9 0 0 0 0 12 168 3 0 42 138 24 6 0 0 0 0 3 3 0 0 6 18 0 18 0 0 87 0 6 0 0 0 0 0
+cpu-prof-experts: 23 3 3 3 3 0 0 0 0 0 0 9 0 0 0 0 0 3 0 0 0 0 12 0 0 0 0 3 0 15 0 3 3 132 0 3 0 6 0 0 3 0 0 0 0 0 27 18 0 9 0 0 0 0 3 0 0 6 0 0 0 12 0 0 0 6 0 0 6 3 0 12 0 0 0 0 0 0 30 0 0 0 0 0 0 0 3 0 3 3 9 0 0 3 0 0 0 0 0 3 6 0 3 0 0 33 0 0 0 0 0 111 3 0 0 18 0 0 0 0 0 3 0 0 3 9 3 6 12 267 0 0 0 3 0 6 0 6 0 3 0 3 0 0 27 0 0 0 18 12 3 3 0 0 0 0 0 0 0 9 0 24 36 6 0 0 0 0 21 9 3 0 42 0 0 0 0 0 27 0 0 9 0 0 0 6 0 12 0 0 0 3 0 3 0 0 0 0 0 12 0 9 12 0 0 3 6 0 0 3 0 3 0 24 0 0 27 0 3 0 27 6 0 3 9 0 0 0 0 21 3 0 3 0 15 6 0 0 0 0 6 0 0 0 0 3 6 0 0 0 0 0 42 15 0 0 0 0 18 0 0 0 0 3 0 0 6 0 0 0 0 3 0 6 15 6 3 0 0 0 3 0 3 0 0 0 0 6 0 3 0 0 0 3 0 0 0 0 120 0 12 0 0 45 3 3 0 0 6 0 0 0 0 0 0 18 0 0 0 15 0 60 0 0 0 3 0 0 0 0 0 3 12 0 30 21 3 60 3 3 0 3 9 57 12 3 0 0 0 0 18 9 6 0 153 0 0 387 0 3 6 3 0 9 3 0 0 0 36 0 3 0 9 6 0 3 105 3 0 0 0 0 0 0 6 0 12 0 15 0 0 0 3 0 0 15 0 0 3 0 0 0 0 0 9 0 0 18 9 6 0 0 0 0 6 3 0 3 0 0 9 0 0 3 69 0 6 0 0 0 0 0 0 6 0 0 3 0 0 0 6 12 0 0 0 0 0 6 0 0 0 3 0 0 0 3 0 0 3 0 0 0 0 36 0 33 0 0 0 0 39 0 0 0 0 0 0 3 63 0 0 0 9 0 9 0 3 0 0 0 3 0 0 3 0 6 3 9 0 0 0 3 0 0 3 6 51 72 6 0 0 3 0
+cpu-prof-experts: 24 72 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 39 3 3 0 0 0 0 0 6 0 0 0 0 0 0 0 12 0 24 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 6 0 0 3 0 0 3 0 0 0 0 0 15 0 198 9 0 0 0 0 0 0 3 0 0 0 0 3 3 0 0 0 33 0 0 0 0 0 9 0 0 3 12 0 0 0 0 12 3 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 3 222 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 30 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 264 0 0 0 3 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 66 0 3 3 9 0 0 0 3 3 0 0 0 0 255 27 0 0 0 45 0 3 0 0 0 0 0 75 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 36 0 0 0 0 0 0 0 0 0 3 0 0 375 3 0 0 6 0 0 0 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 9 0 0 3 12 0 3 0 12 0 0 0 3 0 0 0 0 0 0 3 27 0 39 0 0 0 9 0 0 0 3 0 3 0 9 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 9 0 0 0 150 0 0 0 0 0 372 0 0 0 0 0 0 9 0 0 0 0 0 0 0 3 0 6 0 0 0 9 0 0 0 0 0 297 0 0 6 0 0 48 0 3 0 0 0 0 0 0 0 36 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 6 0 0 0 3 0 0 0 3 0 0 210 6 0 0 0 0 3 0 0 0 3 0 0 0 0 0 348 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 0 3 0 0 0
+cpu-prof-experts: 25 0 0 0 0 0 0 0 0 63 0 0 42 6 9 0 0 6 54 0 0 3 0 3 6 0 3 15 0 0 0 0 0 0 0 9 0 0 3 3 0 0 3 0 0 6 48 0 0 0 0 6 0 9 3 3 0 0 0 0 303 0 0 0 0 0 0 0 0 81 21 3 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 6 15 0 6 0 0 0 0 0 0 21 0 0 0 3 0 0 27 21 0 0 39 0 24 0 0 0 3 3 9 0 3 0 0 0 6 9 0 0 30 3 6 3 0 0 0 0 3 3 21 0 0 0 3 0 0 15 0 3 0 0 0 0 0 6 0 0 90 0 0 108 0 0 3 0 0 3 0 0 0 0 0 0 3 6 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 0 0 18 9 0 0 0 0 0 0 0 0 9 0 0 0 3 0 0 9 0 6 0 0 0 0 0 0 45 3 0 0 0 3 0 0 0 0 0 9 27 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 9 0 0 0 0 6 0 3 3 6 0 0 0 0 0 0 0 9 288 0 0 9 0 0 0 0 0 0 0 132 42 0 0 0 0 0 0 6 0 0 0 0 3 18 0 3 84 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 87 3 0 0 0 0 0 0 24 24 3 0 0 0 0 0 0 0 3 0 0 0 3 0 0 18 0 0 3 3 6 3 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 93 69 0 54 0 195 18 33 15 24 0 3 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 9 0 0 0 15 0 0 0 0 0 9 0 0 21 21 0 3 0 0 3 0 18 0 0 0 0 0 0 0 0 0 276 0 0 153 3 36 0 0 3 0 0 0 0 0 0 0 0 0 3 0 0 0 0 9 0 9 0 3 0 0 0 0 21 0 0 0 0 0 0 21 3 0 0 0 0 0 0 0 0 0 0 81 0 0 0 3 0 0 27 3 0 90 0 0 0 0 6 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 3 0 51
+cpu-prof-experts: 26 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 21 357 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 102 30 0 0 0 87 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 0 0 33 0 0 0 0 0 255 6 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 3 264 0 0 3 0 0 0 0 0 0 12 0 0 0 0 0 0 24 0 0 0 0 0 0 3 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 87 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 27 0 0 0 0 9 0 0 0 0 0 0 30 0 0 0 12 0 0 6 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 3 0 12 0 0 0 18 0 0 0 0 0 0 3 0 0 0 0 0 129 0 0 0 51 0 0 27 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 21 0 0 0 18 0 0 0 0 0 0 180 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 57 0 0 0 0 0 0 0 0 6 0 0 0 0 0 12 231 0 210 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 6 0 0 3 0 0 0 0 0 0 0 0 105 0 0 0 0 0 0 0 0 0 0 6 3 0 0 3 0 0 54 0 0 0 0 0 12 0 0 0 0 129 0 0 186 0 0 0 0 0 0 0 0 3 0 0 6 0 0 0 45 6 0 21 0 0 0 0 0 0 0 0 0 15 204 0 0 0 0 0 15 0 0 0 0 0 0 0 0 12 21 0 0 3 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 15 0 21 0 0 0 0 0 165 0 0 84 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 69 0 0 0 0 0 0 0 3 3 0 0 0 33 3 0 0
+cpu-prof-experts: 27 3 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 3 0 0 24 0 0 0 0 0 0 12 0 0 0 0 6 3 0 0 0 0 0 0 0 0 0 0 0 9 3 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 3 0 117 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 72 216 3 0 0 6 0 6 0 0 0 87 0 0 0 0 0 0 0 0 0 0 0 51 0 0 0 3 0 0 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 3 0 9 0 0 0 0 0 0 0 0 0 0 0 0 33 3 21 0 0 0 0 0 3 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 9 3 0 0 0 0 0 0 0 0 0 9 6 0 0 6 0 0 0 9 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 102 6 0 99 0 0 0 6 0 0 0 0 6 21 0 0 21 0 0 0 0 0 0 0 264 0 0 0 0 0 0 6 0 0 0 3 0 96 0 0 0 0 0 0 0 0 0 3 12 129 0 0 0 0 0 6 6 0 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 3 0 0 0 0 0 0 0 0 0 15 0 375 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 237 0 0 0 0 0 0 12 0 0 192 6 0 0 0 0 0 0 9 0 0 0 0 3 0 3 0 0 0 0 0 0 0 0 18 0 33 0 0 0 0 9 0 0 0 0 0 9 0 0 6 0 0 0 0 15 6 0 0 0 0 0 0 132 0 0 0 0 366 0 0 3 0 0 3 6 0 0 0 0 57 0 0 0 21 0 0 309 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 9 0 0 0 0 0 0 0 0 0 12 3 0 0 0 0 0 0 3 0 0 0 3 3 0 60 108 0 0 0
+cpu-prof-experts: 28 291 12 36 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 111 0 3 0 0 0 3 9 3 0 0 0 0 0 0 9 3 0 0 0 0 0 57 0 0 0 0 0 0 0 0 381 0 6 0 0 0 0 0 3 0 0 159 0 0 63 24 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 15 0 0 15 0 0 3 3 0 0 0 0 0 3 0 0 9 0 0 0 0 0 0 0 0 0 0 33 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 6 0 0 36 0 0 63 0 0 3 0 0 69 0 42 0 0 3 0 0 3 0 0 12 0 0 0 0 0 30 0 0 0 0 0 0 0 3 3 0 21 0 0 9 0 120 0 0 0 0 0 0 0 0 3 18 0 0 0 0 0 0 21 0 0 0 0 12 0 0 0 0 0 6 18 0 0 0 3 0 21 0 0 0 0 0 0 33 0 6 0 0 132 0 0 0 0 0 0 0 0 0 75 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 0 0 0 0 0 39 0 81 0 0 0 0 0 0 3 0 0 0 0 105 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 0 0 0 0 0 0 3 0 0 0 276 0 0 3 3 0 0 0 0 0 0 0 3 0 306 0 168 0 0 0 0 0 0 3 0 0 0 0 0 18 0 0 0 0 3 0 0 0 24 3 18 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 24 0 0 0 0 0 0 0 0 0 6 0 0 72 3 0 0 6 0 0 0 0 30 0 0 195 0 0 3 0 0 0 3 9 0 0 0 0 0 0 9 0 0 0 0 0 6 0 0 0 156 0 0 0 0 0 0 0 0 0 0 153 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 6 3 0 0 0 0 0 3 0 3 0 0 3 0 0 0
+cpu-prof-experts: 29 0 0 9 0 0 0 0 0 0 0 0 48 0 0 0 0 12 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 3 0 0 0 93 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 30 3 0 0 0 0 0 0 0 0 3 0 9 0 9 0 0 0 0 42 0 0 0 0 3 0 0 6 0 0 0 0 3 0 0 0 0 72 0 27 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 189 0 0 0 0 18 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 0 0 0 0 6 0 0 0 0 0 0 0 33 3 0 3 0 0 0 0 3 0 3 0 0 24 0 0 0 0 0 0 0 0 0 45 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 177 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 9 60 0 0 0 0 0 0 0 0 342 0 0 9 0 0 210 0 0 0 0 0 0 0 105 0 0 0 0 0 288 0 0 0 0 0 3 0 0 3 0 162 30 0 9 6 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 3 0 21 0 0 0 0 42 0 0 0 0 0 0 66 39 0 0 0 336 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 162 12 0 0 0 0 0 0 0 0 201 0 0 0 3 0 168 0 60 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 312 0 66 0 0 0 0 0 0 0 0 0 0 72 0 15 0 0 0 0 6 0 0 0 0 6 0 0 9 0 24 9 0 0 0 0 3 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 3 0 0 0
+cpu-prof-experts: 30 3 0 15 3 0 0 6 3 0 0 30 132 0 0 45 33 0 0 0 0 0 0 0 3 0 0 0 0 0 21 0 0 3 0 0 3 0 0 0 0 174 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 3 0 0 0 0 39 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 6 0 15 0 0 0 81 0 0 0 0 0 0 0 6 117 0 0 0 12 6 0 0 0 0 0 3 0 15 0 0 18 6 3 0 0 0 6 0 0 0 0 0 0 0 0 0 0 126 24 0 3 0 0 0 54 27 0 159 6 0 0 0 0 0 0 0 0 6 0 0 45 0 0 6 0 0 0 0 0 0 0 9 0 0 9 0 0 21 0 3 3 0 30 0 0 15 0 0 0 6 15 0 0 0 3 21 0 0 0 0 3 0 0 3 0 0 0 0 0 9 0 0 0 0 27 0 0 0 0 0 0 81 0 3 3 9 0 0 0 0 0 0 0 0 0 9 3 0 0 0 0 0 0 87 0 0 0 15 0 0 0 0 9 81 0 0 0 0 0 0 0 21 0 6 0 0 0 0 0 6 0 0 0 0 0 27 0 0 6 0 0 0 0 0 0 0 0 0 0 210 3 9 0 9 0 0 0 0 0 0 0 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 15 12 0 0 0 0 0 18 0 0 6 0 0 3 0 12 0 0 3 3 12 141 0 0 180 0 0 57 30 0 21 0 0 0 0 0 0 0 0 0 0 0 24 0 0 3 0 0 0 36 0 3 0 0 3 0 0 0 18 12 0 0 0 0 0 0 78 0 0 0 0 0 0 0 12 0 18 0 0 0 6 0 0 0 0 3 0 84 0 0 0 0 0 3 0 0 42 0 75 0 0 0 0 27 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 0 6 0 0 0 9 45 0 144 3 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 3 0 3 0 0 0 0 0 15 39 0 39 0 0 0 0 0 0 0 3 9 0 0 0 0 0 6 0 3 0 3 0 0 15 6 0 69 0 114 18 0 3 0 3 237 0 0 0 0 0
+cpu-prof-experts: 31 0 0 0 0 0 0 0 0 0 0 0 0 63 3 0 0 0 0 57 0 0 0 0 0 0 3 3 0 0 0 33 3 27 0 3 0 0 0 6 51 0 0 0 0 0 0 0 0 0 0 144 0 0 15 0 3 108 0 0 0 0 18 0 0 0 0 0 0 0 0 0 3 0 9 0 0 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 27 0 51 0 0 15 0 3 0 0 0 15 3 3 0 0 0 0 0 0 3 15 3 0 3 0 0 0 0 3 0 0 0 6 0 0 15 0 12 0 0 3 0 3 0 12 0 0 6 0 0 0 0 0 0 0 0 0 75 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 288 0 0 6 0 0 0 0 0 0 3 0 0 0 3 0 0 0 36 117 0 0 0 0 0 36 0 0 0 0 63 0 12 12 3 9 0 123 0 6 0 6 0 0 0 3 0 3 3 9 0 0 0 0 0 0 0 0 0 9 3 0 0 0 3 0 0 3 0 0 0 0 0 0 0 3 24 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 12 0 0 3 0 0 0 0 6 0 0 6 156 3 87 0 0 0 9 30 21 39 0 0 0 0 0 0 0 0 0 0 0 27 270 0 0 0 0 0 12 0 123 0 0 12 0 3 0 96 0 0 12 0 0 3 0 0 9 0 0 3 0 3 0 0 0 0 0 0 0 6 0 3 39 0 0 3 15 0 0 3 6 24 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 0 15 0 0 0 0 0 0 39 0 0 0 0 0 234 9 0 9 0 0 6 0 0 0 0 0 0 0 0 0 0 0 9 0 0 6 3 0 0 0 0 12 0 0 0 0 3 0 0 0 0 0 0 0 0 39 0 6 240 0 0 0 0 0 0 0 0 3 6 3 0 0 15 0 0 0 0 0 0 3 0 0 0 0 9 0 0 0 0 0 6 0 0 0 0 0 27 0 3 3 3 0 0 261 12 9 0 0 0 0 123 0 0 3 0 3 0 0 0 6 18
+cpu-prof-experts: 32 0 0 3 9 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 33 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 30 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 12 0 3 0 0 0 0 0 57 0 15 0 0 0 6 0 0 198 0 0 0 0 0 0 0 3 0 0 0 0 3 0 3 0 0 0 0 3 0 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 18 0 0 0 0 12 0 0 0 0 0 3 3 0 6 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 18 0 0 6 0 0 0 0 354 0 0 0 0 0 0 0 0 0 0 12 0 39 0 0 6 27 3 0 207 6 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 0 0 0 3 0 0 0 0 6 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 0 12 0 0 3 0 0 0 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 222 0 0 3 0 3 0 6 3 0 0 0 0 0 0 0 6 0 12 0 0 0 0 0 0 0 0 0 0 9 0 3 24 6 0 6 0 0 0 0 0 102 0 0 0 0 0 0 0 3 15 0 0 0 0 0 0 0 0 0 24 0 0 3 0 0 0 0 0 3 0 3 0 0 3 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 261 0 3 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 9 3 0 0 75 135 0 0 0 0 0 3 57 0 129 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+cpu-prof-experts: 33 0 0 3 0 6 0 0 0 3 0 78 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 6 0 0 0 0 0 0 3 0 0 0 0 180 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 45 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 33 0 0 0 0 0 0 0 0 0 9 0 0 0 0 6 0 0 0 0 0 0 6 6 0 0 0 0 0 0 0 378 3 0 33 0 0 0 6 0 0 0 0 0 0 3 0 0 0 0 66 0 0 0 0 33 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 3 0 0 0 0 0 18 0 0 30 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 9 0 0 9 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 324 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 6 0 0 51 0 3 0 0 3 3 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 27 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 24 0 6 3 0 0 3 0 0 0 0 0 0 0 0 0 0 339 312 0 0 279 0 0 0 0 0 0 0 303 0 0 0 0 0 0 0 0 0 0 0 0 174 0 0 6 0 0 0 0 0 0 0 15 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 63 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 9 0 0 0 0 0 87 231 0 0 0 0 0 0 0 3 0 0 0 0 0 0 279 0 0 0 0 0 0 0 0 0 0 3 123 0 0 0 0 0 0 0 9 0 3 3 3 0
+cpu-prof-experts: 34 0 0 0 0 0 18 0 18 0 12 0 3 0 0 0 0 0 0 0 0 0 0 339 0 264 3 0 0 15 282 0 0 0 0 0 0 24 0 0 0 0 0 0 0 0 0 6 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 354 150 3 0 0 0 0 3 0 12 243 0 0 0 0 3 0 3 42 0 0 0 0 0 0 0 0 0 0 0 321 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 60 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 39 0 0 24 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 21 3 0 0 3 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 0 9 0 0 0 0 0 3 0 24 3 6 6 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 21 0 0 0 9 0 135 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 3 0 39 3 144 0 0 0 0 0 0 0 0 3 0 0 0 0 0 3 0 0 3 0 0 0 0 0 0 78 0 0 0 0 0 0 0 0 0 0 0 27 33 0 0 3 0 0 0 39 357 6 0 0 0 0 0 0 0 0 0 36 72 0 0 0 0 0 0 0 0 0 0 0 0 0 9 12 0 0 0 0 0 3 0 0 9 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0
+cpu-prof-experts: 35 0 0 0 90 3 12 3 0 0 21 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 42 330 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 0 9 0 0 0 213 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 183 0 0 0 0 0 3 0 0 0 0 0 0 0 0 156 0 0 0 0 0 0 0 0 0 6 0 3 0 0 0 0 0 9 0 0 0 0 0 0 249 21 0 0 3 0 0 0 3 12 0 0 24 0 0 0 0 0 0 0 6 0 3 0 0 0 0 0 0 0 0 9 21 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 147 0 177 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 9 9 3 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 21 0 0 0 0 0 0 0 0 0 6 0 0 0 99 0 3 0 0 0 0 0 0 0 0 0 0 12 0 0 6 0 21 0 0 0 0 0 342 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 3 0 0 0 0 0 0 0 0 3 0 9 0 0 0 3 9 0 0 3 0 0 0 3 0 0 0 0 12 0 0 0 0 0 12 0 0 0 0 0 0 363 0 18 0 3 0 0 0 0 0 258 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 3 0 0 9 0 0 0 0 0 0 18 0 0 0 0 0 0 0 3 33 0 0 0 21 0 0 0 0 0 0 0 150 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 30 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 384 0 0 21 0 0 0 0 0 0 0 0 0 0 3 0 0 0 21 0 0 0 0 0 3 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0
+cpu-prof-experts: 36 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 3 0 0 12 24 0 0 354 27 9 0 0 0 0 0 0 0 0 0 3 0 159 48 0 3 0 0 0 0 0 0 3 0 0 0 0 3 0 0 0 0 48 0 0 3 12 0 3 0 0 0 0 0 0 0 0 0 0 48 6 0 0 0 0 0 0 9 0 0 0 3 0 0 0 0 0 0 0 9 0 0 0 0 3 6 0 0 18 0 3 0 6 9 0 0 0 0 0 0 0 0 3 0 0 6 0 0 6 0 0 0 0 0 3 0 0 0 0 0 12 0 0 0 0 0 0 0 0 18 0 0 0 0 6 0 0 0 0 0 0 18 0 12 3 12 3 0 0 0 0 192 66 3 0 0 0 6 0 0 0 0 72 0 0 0 0 0 0 0 3 0 0 0 0 0 6 0 0 0 0 0 0 0 0 6 0 0 3 0 0 0 0 150 12 0 0 0 0 0 12 162 6 0 0 0 0 0 0 0 0 0 0 39 0 0 33 0 6 0 0 3 0 3 0 0 30 21 0 0 0 0 3 0 6 0 0 0 9 0 0 0 0 0 0 9 0 0 69 0 36 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 105 0 0 0 9 0 0 0 0 0 12 0 6 9 0 0 0 9 6 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 102 0 3 0 0 0 0 0 0 6 0 39 0 0 15 0 0 0 0 0 0 0 0 0 3 0 0 0 36 0 0 0 0 9 0 0 0 0 0 0 0 24 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 369 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 3 0 0 33 0 9 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 120 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 36 0 0 0 18 0 3 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+cpu-prof-experts: 37 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 348 0 0 0 0 0 63 0 3 0 6 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 339 0 0 0 0 0 0 24 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 225 0 0 0 0 0 0 0 0 0 63 0 0 60 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 3 3 0 0 6 0 0 0 18 0 0 96 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18 261 0 0 0 0 0 0 0 0 294 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 18 0 0 0 0 0 0 9 0 0 0 0 3 3 0 0 0 0 0 0 321 0 69 0 3 3 0 0 6 138 0 0 0 0 0 0 0 0 0 0 0 0 39 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 258 0 0 0 0 0 9 0 0 3 0 0 0 6 3 0 6 0 0 0 0 0 3 366 0 30 0 0 0 0 3 0 0 99 0 0 0 0 0 0 0 0 0 21 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 0 18 0 3 0 6 0 0 0 12 0 3 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 81 0 0 0 0 0 0 0 9 3 0 0 0 0 0 54 0 0 3 0 0 0 0 0 0 54 0 0 0 0 0 0 3 0 0 0 0 0 54 0 0 0 0
+cpu-prof-experts: 38 0 0 0 0 0 0 0 195 3 0 0 3 0 33 3 0 0 0 69 0 0 0 0 0 0 0 0 12 0 0 0 0 27 15 0 3 0 0 0 3 0 33 0 0 0 0 0 21 0 3 204 3 0 0 0 0 3 3 0 0 0 0 12 0 0 3 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 12 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 3 0 0 45 0 0 0 0 0 0 3 12 0 0 0 0 0 0 0 0 0 3 30 0 0 0 0 0 0 3 3 0 0 0 0 48 0 0 0 0 6 0 0 0 0 3 0 0 0 0 0 0 33 0 0 0 0 3 0 0 18 0 0 0 0 0 0 0 0 12 0 0 0 0 9 84 0 3 0 0 0 3 0 9 3 0 0 0 0 0 0 12 105 285 3 0 0 12 0 0 3 0 3 21 0 0 6 3 0 0 0 0 3 219 0 0 0 0 0 15 0 0 6 0 6 3 3 0 0 0 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 6 15 0 0 0 0 0 24 0 0 0 0 0 0 0 0 0 36 0 0 0 84 0 0 0 0 0 0 0 12 0 0 0 6 0 0 0 0 0 0 0 0 6 36 6 0 0 21 9 0 6 51 0 0 3 0 0 0 0 0 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 21 0 3 12 36 9 6 0 0 0 9 3 0 0 9 0 0 0 0 15 0 0 0 0 3 3 3 0 3 0 27 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 3 0 0 0 24 27 0 3 0 0 9 0 0 33 0 0 0 3 0 6 0 0 3 0 0 0 0 0 0 0 0 0 0 3 0 0 126 0 0 0 0 0 0 3 0 0 0 0 0 231 12 0 0 6 0 0 21 12 0 0 0 0 0 0 0 45 0 0 3 0 0 303 0 6 0 3 0 0 0 0 0 0 0 3 0 0 0 0 6 0 0 0 0 9 231 0 0 75 78 3 6 0 3 0 0 3 0 0 0 3 6 0 12 0 0 147 0 0 0 0 0 0 3
+cpu-prof-experts: 39 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 3 273 0 0 0 39 0 3 3 0 0 0 0 0 21 0 0 6 0 0 0 0 0 6 0 0 0 0 0 327 0 0 0 6 0 3 0 0 0 0 3 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 6 0 0 0 0 0 0 0 0 0 0 24 0 0 0 0 0 99 6 0 0 0 0 0 0 0 0 0 0 0 0 6 0 6 132 246 6 0 0 0 0 3 0 0 0 0 0 0 0 0 6 0 0 0 12 54 0 0 0 0 0 0 0 0 0 12 0 9 36 3 0 0 0 0 75 0 0 0 0 3 0 0 0 0 24 0 0 0 0 0 0 3 0 0 0 0 0 3 0 6 0 0 0 0 0 0 0 0 3 0 0 0 0 0 3 0 0 0 0 6 0 0 21 0 0 0 15 0 0 0 0 0 0 0 0 18 0 0 0 0 0 3 0 3 0 0 0 0 0 0 0 93 3 0 0 0 0 0 21 12 0 0 0 0 0 0 0 0 0 6 0 0 0 0 3 0 0 0 0 15 12 6 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 6 0 0 0 0 0 0 6 0 45 0 0 30 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18 0 3 0 0 0 6 0 0 0 0 0 3 0 3 27 246 0 0 12 3 0 0 3 39 0 0 3 0 0 0 3 0 0 6 27 6 0 0 0 0 6 36 0 0 3 3 0 0 6 0 3 0 0 9 0 0 63 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 3 0 0 3 0 0 0 0 0 0 0 0 6 0 0 3 9 0 0 0 0 0 0 6 0 0 0 0 6 0 0 3 42 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 6 0 0 0 3 0 0 0 6 0 0 0 0 9 0 0 0 0 0 0 0 0 0 18 0 0 0 0 0 0 0 15 0 0 0 0 0 9 0 0 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 0 0 0 0 15 135 0 0 0 9 0
+cpu-prof-experts: 40 0 0 0 0 0 0 0 0 81 0 0 0 0 0 0 0 0 6 0 0 0 0 69 0 0 0 0 0 6 0 0 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 9 0 0 3 27 0 51 3 0 0 0 3 0 0 0 0 0 9 0 6 0 0 0 3 0 0 0 3 0 12 0 0 0 0 0 0 0 45 3 0 0 6 0 0 0 0 0 0 6 6 0 0 0 0 6 0 6 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 3 0 0 9 21 3 0 0 6 0 0 0 0 0 171 0 3 6 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 6 0 240 0 0 0 0 0 117 0 0 6 0 0 3 0 0 0 0 0 0 0 12 0 0 0 0 0 3 0 9 0 0 0 15 9 3 0 120 0 0 9 138 0 0 0 0 0 33 6 234 0 0 0 0 3 36 0 0 6 9 78 21 0 0 9 3 3 0 0 183 0 0 3 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 0 0 0 0 0 0 0 0 6 0 0 6 174 0 0 0 3 0 6 0 0 0 0 3 0 9 0 0 12 0 0 9 0 3 0 0 0 0 0 0 0 6 0 0 0 18 0 0 3 3 0 3 0 0 0 0 0 3 0 0 0 0 6 0 0 360 51 0 0 0 0 21 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 3 0 0 0 3 0 45 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 3 0 0 6 0 0 0 0 0 0 3 0 0 0 0 0 309 0 0 0 0 21 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 12 0 6 0 3 0 0 0 0 0 0 0 3 0 0 0 0 3 0 24 0 0 0 0 0 0 3 0 0 6 0 0 0 0 0 0 0 0 0 9 123 0 3 0 0 0 99 0 3 0 0 9 0 0 0 0 0 0 0 0 6 0 0 0 3 3 0 0 0 0 0 3 21 9 0 0 0 15 3 0 0 0 0 0 0 0 0 0 0 18 0 0 39
+cpu-prof-experts: 41 0 0 0 0 3 3 3 3 0 0 0 6 0 9 0 0 0 3 0 0 3 12 0 0 0 0 0 6 0 0 0 3 0 0 0 0 0 0 9 0 0 0 3 0 0 0 0 0 0 0 0 3 0 3 6 0 0 0 54 318 0 0 3 0 0 0 6 0 3 0 3 3 0 0 12 63 3 3 0 18 0 0 0 0 3 0 0 0 0 0 0 0 3 0 0 0 0 0 0 3 12 3 0 0 0 39 0 0 0 0 0 0 0 3 0 0 36 0 321 0 0 0 0 3 0 27 0 0 0 0 0 3 135 3 0 0 0 0 0 0 0 0 21 0 0 0 0 0 6 21 9 0 0 0 0 0 0 33 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 6 0 0 0 0 0 0 3 0 33 0 3 0 6 0 0 84 0 0 0 0 0 0 0 33 6 0 0 0 6 0 0 0 0 0 12 0 0 0 0 0 0 9 0 0 9 0 0 6 0 0 147 0 0 0 3 0 0 0 0 0 0 0 15 12 0 0 0 15 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 18 18 0 0 3 0 0 0 0 6 0 0 0 0 6 0 0 0 15 6 0 0 0 0 24 3 66 0 0 0 0 0 6 27 0 0 0 3 12 0 0 0 0 0 0 0 0 6 0 0 0 0 0 6 0 0 9 0 9 0 0 0 0 0 0 0 0 0 0 0 0 3 0 30 0 9 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 27 3 9 0 0 0 0 0 9 0 54 0 117 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 3 0 0 0 3 3 63 0 0 18 0 0 0 0 6 3 0 6 6 0 0 6 3 3 0 0 3 0 3 0 9 15 0 0 0 0 0 0 258 0 0 0 0 0 0 0 3 9 0 0 0 0 0 3 0 237 0 0 0 12 0 0 0 0 0 0 0 0 0 0 21 0 0 0 0 0 0 0 6 0 6 84 9 0 0 33 0 3 0 0 0 45 0 0 0 0 69 6 0 0 0 12 0 0 0 6 0 0 0 0 18 0 0 0 0 12 0
+cpu-prof-experts: 42 0 0 0 0 0 60 252 0 0 0 0 0 0 3 0 0 6 0 0 0 0 30 0 0 0 6 0 0 0 0 0 0 0 3 0 0 0 6 0 3 0 0 6 0 0 0 0 0 0 0 0 0 0 6 3 0 0 0 0 0 12 3 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 51 0 3 0 27 0 0 3 0 0 0 0 0 0 0 0 0 0 0 9 3 0 48 0 3 3 0 324 0 0 0 0 3 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 186 0 0 3 0 0 0 0 0 0 0 96 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 27 0 0 3 48 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 75 285 3 0 0 0 0 0 3 0 0 0 0 0 0 0 3 0 0 0 6 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 0 0 0 0 9 0 0 3 0 0 0 0 0 36 0 0 0 0 3 15 63 0 30 9 3 0 0 12 0 0 0 0 0 0 183 0 0 0 9 0 0 0 15 0 3 0 12 0 0 0 0 3 3 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 0 0 3 3 3 0 0 9 3 6 0 0 0 147 0 0 0 0 0 0 9 6 0 0 3 0 6 0 0 174 0 0 0 3 0 0 0 0 54 0 0 0 0 0 6 0 0 0 0 0 132 0 0 0 3 0 0 0 0 0 0 0 0 87 0 102 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 45 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 60 0 0 0 0 0 39 0 0 0 0 18 0 0 0 3 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 6 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0
+cpu-prof-experts: 43 3 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 0 0 30 0 0 3 3 0 3 0 9 0 0 0 0 3 0 0 0 3 0 0 0 0 0 3 3 0 0 3 0 0 0 0 9 0 0 0 0 0 0 3 0 0 0 3 0 0 6 6 0 0 0 0 0 0 0 0 0 0 0 3 12 0 0 0 0 6 0 9 342 0 0 0 0 15 0 0 0 0 0 15 225 63 0 30 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 12 0 0 3 0 0 0 6 0 12 0 0 0 0 3 0 222 0 0 0 0 0 6 0 0 27 3 0 36 78 3 0 6 0 9 0 6 0 0 0 0 0 0 0 0 15 0 0 3 3 3 0 0 0 0 9 6 0 0 0 0 0 0 21 0 9 0 0 0 0 0 0 0 0 0 0 0 0 6 0 6 6 0 0 0 0 24 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 39 0 6 0 3 0 0 6 51 0 0 0 0 0 0 0 0 0 0 6 3 0 0 0 0 0 3 0 0 0 9 0 0 0 0 0 0 6 3 0 3 0 6 0 0 0 21 0 0 0 3 0 3 0 0 3 0 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 117 0 0 0 6 0 6 0 3 0 0 0 3 0 0 0 30 3 135 18 3 0 0 0 6 0 0 15 0 0 0 18 0 3 0 0 0 6 0 0 9 0 3 0 0 0 0 0 0 0 0 3 0 0 0 0 0 33 0 0 0 0 3 0 0 0 0 0 18 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 117 0 0 0 3 0 3 0 51 0 0 0 6 0 9 0 0 0 0 0 0 6 3 0 6 0 0 12 0 0 3 0 0 0 6 6 3 3 0 3 0 0 0 0 0 0 0 15 0 0 0 3 0 303 0 0 0 0 0 0 0 3 9 0 0 0 6 0 0 0 3 0 0 0 270 0 0 0 0 0 0 0 6 0 0 0 6 0 18 0 294 0 0 0 0 0 0 3 0 0 0 0 0
+cpu-prof-experts: 44 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 0 0 0 261 0 0 0 0 0 0 27 0 0 0 3 0 12 0 258 0 0 3 0 0 33 0 0 0 0 0 0 0 0 0 0 51 0 3 0 0 282 3 0 0 0 0 0 0 0 0 0 0 3 0 24 0 0 0 0 0 6 0 0 0 3 0 315 15 0 0 9 3 0 0 0 0 0 0 0 0 0 3 3 0 27 9 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 6 0 0 0 0 3 0 0 0 0 0 15 0 0 0 3 0 6 0 0 0 0 0 0 0 0 27 0 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 6 0 3 0 0 18 0 63 0 6 0 3 0 0 0 0 0 0 0 15 0 0 0 21 0 12 0 0 0 0 0 9 6 0 0 9 0 9 0 0 198 3 183 0 0 0 0 3 3 3 0 0 0 0 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 123 0 3 0 3 0 0 0 24 0 0 0 0 0 0 3 0 0 6 0 0 0 0 0 3 0 0 6 0 0 0 0 0 0 15 21 129 0 0 126 0 0 0 3 3 0 0 3 12 0 3 3 0 3 0 15 0 0 3 0 0 0 0 0 0 0 18 0 0 0 9 0 0 30 0 0 3 0 0 0 0 0 0 0 0 0 3 0 3 0 21 6 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 3 0 0 3 0 0 0 0 3 15 0 0 3 0 24 0 0 0 3 6 0 72 0 0 27 15 0 6 24 3 0 3 0 3 12 0 0 0 0 57 0 0 0 0 0 0 0 6 0 3 0 0 0 0 3 6 9 0 12 3 0 0 21 0 0 0 0 0 3 39 0 150 0 0 0 0 15 0 3 9 0 0 6 0 0 45 0 0 0 0 0 3 3 12 0 0 3 0 0 0 0 0 0 0 0 3 0 0 0 0 105 0 0 3 0 0 3 0 0 0 0 0 0 3 0 0 0 3 99 0 0 0 0 0 3 0 0 0 0 6 0 0 3 12 0 0 0 0 0 0
+cpu-prof-experts: 45 3 0 0 6 0 0 0 54 0 27 0 0 0 0 0 0 3 0 0 0 0 0 6 0 0 3 0 0 0 15 3 0 0 0 0 0 0 3 0 0 9 0 0 0 0 3 0 0 0 0 0 252 0 0 33 0 0 3 0 0 0 9 12 0 0 0 48 0 0 0 0 0 0 0 0 51 0 0 0 33 0 0 0 0 0 0 3 57 0 0 6 0 0 3 0 0 0 0 3 15 0 0 0 0 0 0 12 0 3 0 0 0 3 3 0 0 0 0 0 0 0 3 0 0 3 0 0 75 0 0 0 9 0 0 0 3 3 0 0 0 0 0 57 0 0 0 0 0 0 27 0 0 21 0 0 0 3 0 0 0 30 0 0 0 0 0 0 3 0 9 0 3 0 0 9 0 0 0 3 0 0 0 12 0 0 66 9 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 9 3 0 0 3 0 0 0 0 0 0 135 3 51 0 48 0 0 45 3 0 0 99 0 45 0 0 0 192 0 0 3 21 6 3 0 3 0 0 0 0 0 3 0 0 96 0 0 0 0 0 3 0 0 0 6 0 18 0 0 0 0 0 0 0 3 0 0 9 0 3 0 0 0 0 3 0 0 0 3 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 9 228 0 0 0 0 0 3 0 3 0 0 0 3 45 0 0 0 0 0 0 0 3 90 0 0 12 0 0 0 0 3 0 0 0 0 3 12 0 6 18 9 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 66 3 0 0 0 0 0 6 0 0 0 0 0 0 0 0 21 0 0 0 0 0 33 0 0 0 0 0 0 0 9 0 0 0 0 0 12 0 0 0 3 0 0 0 0 0 3 0 0 0 0 0 3 0 0 0 3 0 0 63 0 0 0 3 0 0 9 0 12 0 9 0 0 0 3 0 0 0 3 48 246 3 0 0 0 0 0 0 0 0 0 0 0 36 0 0 0 0 3 0 0 0 183 3 0 0 0 0 63 3 0 0 18 3 6 0 0 3 0 0 0 3 0 24 0 0 0 0 0 0 0 0 0 0 3 3 0 0 0 0 0 0 18 0 0 0 0 3 0
+cpu-prof-experts: 46 0 0 0 0 0 0 6 0 6 6 0 9 3 0 3 0 9 0 6 138 0 0 0 0 0 0 0 0 0 0 15 27 0 0 3 0 3 0 33 0 0 0 6 30 0 0 0 0 0 0 0 0 0 0 114 0 354 0 0 0 294 0 0 0 0 0 0 261 78 0 0 0 6 0 0 0 0 0 6 0 3 54 0 0 0 0 0 0 18 0 0 9 18 0 0 0 0 9 3 0 0 0 0 0 3 0 0 0 0 0 18 0 0 0 0 39 0 0 0 3 0 0 0 15 0 0 0 3 0 3 0 0 3 0 0 3 0 0 6 0 0 0 3 0 0 0 0 0 0 0 0 15 0 0 0 66 0 0 0 0 0 3 0 12 3 6 0 6 0 0 0 0 6 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 54 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 54 0 0 0 0 3 0 0 0 0 0 3 0 3 0 15 9 0 15 0 3 0 0 0 0 0 0 0 0 0 3 3 0 0 0 0 0 0 0 0 3 0 132 12 0 0 0 0 0 21 0 3 6 3 3 0 3 0 3 3 3 0 0 0 3 6 0 0 6 0 0 0 0 36 3 0 0 0 0 12 0 114 9 0 0 3 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 3 3 0 0 0 0 0 0 0 0 12 0 0 45 3 0 0 0 0 12 0 0 0 0 177 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 9 0 0 3 0 24 0 0 0 6 0 165 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 0 0 30 0 3 3 0 15 3 3 60 0 15 0 0 27 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 48 0 0 0 0 0 0 0 3 3 0 0 9 0 0 3 6 0 0 0 0 0 0 0 0 0 63 0 6 0 0 0 9 48 3 0 0 0 0 9 0 0 111 0 0 0 6 9 0 0 0 3 3 0
+cpu-prof-experts: 47 0 0 0 3 3 0 0 0 57 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 0 0 0 0 6 0 0 0 0 0 0 3 0 0 0 6 0 0 0 0 3 0 0 0 3 3 3 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 243 0 0 3 0 0 42 0 6 0 3 0 27 0 0 0 0 0 0 0 0 3 3 0 0 12 0 3 0 15 15 0 0 0 0 3 0 0 198 3 0 0 0 0 0 0 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 0 0 0 3 3 0 0 0 0 0 0 0 3 0 0 3 0 0 0 3 0 0 3 0 0 0 0 0 9 3 3 3 0 0 0 0 0 15 0 0 0 0 0 18 0 129 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 9 3 3 0 3 3 0 0 0 0 0 0 0 0 0 0 6 0 0 6 0 0 3 0 0 186 0 363 0 0 0 0 0 0 0 0 0 0 0 66 0 0 3 3 0 3 0 0 0 30 0 0 0 0 3 0 0 0 3 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 18 0 0 102 0 0 0 0 0 0 0 3 0 0 0 15 0 0 0 0 0 72 0 0 0 0 0 6 0 0 9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 12 0 0 6 0 0 0 282 0 6 21 3 0 0 0 0 0 0 330 0 78 0 0 0 0 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 132 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 3 0 0 0 24 0 0 0 0 0 0 0 0 0 6 0 0 0 0 3 0 0 0 12 3 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 6 309 0 0 0 27 0 102 102 0 0 0 0 0 0 0 0 0 66 3 0 0 0 0 0 0 0 0 0 3 0 0 3 0 6 66 6 0 3 0 0 0 24 0 3 0 0 0 0 0 0 0 3 0 6 0 0 0 0 0 0 0 0 0 0 6 3 0 0

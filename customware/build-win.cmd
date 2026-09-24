@@ -23,4 +23,4 @@ cmake -S . -B build -G Ninja ^
   -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON ^
   -DBUILD_SHARED_LIBS=OFF ^
   || exit /b 1
-cmake --build build --config Release --target llama-server llama-bench llama-batched-bench -j 14 %*
+cmake --build build --config Release --target llama-server llama-bench llama-batched-bench llama-perplexity -j 14 %*

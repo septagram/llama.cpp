@@ -1,0 +1,430 @@
+ggml_cuda_init: found 2 CUDA devices (Total VRAM: 24571 MiB):
+  Device 0: NVIDIA GeForce RTX 4060 Ti, compute capability 8.9, VMM: yes, VRAM: 16379 MiB
+  Device 1: NVIDIA GeForce RTX 2060 SUPER, compute capability 7.5, VMM: yes, VRAM: 8191 MiB
+llama-bench: benchmark 1/1: starting
+llama-bench: benchmark 1/1: warmup generation run
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=  1060.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes= 112 copy= 43536.0 us comp= 49977.0 us  hc_init
+sched-prof:   split   2 CPU    nodes=   4 copy=   105.0 us comp= 10863.0 us  node_116
+sched-prof:   split   3 CUDA0  nodes= 220 copy=   141.0 us comp=  3944.0 us  node_120
+sched-prof:   split   4 CPU    nodes=   4 copy=   115.0 us comp=  3429.0 us  node_340
+sched-prof:   split   5 CUDA0  nodes= 144 copy=    86.0 us comp=  1116.0 us  node_344
+sched-prof:   split   6 CPU    nodes=   4 copy=    90.0 us comp=  5075.0 us  node_488
+sched-prof:   split   7 CUDA0  nodes= 191 copy=   644.0 us comp= 17225.0 us  node_492
+sched-prof:   split   8 CPU    nodes=   4 copy=    84.0 us comp=  5290.0 us  node_683
+sched-prof:   split   9 CUDA0  nodes= 144 copy=    82.0 us comp=   943.0 us  node_687
+sched-prof:   split  10 CPU    nodes=   4 copy=    76.0 us comp=  3754.0 us  node_831
+sched-prof:   split  11 CUDA0  nodes= 144 copy=   112.0 us comp=  1139.0 us  node_835
+sched-prof:   split  12 CPU    nodes=   4 copy=   109.0 us comp=  3348.0 us  node_979
+sched-prof:   split  13 CUDA0  nodes= 144 copy=    87.0 us comp=  1192.0 us  node_983
+sched-prof:   split  14 CPU    nodes=   4 copy=   104.0 us comp=  5024.0 us  node_1127
+sched-prof:   split  15 CUDA0  nodes= 191 copy=    91.0 us comp=  1134.0 us  node_1131
+sched-prof:   split  16 CPU    nodes=   4 copy=    95.0 us comp=  3874.0 us  node_1322
+sched-prof:   split  17 CUDA0  nodes= 144 copy=   101.0 us comp=  1120.0 us  node_1326
+sched-prof:   split  18 CPU    nodes=   4 copy=    83.0 us comp=  1835.0 us  node_1470
+sched-prof:   split  19 CUDA0  nodes= 144 copy=    69.0 us comp=   975.0 us  node_1474
+sched-prof:   split  20 CPU    nodes=   4 copy=    82.0 us comp=  3972.0 us  node_1618
+sched-prof:   split  21 CUDA0  nodes= 144 copy=    91.0 us comp=  1091.0 us  node_1622
+sched-prof:   split  22 CPU    nodes=   4 copy=    76.0 us comp=  2423.0 us  node_1766
+sched-prof:   split  23 CUDA0  nodes= 191 copy=    84.0 us comp=  1074.0 us  node_1770
+sched-prof:   split  24 CPU    nodes=   4 copy=    77.0 us comp=  3258.0 us  node_1961
+sched-prof:   split  25 CUDA0  nodes= 144 copy=    89.0 us comp=  1069.0 us  node_1965
+sched-prof:   split  26 CPU    nodes=   4 copy=    72.0 us comp=  2307.0 us  node_2109
+sched-prof:   split  27 CUDA0  nodes= 144 copy=    77.0 us comp=  1702.0 us  node_2113
+sched-prof:   split  28 CPU    nodes=   4 copy=    72.0 us comp=  3721.0 us  node_2257
+sched-prof:   split  29 CUDA0  nodes= 144 copy=    83.0 us comp=  1025.0 us  node_2261
+sched-prof:   split  30 CPU    nodes=   4 copy=    65.0 us comp=  1289.0 us  node_2405
+sched-prof:   split  31 CUDA0  nodes= 191 copy=    78.0 us comp=  1059.0 us  node_2409
+sched-prof:   split  32 CPU    nodes=   4 copy=    74.0 us comp=  4058.0 us  node_2600
+sched-prof:   split  33 CUDA0  nodes= 144 copy=    69.0 us comp=  1086.0 us  node_2604
+sched-prof:   split  34 CPU    nodes=   4 copy=    77.0 us comp=  1625.0 us  node_2748
+sched-prof:   split  35 CUDA0  nodes= 144 copy=    50.0 us comp=   936.0 us  node_2752
+sched-prof:   split  36 CPU    nodes=   4 copy=    69.0 us comp=  2827.0 us  node_2896
+sched-prof:   split  37 CUDA0  nodes= 144 copy=    50.0 us comp=  1014.0 us  node_2900
+sched-prof:   split  38 CPU    nodes=   4 copy=    98.0 us comp=  3024.0 us  node_3044
+sched-prof:   split  39 CUDA0  nodes= 191 copy=    70.0 us comp=  1025.0 us  node_3048
+sched-prof:   split  40 CPU    nodes=   4 copy=    75.0 us comp=  3282.0 us  node_3239
+sched-prof:   split  41 CUDA0  nodes= 144 copy=    56.0 us comp=  1043.0 us  node_3243
+sched-prof:   split  42 CPU    nodes=   4 copy=    69.0 us comp=  2021.0 us  node_3387
+sched-prof:   split  43 CUDA0  nodes= 144 copy=    43.0 us comp=   914.0 us  node_3391
+sched-prof:   split  44 CPU    nodes=   4 copy=    65.0 us comp=  2668.0 us  node_3535
+sched-prof:   split  45 CUDA0  nodes= 144 copy=    82.0 us comp=  1387.0 us  node_3539
+sched-prof:   split  46 CPU    nodes=   4 copy=    69.0 us comp=  1800.0 us  node_3683
+sched-prof:   split  47 CUDA0  nodes= 191 copy=    63.0 us comp=  1056.0 us  node_3687
+sched-prof:   split  48 CPU    nodes=   4 copy=    67.0 us comp=  3798.0 us  node_3878
+sched-prof:   split  49 CUDA0  nodes= 144 copy=    55.0 us comp=  1044.0 us  node_3882
+sched-prof:   split  50 CPU    nodes=   4 copy=   102.0 us comp=  2376.0 us  node_4026
+sched-prof:   split  51 CUDA0  nodes= 144 copy=    58.0 us comp=   982.0 us  node_4030
+sched-prof:   split  52 CPU    nodes=   4 copy=    66.0 us comp=  3072.0 us  node_4174
+sched-prof:   split  53 CUDA0  nodes= 144 copy=    49.0 us comp=  1468.0 us  node_4178
+sched-prof:   split  54 CPU    nodes=   4 copy=   112.0 us comp=  1617.0 us  node_4322
+sched-prof:   split  55 CUDA0  nodes= 191 copy=    54.0 us comp=  1071.0 us  node_4326
+sched-prof:   split  56 CPU    nodes=   4 copy=    66.0 us comp=  3644.0 us  node_4517
+sched-prof:   split  57 CUDA0  nodes= 144 copy=    81.0 us comp=  1375.0 us  node_4521
+sched-prof:   split  58 CPU    nodes=   4 copy=    73.0 us comp=  2120.0 us  node_4665
+sched-prof:   split  59 CUDA0  nodes= 144 copy=    68.0 us comp=   931.0 us  node_4669
+sched-prof:   split  60 CPU    nodes=   4 copy=    68.0 us comp=  3917.0 us  node_4813
+sched-prof:   split  61 CUDA0  nodes= 144 copy=   106.0 us comp=  1173.0 us  node_4817
+sched-prof:   split  62 CPU    nodes=   4 copy=    76.0 us comp=  1809.0 us  node_4961
+sched-prof:   split  63 CUDA0  nodes= 191 copy=    75.0 us comp=  1058.0 us  node_4965
+sched-prof:   split  64 CPU    nodes=   4 copy=    73.0 us comp=  3611.0 us  node_5156
+sched-prof:   split  65 CUDA0  nodes= 144 copy=    55.0 us comp=  1339.0 us  node_5160
+sched-prof:   split  66 CPU    nodes=   4 copy=   110.0 us comp=  2569.0 us  node_5304
+sched-prof:   split  67 CUDA0  nodes= 144 copy=    83.0 us comp=   967.0 us  node_5308
+sched-prof:   split  68 CPU    nodes=   4 copy=    81.0 us comp=  3370.0 us  node_5452
+sched-prof:   split  69 CUDA0  nodes= 144 copy=    94.0 us comp=  1112.0 us  node_5456
+sched-prof:   split  70 CPU    nodes=   4 copy=    76.0 us comp=  2409.0 us  node_5600
+sched-prof:   split  71 CUDA0  nodes= 191 copy=    64.0 us comp=  1078.0 us  node_5604
+sched-prof:   split  72 CPU    nodes=   4 copy=    67.0 us comp=  2842.0 us  node_5795
+sched-prof:   split  73 CUDA0  nodes= 144 copy=   125.0 us comp=  1225.0 us  node_5799
+sched-prof:   split  74 CPU    nodes=   4 copy=    78.0 us comp=  3592.0 us  node_5943
+sched-prof:   split  75 CUDA0  nodes= 144 copy=    99.0 us comp=  1075.0 us  node_5947
+sched-prof:   split  76 CPU    nodes=   4 copy=   102.0 us comp=  2215.0 us  node_6091
+sched-prof:   split  77 CUDA0  nodes= 144 copy=    90.0 us comp=   994.0 us  node_6095
+sched-prof:   split  78 CPU    nodes=   4 copy=   118.0 us comp=  1328.0 us  node_6239
+sched-prof:   split  79 CUDA0  nodes= 191 copy=    55.0 us comp=  1292.0 us  node_6243
+sched-prof:   split  80 CPU    nodes=   4 copy=    79.0 us comp=  3942.0 us  node_6434
+sched-prof:   split  81 CUDA0  nodes= 144 copy=   143.0 us comp=  1535.0 us  node_6438
+sched-prof:   split  82 CPU    nodes=   4 copy=   132.0 us comp=  3533.0 us  node_6582
+sched-prof:   split  83 CUDA0  nodes= 144 copy=    98.0 us comp=  1054.0 us  node_6586
+sched-prof:   split  84 CPU    nodes=   4 copy=    72.0 us comp=  3619.0 us  node_6730
+sched-prof:   split  85 CUDA0  nodes= 144 copy=   105.0 us comp=  1223.0 us  node_6734
+sched-prof:   split  86 CPU    nodes=   4 copy=    88.0 us comp=   748.0 us  node_6878
+sched-prof:   split  87 CUDA0  nodes= 191 copy=    84.0 us comp=  1299.0 us  node_6882
+sched-prof:   split  88 CPU    nodes=   4 copy=   107.0 us comp=  3475.0 us  node_7073
+sched-prof:   split  89 CUDA0  nodes= 144 copy=   120.0 us comp=  1442.0 us  node_7077
+sched-prof:   split  90 CPU    nodes=   4 copy=   119.0 us comp=  3463.0 us  node_7221
+sched-prof:   split  91 CUDA0  nodes= 144 copy=   107.0 us comp=  1009.0 us  node_7225
+sched-prof:   split  92 CPU    nodes=   4 copy=    87.0 us comp=  2318.0 us  node_7369
+sched-prof:   split  93 CUDA0  nodes= 144 copy=    78.0 us comp=  1080.0 us  node_7373
+sched-prof:   split  94 CPU    nodes=   4 copy=    91.0 us comp=  4739.0 us  node_7517
+sched-prof:   split  95 CUDA0  nodes= 196 copy=   162.0 us comp=  1158.0 us  node_7521
+sched-prof:   split  96 CPU    nodes=   4 copy=    74.0 us comp=  2370.0 us  node_7717
+sched-prof:   split  97 CUDA0  nodes=  55 copy=    99.0 us comp=  2981.0 us  node_7721
+sched-prof: graph 0 total=331.84 ms splits=98 | CUDA0 n=49 nodes=7580 copy=48.14 comp=125.21 | CPU n=49 nodes=196 copy=4.08 comp=154.32
+llama-bench: benchmark 1/1: generation run 1/2
+sched-prof: graph 1 total=191.52 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.94 comp=84.32 | CPU n=49 nodes=196 copy=4.09 comp=99.16
+sched-prof: graph 2 total=145.39 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.83 comp=50.34 | CPU n=49 nodes=196 copy=3.90 comp=87.29
+sched-prof: graph 3 total=176.33 ms splits=98 | CUDA0 n=49 nodes=7580 copy=4.52 comp=62.65 | CPU n=49 nodes=196 copy=4.34 comp=104.79
+sched-prof: graph 4 total=164.43 ms splits=98 | CUDA0 n=49 nodes=7580 copy=5.49 comp=39.63 | CPU n=49 nodes=196 copy=4.26 comp=114.99
+sched-prof: graph 5 total=111.53 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.57 comp=42.31 | CPU n=49 nodes=196 copy=4.34 comp=61.30
+sched-prof: graph 6 total=84.66 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.33 comp=40.68 | CPU n=49 nodes=196 copy=4.49 comp=36.15
+sched-prof: graph 7 total=90.98 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.42 comp=41.25 | CPU n=49 nodes=196 copy=4.72 comp=41.58
+sched-prof: graph 8 total=104.91 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.62 comp=38.40 | CPU n=49 nodes=196 copy=4.36 comp=58.51
+sched-prof: graph 9 total=80.45 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.98 comp=38.70 | CPU n=49 nodes=196 copy=4.02 comp=34.74
+sched-prof: graph 10 total=82.27 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.96 comp=38.08 | CPU n=49 nodes=196 copy=3.89 comp=37.32
+sched-prof: graph 11 total=87.23 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.84 comp=37.72 | CPU n=49 nodes=196 copy=4.18 comp=42.48
+sched-prof: graph 12 total=101.99 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.18 comp=38.70 | CPU n=49 nodes=196 copy=4.05 comp=56.04
+sched-prof: graph 13 total=70.54 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.71 comp=35.38 | CPU n=49 nodes=196 copy=4.22 comp=28.23
+sched-prof: graph 14 total=78.52 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.04 comp=38.53 | CPU n=49 nodes=196 copy=4.21 comp=32.73
+sched-prof: graph 15 total=74.82 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.23 comp=37.72 | CPU n=49 nodes=196 copy=4.48 comp=29.38
+sched-prof: graph 16 total=72.01 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.08 comp=35.96 | CPU n=49 nodes=196 copy=4.26 comp=28.69
+sched-prof: graph 17 total=65.38 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.62 comp=35.02 | CPU n=49 nodes=196 copy=3.98 comp=23.74
+sched-prof: graph 18 total=79.73 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.14 comp=35.16 | CPU n=49 nodes=196 copy=4.15 comp=37.26
+sched-prof: graph 19 total=82.91 ms splits=98 | CUDA0 n=49 nodes=7580 copy=4.13 comp=36.40 | CPU n=49 nodes=196 copy=5.07 comp=37.29
+sched-prof: graph 20 total=81.13 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.88 comp=35.89 | CPU n=49 nodes=196 copy=4.81 comp=36.53
+sched-prof: graph 21 total=64.89 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.08 comp=35.55 | CPU n=49 nodes=196 copy=4.32 comp=21.93
+sched-prof: graph 22 total=101.40 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.28 comp=36.94 | CPU n=49 nodes=196 copy=4.02 comp=57.14
+sched-prof: graph 23 total=65.49 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.76 comp=35.90 | CPU n=49 nodes=196 copy=3.86 comp=22.97
+sched-prof: graph 24 total=121.79 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.36 comp=36.39 | CPU n=49 nodes=196 copy=3.96 comp=78.08
+sched-prof: graph 25 total=81.33 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.10 comp=36.36 | CPU n=49 nodes=196 copy=4.46 comp=37.38
+sched-prof: graph 26 total=89.45 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.45 comp=35.59 | CPU n=49 nodes=196 copy=4.28 comp=46.13
+sched-prof: graph 27 total=71.25 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.63 comp=33.92 | CPU n=49 nodes=196 copy=3.90 comp=30.79
+sched-prof: graph 28 total=71.54 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.81 comp=35.13 | CPU n=49 nodes=196 copy=3.91 comp=29.68
+sched-prof: graph 29 total=59.36 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.83 comp=34.44 | CPU n=49 nodes=196 copy=3.88 comp=18.20
+sched-prof: graph 30 total=58.86 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.51 comp=35.09 | CPU n=49 nodes=196 copy=3.96 comp=17.29
+sched-prof: graph 31 total=60.81 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.24 comp=35.48 | CPU n=49 nodes=196 copy=4.50 comp=17.57
+sched-prof: graph 32 total=59.49 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.80 comp=35.62 | CPU n=49 nodes=196 copy=4.54 comp=16.52
+sched-prof: graph 33 total=66.32 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.23 comp=36.58 | CPU n=49 nodes=196 copy=4.53 comp=21.97
+sched-prof: graph 34 total=79.87 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.47 comp=36.11 | CPU n=49 nodes=196 copy=4.57 comp=35.70
+sched-prof: graph 35 total=65.56 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.06 comp=37.01 | CPU n=49 nodes=196 copy=4.67 comp=20.80
+sched-prof: graph 36 total=64.03 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.23 comp=34.66 | CPU n=49 nodes=196 copy=4.10 comp=22.02
+sched-prof: graph 37 total=56.71 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.71 comp=35.98 | CPU n=49 nodes=196 copy=4.34 comp=13.66
+sched-prof: graph 38 total=69.45 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.86 comp=35.05 | CPU n=49 nodes=196 copy=4.31 comp=27.21
+sched-prof: graph 39 total=95.09 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.41 comp=36.12 | CPU n=49 nodes=196 copy=4.00 comp=51.55
+sched-prof: graph 40 total=59.33 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.43 comp=35.54 | CPU n=49 nodes=196 copy=3.78 comp=17.57
+sched-prof: graph 41 total=74.81 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.94 comp=34.83 | CPU n=49 nodes=196 copy=3.89 comp=33.14
+sched-prof: graph 42 total=67.87 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.86 comp=35.14 | CPU n=49 nodes=196 copy=4.04 comp=25.83
+sched-prof: graph 43 total=78.27 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.92 comp=35.39 | CPU n=49 nodes=196 copy=4.11 comp=35.84
+sched-prof: graph 44 total=64.64 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.76 comp=35.57 | CPU n=49 nodes=196 copy=3.92 comp=22.38
+sched-prof: graph 45 total=65.54 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.20 comp=35.72 | CPU n=49 nodes=196 copy=4.26 comp=22.36
+sched-prof: graph 46 total=57.20 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.58 comp=35.24 | CPU n=49 nodes=196 copy=4.05 comp=15.33
+sched-prof: graph 47 total=58.92 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.64 comp=35.53 | CPU n=49 nodes=196 copy=3.97 comp=16.78
+sched-prof: graph 48 total=66.45 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.93 comp=35.94 | CPU n=49 nodes=196 copy=4.20 comp=23.36
+sched-prof: graph 49 total=64.95 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.70 comp=35.74 | CPU n=49 nodes=196 copy=4.16 comp=22.33
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=    83.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes= 112 copy=    73.0 us comp=   580.0 us  hc_init
+sched-prof:   split   2 CPU    nodes=   4 copy=    79.0 us comp=   129.0 us  node_116
+sched-prof:   split   3 CUDA0  nodes= 220 copy=    70.0 us comp=   848.0 us  node_120
+sched-prof:   split   4 CPU    nodes=   4 copy=    82.0 us comp=   328.0 us  node_340
+sched-prof:   split   5 CUDA0  nodes= 144 copy=    39.0 us comp=   644.0 us  node_344
+sched-prof:   split   6 CPU    nodes=   4 copy=    69.0 us comp=   382.0 us  node_488
+sched-prof:   split   7 CUDA0  nodes= 191 copy=   487.0 us comp=   899.0 us  node_492
+sched-prof:   split   8 CPU    nodes=   4 copy=    76.0 us comp=   131.0 us  node_683
+sched-prof:   split   9 CUDA0  nodes= 144 copy=    37.0 us comp=   725.0 us  node_687
+sched-prof:   split  10 CPU    nodes=   4 copy=    73.0 us comp=   231.0 us  node_831
+sched-prof:   split  11 CUDA0  nodes= 144 copy=    50.0 us comp=   631.0 us  node_835
+sched-prof:   split  12 CPU    nodes=   4 copy=    71.0 us comp=   133.0 us  node_979
+sched-prof:   split  13 CUDA0  nodes= 144 copy=    36.0 us comp=   617.0 us  node_983
+sched-prof:   split  14 CPU    nodes=   4 copy=   178.0 us comp=   996.0 us  node_1127
+sched-prof:   split  15 CUDA0  nodes= 191 copy=    65.0 us comp=   615.0 us  node_1131
+sched-prof:   split  16 CPU    nodes=   4 copy=    78.0 us comp=   245.0 us  node_1322
+sched-prof:   split  17 CUDA0  nodes= 144 copy=    64.0 us comp=   629.0 us  node_1326
+sched-prof:   split  18 CPU    nodes=   4 copy=    97.0 us comp=   252.0 us  node_1470
+sched-prof:   split  19 CUDA0  nodes= 144 copy=    52.0 us comp=   645.0 us  node_1474
+sched-prof:   split  20 CPU    nodes=   4 copy=    78.0 us comp=   190.0 us  node_1618
+sched-prof:   split  21 CUDA0  nodes= 144 copy=    57.0 us comp=  1261.0 us  node_1622
+sched-prof:   split  22 CPU    nodes=   4 copy=   156.0 us comp=   810.0 us  node_1766
+sched-prof:   split  23 CUDA0  nodes= 191 copy=    52.0 us comp=   631.0 us  node_1770
+sched-prof:   split  24 CPU    nodes=   4 copy=   105.0 us comp=   116.0 us  node_1961
+sched-prof:   split  25 CUDA0  nodes= 144 copy=    50.0 us comp=   608.0 us  node_1965
+sched-prof:   split  26 CPU    nodes=   4 copy=   103.0 us comp=   459.0 us  node_2109
+sched-prof:   split  27 CUDA0  nodes= 144 copy=    55.0 us comp=   648.0 us  node_2113
+sched-prof:   split  28 CPU    nodes=   4 copy=    78.0 us comp=   111.0 us  node_2257
+sched-prof:   split  29 CUDA0  nodes= 144 copy=    36.0 us comp=   641.0 us  node_2261
+sched-prof:   split  30 CPU    nodes=   4 copy=    77.0 us comp=   101.0 us  node_2405
+sched-prof:   split  31 CUDA0  nodes= 191 copy=    35.0 us comp=   577.0 us  node_2409
+sched-prof:   split  32 CPU    nodes=   4 copy=    75.0 us comp=  1081.0 us  node_2600
+sched-prof:   split  33 CUDA0  nodes= 144 copy=    65.0 us comp=   631.0 us  node_2604
+sched-prof:   split  34 CPU    nodes=   4 copy=    97.0 us comp=   448.0 us  node_2748
+sched-prof:   split  35 CUDA0  nodes= 144 copy=    59.0 us comp=  1157.0 us  node_2752
+sched-prof:   split  36 CPU    nodes=   4 copy=   121.0 us comp=    38.0 us  node_2896
+sched-prof:   split  37 CUDA0  nodes= 144 copy=    39.0 us comp=   648.0 us  node_2900
+sched-prof:   split  38 CPU    nodes=   4 copy=   110.0 us comp=   870.0 us  node_3044
+sched-prof:   split  39 CUDA0  nodes= 191 copy=    67.0 us comp=   633.0 us  node_3048
+sched-prof:   split  40 CPU    nodes=   4 copy=   122.0 us comp=   170.0 us  node_3239
+sched-prof:   split  41 CUDA0  nodes= 144 copy=    45.0 us comp=   622.0 us  node_3243
+sched-prof:   split  42 CPU    nodes=   4 copy=    91.0 us comp=  1477.0 us  node_3387
+sched-prof:   split  43 CUDA0  nodes= 144 copy=    95.0 us comp=   643.0 us  node_3391
+sched-prof:   split  44 CPU    nodes=   4 copy=    95.0 us comp=   939.0 us  node_3535
+sched-prof:   split  45 CUDA0  nodes= 144 copy=    62.0 us comp=   637.0 us  node_3539
+sched-prof:   split  46 CPU    nodes=   4 copy=    98.0 us comp=   291.0 us  node_3683
+sched-prof:   split  47 CUDA0  nodes= 191 copy=    46.0 us comp=   619.0 us  node_3687
+sched-prof:   split  48 CPU    nodes=   4 copy=    78.0 us comp=   696.0 us  node_3878
+sched-prof:   split  49 CUDA0  nodes= 144 copy=    46.0 us comp=   904.0 us  node_3882
+sched-prof:   split  50 CPU    nodes=   4 copy=    82.0 us comp=   111.0 us  node_4026
+sched-prof:   split  51 CUDA0  nodes= 144 copy=    42.0 us comp=   613.0 us  node_4030
+sched-prof:   split  52 CPU    nodes=   4 copy=    87.0 us comp=   257.0 us  node_4174
+sched-prof:   split  53 CUDA0  nodes= 144 copy=    38.0 us comp=   606.0 us  node_4178
+sched-prof:   split  54 CPU    nodes=   4 copy=    80.0 us comp=  1168.0 us  node_4322
+sched-prof:   split  55 CUDA0  nodes= 191 copy=    46.0 us comp=   608.0 us  node_4326
+sched-prof:   split  56 CPU    nodes=   4 copy=    72.0 us comp=   749.0 us  node_4517
+sched-prof:   split  57 CUDA0  nodes= 144 copy=    52.0 us comp=   633.0 us  node_4521
+sched-prof:   split  58 CPU    nodes=   4 copy=    97.0 us comp=   358.0 us  node_4665
+sched-prof:   split  59 CUDA0  nodes= 144 copy=    45.0 us comp=   720.0 us  node_4669
+sched-prof:   split  60 CPU    nodes=   4 copy=    96.0 us comp=   666.0 us  node_4813
+sched-prof:   split  61 CUDA0  nodes= 144 copy=    42.0 us comp=   663.0 us  node_4817
+sched-prof:   split  62 CPU    nodes=   4 copy=    98.0 us comp=   744.0 us  node_4961
+sched-prof:   split  63 CUDA0  nodes= 191 copy=    58.0 us comp=   622.0 us  node_4965
+sched-prof:   split  64 CPU    nodes=   4 copy=    97.0 us comp=   218.0 us  node_5156
+sched-prof:   split  65 CUDA0  nodes= 144 copy=    40.0 us comp=   595.0 us  node_5160
+sched-prof:   split  66 CPU    nodes=   4 copy=    92.0 us comp=  1070.0 us  node_5304
+sched-prof:   split  67 CUDA0  nodes= 144 copy=    78.0 us comp=   654.0 us  node_5308
+sched-prof:   split  68 CPU    nodes=   4 copy=    89.0 us comp=  1038.0 us  node_5452
+sched-prof:   split  69 CUDA0  nodes= 144 copy=    53.0 us comp=   621.0 us  node_5456
+sched-prof:   split  70 CPU    nodes=   4 copy=    91.0 us comp=   845.0 us  node_5600
+sched-prof:   split  71 CUDA0  nodes= 191 copy=    52.0 us comp=  1369.0 us  node_5604
+sched-prof:   split  72 CPU    nodes=   4 copy=    86.0 us comp=   113.0 us  node_5795
+sched-prof:   split  73 CUDA0  nodes= 144 copy=    37.0 us comp=   641.0 us  node_5799
+sched-prof:   split  74 CPU    nodes=   4 copy=    91.0 us comp=   376.0 us  node_5943
+sched-prof:   split  75 CUDA0  nodes= 144 copy=    39.0 us comp=   626.0 us  node_5947
+sched-prof:   split  76 CPU    nodes=   4 copy=    76.0 us comp=   674.0 us  node_6091
+sched-prof:   split  77 CUDA0  nodes= 144 copy=    50.0 us comp=   616.0 us  node_6095
+sched-prof:   split  78 CPU    nodes=   4 copy=   106.0 us comp=   717.0 us  node_6239
+sched-prof:   split  79 CUDA0  nodes= 191 copy=    49.0 us comp=   574.0 us  node_6243
+sched-prof:   split  80 CPU    nodes=   4 copy=   105.0 us comp=  1508.0 us  node_6434
+sched-prof:   split  81 CUDA0  nodes= 144 copy=    60.0 us comp=   717.0 us  node_6438
+sched-prof:   split  82 CPU    nodes=   4 copy=    83.0 us comp=   742.0 us  node_6582
+sched-prof:   split  83 CUDA0  nodes= 144 copy=    53.0 us comp=   632.0 us  node_6586
+sched-prof:   split  84 CPU    nodes=   4 copy=    97.0 us comp=   965.0 us  node_6730
+sched-prof:   split  85 CUDA0  nodes= 144 copy=    53.0 us comp=   621.0 us  node_6734
+sched-prof:   split  86 CPU    nodes=   4 copy=    67.0 us comp=   733.0 us  node_6878
+sched-prof:   split  87 CUDA0  nodes= 191 copy=    37.0 us comp=   594.0 us  node_6882
+sched-prof:   split  88 CPU    nodes=   4 copy=   103.0 us comp=  1309.0 us  node_7073
+sched-prof:   split  89 CUDA0  nodes= 144 copy=    99.0 us comp=  1450.0 us  node_7077
+sched-prof:   split  90 CPU    nodes=   4 copy=    95.0 us comp=   774.0 us  node_7221
+sched-prof:   split  91 CUDA0  nodes= 144 copy=    53.0 us comp=   681.0 us  node_7225
+sched-prof:   split  92 CPU    nodes=   4 copy=   109.0 us comp=   724.0 us  node_7369
+sched-prof:   split  93 CUDA0  nodes= 144 copy=    48.0 us comp=   642.0 us  node_7373
+sched-prof:   split  94 CPU    nodes=   4 copy=   103.0 us comp=   765.0 us  node_7517
+sched-prof:   split  95 CUDA0  nodes= 196 copy=    87.0 us comp=   660.0 us  node_7521
+sched-prof:   split  96 CPU    nodes=   4 copy=    71.0 us comp=   984.0 us  node_7717
+sched-prof:   split  97 CUDA0  nodes=  55 copy=    60.0 us comp=  3169.0 us  node_7721
+sched-prof: graph 50 total=72.88 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.05 comp=37.02 | CPU n=49 nodes=196 copy=4.46 comp=28.32
+sched-prof: graph 51 total=68.01 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.18 comp=35.53 | CPU n=49 nodes=196 copy=4.56 comp=24.72
+sched-prof: graph 52 total=70.12 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.23 comp=35.89 | CPU n=49 nodes=196 copy=4.09 comp=26.90
+sched-prof: graph 53 total=61.33 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.66 comp=35.58 | CPU n=49 nodes=196 copy=3.91 comp=19.17
+sched-prof: graph 54 total=56.17 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.51 comp=36.76 | CPU n=49 nodes=196 copy=3.99 comp=12.89
+sched-prof: graph 55 total=55.52 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.80 comp=35.85 | CPU n=49 nodes=196 copy=4.26 comp=12.61
+sched-prof: graph 56 total=73.13 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.47 comp=36.83 | CPU n=49 nodes=196 copy=4.99 comp=27.82
+sched-prof: graph 57 total=71.76 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.23 comp=36.86 | CPU n=49 nodes=196 copy=4.52 comp=27.13
+sched-prof: graph 58 total=60.33 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.02 comp=35.53 | CPU n=49 nodes=196 copy=4.96 comp=16.81
+sched-prof: graph 59 total=56.91 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.04 comp=35.44 | CPU n=49 nodes=196 copy=4.47 comp=13.95
+sched-prof: graph 60 total=66.98 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.79 comp=34.60 | CPU n=49 nodes=196 copy=4.22 comp=25.37
+sched-prof: graph 61 total=70.80 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.97 comp=35.58 | CPU n=49 nodes=196 copy=4.24 comp=28.01
+sched-prof: graph 62 total=61.20 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.72 comp=36.15 | CPU n=49 nodes=196 copy=3.84 comp=18.47
+sched-prof: graph 63 total=63.92 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.27 comp=35.91 | CPU n=49 nodes=196 copy=4.39 comp=20.34
+sched-prof: graph 64 total=60.87 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.74 comp=35.77 | CPU n=49 nodes=196 copy=3.89 comp=18.45
+llama-bench: benchmark 1/1: generation run 2/2
+sched-prof: graph 65 total=99.43 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.32 comp=44.61 | CPU n=49 nodes=196 copy=3.69 comp=47.80
+sched-prof: graph 66 total=135.24 ms splits=98 | CUDA0 n=49 nodes=7580 copy=4.44 comp=45.52 | CPU n=49 nodes=196 copy=4.17 comp=81.08
+sched-prof: graph 67 total=130.07 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.86 comp=49.94 | CPU n=49 nodes=196 copy=4.30 comp=71.95
+sched-prof: graph 68 total=89.50 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.56 comp=35.76 | CPU n=49 nodes=196 copy=4.04 comp=46.13
+sched-prof: graph 69 total=106.55 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.56 comp=34.93 | CPU n=49 nodes=196 copy=4.02 comp=64.01
+sched-prof: graph 70 total=79.24 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.13 comp=35.13 | CPU n=49 nodes=196 copy=4.30 comp=36.66
+sched-prof: graph 71 total=70.81 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.86 comp=35.57 | CPU n=49 nodes=196 copy=4.16 comp=28.21
+sched-prof: graph 72 total=61.08 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.88 comp=34.75 | CPU n=49 nodes=196 copy=4.13 comp=19.30
+sched-prof: graph 73 total=75.65 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.26 comp=36.65 | CPU n=49 nodes=196 copy=4.57 comp=31.16
+sched-prof: graph 74 total=80.44 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.54 comp=36.12 | CPU n=49 nodes=196 copy=4.51 comp=36.25
+sched-prof: graph 75 total=79.07 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.15 comp=34.98 | CPU n=49 nodes=196 copy=4.21 comp=36.73
+sched-prof: graph 76 total=62.49 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.69 comp=34.77 | CPU n=49 nodes=196 copy=4.03 comp=20.99
+sched-prof: graph 77 total=60.07 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.68 comp=35.39 | CPU n=49 nodes=196 copy=4.08 comp=17.92
+sched-prof: graph 78 total=56.28 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.67 comp=35.56 | CPU n=49 nodes=196 copy=3.90 comp=14.14
+sched-prof: graph 79 total=92.99 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.32 comp=36.09 | CPU n=49 nodes=196 copy=4.43 comp=49.12
+sched-prof: graph 80 total=71.24 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.08 comp=35.96 | CPU n=49 nodes=196 copy=4.33 comp=27.86
+sched-prof: graph 81 total=71.56 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.00 comp=36.78 | CPU n=49 nodes=196 copy=4.39 comp=27.37
+sched-prof: graph 82 total=59.80 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.68 comp=36.67 | CPU n=49 nodes=196 copy=3.81 comp=16.64
+sched-prof: graph 83 total=60.73 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.91 comp=36.22 | CPU n=49 nodes=196 copy=4.52 comp=17.08
+sched-prof: graph 84 total=68.66 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.86 comp=36.01 | CPU n=49 nodes=196 copy=4.18 comp=25.60
+sched-prof: graph 85 total=57.36 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.12 comp=36.15 | CPU n=49 nodes=196 copy=4.16 comp=13.93
+sched-prof: graph 86 total=56.93 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.61 comp=35.01 | CPU n=49 nodes=196 copy=3.94 comp=15.36
+sched-prof: graph 87 total=56.86 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.51 comp=36.59 | CPU n=49 nodes=196 copy=4.16 comp=13.59
+sched-prof: graph 88 total=57.78 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.06 comp=35.82 | CPU n=49 nodes=196 copy=4.50 comp=14.38
+sched-prof: graph 89 total=55.93 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.81 comp=35.83 | CPU n=49 nodes=196 copy=4.17 comp=13.11
+sched-prof: graph 90 total=60.10 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.98 comp=35.92 | CPU n=49 nodes=196 copy=4.32 comp=16.87
+sched-prof: graph 91 total=54.65 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.00 comp=35.94 | CPU n=49 nodes=196 copy=4.30 comp=11.39
+sched-prof: graph 92 total=53.28 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.67 comp=36.04 | CPU n=49 nodes=196 copy=4.17 comp=10.40
+sched-prof: graph 93 total=55.23 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.85 comp=35.50 | CPU n=49 nodes=196 copy=4.23 comp=12.63
+sched-prof: graph 94 total=70.54 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.52 comp=37.49 | CPU n=49 nodes=196 copy=4.37 comp=25.14
+sched-prof: graph 95 total=59.50 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.89 comp=36.58 | CPU n=49 nodes=196 copy=4.39 comp=15.64
+sched-prof: graph 96 total=65.59 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.20 comp=36.37 | CPU n=49 nodes=196 copy=4.56 comp=21.45
+sched-prof: graph 97 total=62.47 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.94 comp=36.91 | CPU n=49 nodes=196 copy=4.54 comp=18.06
+sched-prof: graph 98 total=57.97 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.89 comp=35.70 | CPU n=49 nodes=196 copy=4.65 comp=14.72
+sched-prof: graph 99 total=63.07 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.21 comp=36.40 | CPU n=49 nodes=196 copy=4.72 comp=18.70
+sched-prof:   split   0 CPU    nodes=   4 copy=     0.0 us comp=   100.0 us  model.input_embed
+sched-prof:   split   1 CUDA0  nodes= 112 copy=   108.0 us comp=   558.0 us  hc_init
+sched-prof:   split   2 CPU    nodes=   4 copy=    82.0 us comp=  1775.0 us  node_116
+sched-prof:   split   3 CUDA0  nodes= 220 copy=   170.0 us comp=   854.0 us  node_120
+sched-prof:   split   4 CPU    nodes=   4 copy=    92.0 us comp=  2317.0 us  node_340
+sched-prof:   split   5 CUDA0  nodes= 144 copy=   114.0 us comp=  1412.0 us  node_344
+sched-prof:   split   6 CPU    nodes=   4 copy=   112.0 us comp=  2236.0 us  node_488
+sched-prof:   split   7 CUDA0  nodes= 191 copy=   652.0 us comp=   978.0 us  node_492
+sched-prof:   split   8 CPU    nodes=   4 copy=    95.0 us comp=   877.0 us  node_683
+sched-prof:   split   9 CUDA0  nodes= 144 copy=    60.0 us comp=   718.0 us  node_687
+sched-prof:   split  10 CPU    nodes=   4 copy=    89.0 us comp=  1528.0 us  node_831
+sched-prof:   split  11 CUDA0  nodes= 144 copy=    90.0 us comp=   635.0 us  node_835
+sched-prof:   split  12 CPU    nodes=   4 copy=   125.0 us comp=  2081.0 us  node_979
+sched-prof:   split  13 CUDA0  nodes= 144 copy=   104.0 us comp=   642.0 us  node_983
+sched-prof:   split  14 CPU    nodes=   4 copy=    89.0 us comp=  1829.0 us  node_1127
+sched-prof:   split  15 CUDA0  nodes= 191 copy=    93.0 us comp=  1282.0 us  node_1131
+sched-prof:   split  16 CPU    nodes=   4 copy=   108.0 us comp=  1828.0 us  node_1322
+sched-prof:   split  17 CUDA0  nodes= 144 copy=    66.0 us comp=   722.0 us  node_1326
+sched-prof:   split  18 CPU    nodes=   4 copy=    87.0 us comp=    40.0 us  node_1470
+sched-prof:   split  19 CUDA0  nodes= 144 copy=    36.0 us comp=   680.0 us  node_1474
+sched-prof:   split  20 CPU    nodes=   4 copy=   102.0 us comp=   154.0 us  node_1618
+sched-prof:   split  21 CUDA0  nodes= 144 copy=    45.0 us comp=   649.0 us  node_1622
+sched-prof:   split  22 CPU    nodes=   4 copy=    82.0 us comp=   127.0 us  node_1766
+sched-prof:   split  23 CUDA0  nodes= 191 copy=    42.0 us comp=   600.0 us  node_1770
+sched-prof:   split  24 CPU    nodes=   4 copy=   102.0 us comp=   390.0 us  node_1961
+sched-prof:   split  25 CUDA0  nodes= 144 copy=    49.0 us comp=   852.0 us  node_1965
+sched-prof:   split  26 CPU    nodes=   4 copy=   101.0 us comp=   275.0 us  node_2109
+sched-prof:   split  27 CUDA0  nodes= 144 copy=    42.0 us comp=   639.0 us  node_2113
+sched-prof:   split  28 CPU    nodes=   4 copy=    97.0 us comp=    27.0 us  node_2257
+sched-prof:   split  29 CUDA0  nodes= 144 copy=    45.0 us comp=   613.0 us  node_2261
+sched-prof:   split  30 CPU    nodes=   4 copy=    96.0 us comp=   518.0 us  node_2405
+sched-prof:   split  31 CUDA0  nodes= 191 copy=    47.0 us comp=   582.0 us  node_2409
+sched-prof:   split  32 CPU    nodes=   4 copy=   110.0 us comp=   496.0 us  node_2600
+sched-prof:   split  33 CUDA0  nodes= 144 copy=    53.0 us comp=   612.0 us  node_2604
+sched-prof:   split  34 CPU    nodes=   4 copy=   100.0 us comp=   564.0 us  node_2748
+sched-prof:   split  35 CUDA0  nodes= 144 copy=    49.0 us comp=   644.0 us  node_2752
+sched-prof:   split  36 CPU    nodes=   4 copy=   104.0 us comp=   226.0 us  node_2896
+sched-prof:   split  37 CUDA0  nodes= 144 copy=    45.0 us comp=   648.0 us  node_2900
+sched-prof:   split  38 CPU    nodes=   4 copy=    99.0 us comp=   184.0 us  node_3044
+sched-prof:   split  39 CUDA0  nodes= 191 copy=    56.0 us comp=   630.0 us  node_3048
+sched-prof:   split  40 CPU    nodes=   4 copy=    92.0 us comp=   222.0 us  node_3239
+sched-prof:   split  41 CUDA0  nodes= 144 copy=    52.0 us comp=   623.0 us  node_3243
+sched-prof:   split  42 CPU    nodes=   4 copy=    84.0 us comp=   851.0 us  node_3387
+sched-prof:   split  43 CUDA0  nodes= 144 copy=    57.0 us comp=   723.0 us  node_3391
+sched-prof:   split  44 CPU    nodes=   4 copy=    86.0 us comp=   751.0 us  node_3535
+sched-prof:   split  45 CUDA0  nodes= 144 copy=    57.0 us comp=   623.0 us  node_3539
+sched-prof:   split  46 CPU    nodes=   4 copy=    84.0 us comp=  1403.0 us  node_3683
+sched-prof:   split  47 CUDA0  nodes= 191 copy=    64.0 us comp=   608.0 us  node_3687
+sched-prof:   split  48 CPU    nodes=   4 copy=    76.0 us comp=   718.0 us  node_3878
+sched-prof:   split  49 CUDA0  nodes= 144 copy=    62.0 us comp=   663.0 us  node_3882
+sched-prof:   split  50 CPU    nodes=   4 copy=    91.0 us comp=    31.0 us  node_4026
+sched-prof:   split  51 CUDA0  nodes= 144 copy=    60.0 us comp=   833.0 us  node_4030
+sched-prof:   split  52 CPU    nodes=   4 copy=    87.0 us comp=   122.0 us  node_4174
+sched-prof:   split  53 CUDA0  nodes= 144 copy=    42.0 us comp=   629.0 us  node_4178
+sched-prof:   split  54 CPU    nodes=   4 copy=    89.0 us comp=   229.0 us  node_4322
+sched-prof:   split  55 CUDA0  nodes= 191 copy=    42.0 us comp=   595.0 us  node_4326
+sched-prof:   split  56 CPU    nodes=   4 copy=    83.0 us comp=   457.0 us  node_4517
+sched-prof:   split  57 CUDA0  nodes= 144 copy=    44.0 us comp=   633.0 us  node_4521
+sched-prof:   split  58 CPU    nodes=   4 copy=    83.0 us comp=    29.0 us  node_4665
+sched-prof:   split  59 CUDA0  nodes= 144 copy=    42.0 us comp=   633.0 us  node_4669
+sched-prof:   split  60 CPU    nodes=   4 copy=    84.0 us comp=    26.0 us  node_4813
+sched-prof:   split  61 CUDA0  nodes= 144 copy=    36.0 us comp=   660.0 us  node_4817
+sched-prof:   split  62 CPU    nodes=   4 copy=   115.0 us comp=    76.0 us  node_4961
+sched-prof:   split  63 CUDA0  nodes= 191 copy=    43.0 us comp=   631.0 us  node_4965
+sched-prof:   split  64 CPU    nodes=   4 copy=    87.0 us comp=    30.0 us  node_5156
+sched-prof:   split  65 CUDA0  nodes= 144 copy=    38.0 us comp=   607.0 us  node_5160
+sched-prof:   split  66 CPU    nodes=   4 copy=    92.0 us comp=   556.0 us  node_5304
+sched-prof:   split  67 CUDA0  nodes= 144 copy=    60.0 us comp=   641.0 us  node_5308
+sched-prof:   split  68 CPU    nodes=   4 copy=    81.0 us comp=   135.0 us  node_5452
+sched-prof:   split  69 CUDA0  nodes= 144 copy=    43.0 us comp=   639.0 us  node_5456
+sched-prof:   split  70 CPU    nodes=   4 copy=    79.0 us comp=   120.0 us  node_5600
+sched-prof:   split  71 CUDA0  nodes= 191 copy=    35.0 us comp=   612.0 us  node_5604
+sched-prof:   split  72 CPU    nodes=   4 copy=    95.0 us comp=   125.0 us  node_5795
+sched-prof:   split  73 CUDA0  nodes= 144 copy=    39.0 us comp=   604.0 us  node_5799
+sched-prof:   split  74 CPU    nodes=   4 copy=    85.0 us comp=  1512.0 us  node_5943
+sched-prof:   split  75 CUDA0  nodes= 144 copy=    79.0 us comp=   731.0 us  node_5947
+sched-prof:   split  76 CPU    nodes=   4 copy=   106.0 us comp=   777.0 us  node_6091
+sched-prof:   split  77 CUDA0  nodes= 144 copy=    53.0 us comp=   638.0 us  node_6095
+sched-prof:   split  78 CPU    nodes=   4 copy=    87.0 us comp=  1319.0 us  node_6239
+sched-prof:   split  79 CUDA0  nodes= 191 copy=    72.0 us comp=  1002.0 us  node_6243
+sched-prof:   split  80 CPU    nodes=   4 copy=    90.0 us comp=   545.0 us  node_6434
+sched-prof:   split  81 CUDA0  nodes= 144 copy=    67.0 us comp=   655.0 us  node_6438
+sched-prof:   split  82 CPU    nodes=   4 copy=    79.0 us comp=   135.0 us  node_6582
+sched-prof:   split  83 CUDA0  nodes= 144 copy=    43.0 us comp=   661.0 us  node_6586
+sched-prof:   split  84 CPU    nodes=   4 copy=   101.0 us comp=   334.0 us  node_6730
+sched-prof:   split  85 CUDA0  nodes= 144 copy=    46.0 us comp=   657.0 us  node_6734
+sched-prof:   split  86 CPU    nodes=   4 copy=   126.0 us comp=   831.0 us  node_6878
+sched-prof:   split  87 CUDA0  nodes= 191 copy=   100.0 us comp=   630.0 us  node_6882
+sched-prof:   split  88 CPU    nodes=   4 copy=    83.0 us comp=   247.0 us  node_7073
+sched-prof:   split  89 CUDA0  nodes= 144 copy=    37.0 us comp=   630.0 us  node_7077
+sched-prof:   split  90 CPU    nodes=   4 copy=   120.0 us comp=   159.0 us  node_7221
+sched-prof:   split  91 CUDA0  nodes= 144 copy=    45.0 us comp=   632.0 us  node_7225
+sched-prof:   split  92 CPU    nodes=   4 copy=    85.0 us comp=   360.0 us  node_7369
+sched-prof:   split  93 CUDA0  nodes= 144 copy=    52.0 us comp=   630.0 us  node_7373
+sched-prof:   split  94 CPU    nodes=   4 copy=   100.0 us comp=  1143.0 us  node_7517
+sched-prof:   split  95 CUDA0  nodes= 196 copy=   147.0 us comp=   978.0 us  node_7521
+sched-prof:   split  96 CPU    nodes=   4 copy=   103.0 us comp=   385.0 us  node_7717
+sched-prof:   split  97 CUDA0  nodes=  55 copy=    66.0 us comp=  2629.0 us  node_7721
+sched-prof: graph 100 total=75.75 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.59 comp=36.38 | CPU n=49 nodes=196 copy=4.53 comp=31.20
+sched-prof: graph 101 total=63.76 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.30 comp=35.79 | CPU n=49 nodes=196 copy=4.74 comp=19.91
+sched-prof: graph 102 total=97.94 ms splits=98 | CUDA0 n=49 nodes=7580 copy=4.81 comp=38.09 | CPU n=49 nodes=196 copy=5.03 comp=49.99
+sched-prof: graph 103 total=74.69 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.63 comp=37.10 | CPU n=49 nodes=196 copy=4.76 comp=29.18
+sched-prof: graph 104 total=59.19 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.10 comp=36.79 | CPU n=49 nodes=196 copy=5.00 comp=14.28
+sched-prof: graph 105 total=54.06 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.13 comp=35.69 | CPU n=49 nodes=196 copy=4.42 comp=10.80
+sched-prof: graph 106 total=65.48 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.56 comp=36.26 | CPU n=49 nodes=196 copy=4.74 comp=20.92
+sched-prof: graph 107 total=55.68 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.11 comp=36.44 | CPU n=49 nodes=196 copy=4.59 comp=11.52
+sched-prof: graph 108 total=83.20 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.53 comp=35.12 | CPU n=49 nodes=196 copy=4.31 comp=40.22
+sched-prof: graph 109 total=66.31 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.20 comp=36.57 | CPU n=49 nodes=196 copy=4.54 comp=21.98
+sched-prof: graph 110 total=58.51 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.16 comp=36.84 | CPU n=49 nodes=196 copy=4.53 comp=13.97
+sched-prof: graph 111 total=60.00 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.92 comp=35.20 | CPU n=49 nodes=196 copy=4.52 comp=17.34
+sched-prof: graph 112 total=63.41 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.15 comp=37.18 | CPU n=49 nodes=196 copy=4.58 comp=18.48
+sched-prof: graph 113 total=65.78 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.15 comp=35.84 | CPU n=49 nodes=196 copy=4.42 comp=22.36
+sched-prof: graph 114 total=58.01 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.11 comp=37.20 | CPU n=49 nodes=196 copy=4.76 comp=12.92
+sched-prof: graph 115 total=59.55 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.36 comp=35.73 | CPU n=49 nodes=196 copy=4.93 comp=15.52
+sched-prof: graph 116 total=65.41 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.95 comp=37.55 | CPU n=49 nodes=196 copy=5.14 comp=18.76
+sched-prof: graph 117 total=62.74 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.34 comp=36.93 | CPU n=49 nodes=196 copy=4.87 comp=17.57
+sched-prof: graph 118 total=69.59 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.33 comp=34.94 | CPU n=49 nodes=196 copy=4.84 comp=26.47
+sched-prof: graph 119 total=62.85 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.90 comp=37.41 | CPU n=49 nodes=196 copy=4.47 comp=18.07
+sched-prof: graph 120 total=69.46 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.10 comp=35.44 | CPU n=49 nodes=196 copy=4.53 comp=26.36
+sched-prof: graph 121 total=57.78 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.60 comp=36.56 | CPU n=49 nodes=196 copy=4.26 comp=14.36
+sched-prof: graph 122 total=54.30 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.92 comp=34.56 | CPU n=49 nodes=196 copy=4.39 comp=12.41
+sched-prof: graph 123 total=59.36 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.94 comp=37.30 | CPU n=49 nodes=196 copy=4.21 comp=14.90
+sched-prof: graph 124 total=72.04 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.17 comp=35.35 | CPU n=49 nodes=196 copy=4.22 comp=29.28
+sched-prof: graph 125 total=52.80 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.58 comp=36.27 | CPU n=49 nodes=196 copy=4.23 comp=9.71
+sched-prof: graph 126 total=56.06 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.85 comp=35.37 | CPU n=49 nodes=196 copy=4.21 comp=13.61
+sched-prof: graph 127 total=57.00 ms splits=98 | CUDA0 n=49 nodes=7580 copy=3.10 comp=35.29 | CPU n=49 nodes=196 copy=4.45 comp=14.15
+sched-prof: graph 128 total=55.03 ms splits=98 | CUDA0 n=49 nodes=7580 copy=2.98 comp=35.55 | CPU n=49 nodes=196 copy=4.27 comp=12.22
