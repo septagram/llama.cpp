@@ -89,3 +89,18 @@ gains little from the hot set (it streams all 512 experts per ubatch anyway; the
   including the unchanged classic one. The machine had `sst-prototype.exe` at ~100% of one core and Zed at ~60% of
   one core during these runs; with 6 barrier-synchronized llama threads on 8 cores, one straggler thread explains a
   loss of that size. The profiled run below measures barrier wait per op to confirm.
+- Confirmed by the profiled run (`GGML_CPU_PROFILE=100 GGML_SCHED_PROFILE=100`, 7.1-7.4 t/s under profiling): the CPU
+  ops themselves take 26 ms per token (comp 23.4 + barrier wait 2.8; q4_K gate/up carry all the wait), the n-gram
+  gather 1.1 ms, but the scheduler sees CUDA0 compute at 62.5 ms per token (45 ms in the afternoon profile at the same
+  depth) and the CPU splits at 30-100 ms alternating (thread wake-up latency across 49 CPU splits per token). Windows'
+  per-process GPU counters during the run: `sst-prototype.exe` 58% of the 4060 Ti's 3D engine (continuous repaint),
+  llama-server 46% of its CUDA engine, Zed 3%. The display GPU is time-sliced between the two, and the spinning core
+  delays llama's threads at every split. So the evening's decode numbers measure the machine, not the code; the
+  afternoon's 12.9 t/s stands for this configuration on a quiet box. Reported to the user: closing or throttling the
+  SST Prototype window while the model runs is worth roughly a third of the token rate.
+- H15 measured (same evening, same load): the 341-token follow-up with `GGML_OP_OFFLOAD_MIN_BATCH=512` stays in decode
+  mode, runs on the CPU with the hot split at 52.8 t/s and needs no restore; through the streaming path it was 45-46.5
+  t/s plus a 0.66 s restore. The launcher sets 512: below that a prompt chunk runs on the CPU, above it the scheduler
+  streams the experts (155 t/s for 2048-token chunks). Break-even is somewhere around 600-800 tokens per chunk.
+- Launcher (`release.sh`) now: `-c 160000 -ub 2048`, `LLAMA_HOT_EXPERTS_ALIAS=1`, `GGML_OP_OFFLOAD_MIN_BATCH=512`,
+  the 4 GB placement; ~12.9 GB of VRAM, so there is room for a bigger placement or a second GPU consumer.
