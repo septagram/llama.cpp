@@ -17,11 +17,22 @@ llama_hot_experts::llama_hot_experts(int n_layer, int n_expert, const llama_hot_
     cfg(cfg), n_layer(n_layer), n_expert(n_expert),
     recent((size_t) n_layer * n_expert, 0.0f),
     total ((size_t) n_layer * n_expert, 0.0f) {
+    if (!cfg.trace_path.empty()) {
+        trace = fopen(cfg.trace_path.c_str(), "ab");
+        if (!trace) {
+            LLAMA_LOG_WARN("%s: cannot open trace file %s\n", __func__, cfg.trace_path.c_str());
+        } else {
+            LLAMA_LOG_INFO("%s: routing trace appended to %s\n", __func__, cfg.trace_path.c_str());
+        }
+    }
 }
 
 llama_hot_experts::~llama_hot_experts() {
     if (!cfg.stats_path.empty() && tokens_seen > 0) {
         flush();
+    }
+    if (trace) {
+        fclose(trace);
     }
 }
 
@@ -157,6 +168,11 @@ void llama_hot_experts::bind_layer(int il, llama_layer * layer, std::vector<int3
 void llama_hot_experts::begin_ubatch(uint32_t n_tokens) {
     std::lock_guard<std::mutex> lock(mtx);
     obs_weight = n_tokens >= cfg.prefill_min_tokens ? cfg.prefill_weight : 1.0f;
+    if (trace) {
+        const int32_t tag = -1;
+        fwrite(&tag, sizeof(tag), 1, trace);
+        fwrite(&n_tokens, sizeof(n_tokens), 1, trace);
+    }
 }
 
 void llama_hot_experts::observe(int il, const int32_t * ids, size_t n) {
@@ -180,6 +196,17 @@ void llama_hot_experts::observe(int il, const int32_t * ids, size_t n) {
         if (hot_map && hot_map[e] >= 0) {
             win_hit++;
         }
+    }
+    if (trace) {
+        const int32_t  l  = il;
+        const uint32_t nn = (uint32_t) n;
+        trace_buf.resize(n);
+        for (size_t i = 0; i < n; i++) {
+            trace_buf[i] = (int16_t) ids[i];
+        }
+        fwrite(&l,  sizeof(l),  1, trace);
+        fwrite(&nn, sizeof(nn), 1, trace);
+        fwrite(trace_buf.data(), sizeof(int16_t), n, trace);
     }
 }
 
@@ -347,6 +374,9 @@ void llama_hot_experts::tick(uint32_t n_tokens, bool tensors_valid) {
     if (!cfg.stats_path.empty() && tokens_flush >= cfg.flush_tokens) {
         tokens_flush = 0;
         flush();
+    }
+    if (trace && policy) {
+        fflush(trace);
     }
 }
 

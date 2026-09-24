@@ -1805,6 +1805,7 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
         if (const char * p = getenv("LLAMA_HOT_EXPERTS_MIB");   p && *p) { hcfg.budget_bytes = (size_t) atoll(p) * 1024 * 1024; }
         if (const char * p = getenv("LLAMA_HOT_EXPERTS_SWAP");  p && *p) { hcfg.swaps_enabled = *p != '0'; }
         if (const char * p = getenv("LLAMA_HOT_EXPERTS_LOG");   p && *p) { hcfg.log_tokens = (uint32_t) atoi(p); }
+        if (const char * p = getenv("LLAMA_HOT_EXPERTS_TRACE"); p && *p) { hcfg.trace_path = p; }
         if (!hcfg.stats_path.empty() || !hot_spec.layers.empty()) {
             pimpl->hot_rt.reset(new llama_hot_experts((int) hparams.n_layer(), (int) hparams.n_expert, hcfg));
             if (pimpl->hot_rt->load_stats() && hcfg.budget_bytes > 0 && !devices.empty()) {

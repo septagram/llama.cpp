@@ -34,6 +34,7 @@ struct llama_hot_experts_config {
     float       prefill_weight      = 1.0f/16;   // weight of a prefill token in the histograms and the decay clock
     uint32_t    flush_tokens        = 8192; // rewrite the stats file every this many tokens
     uint32_t    log_tokens          = 4096; // log coverage / swaps every this many tokens (0 = never)
+    std::string trace_path;                 // LLAMA_HOT_EXPERTS_TRACE: per-token routing ids, binary, for offline replay
 };
 
 class llama_hot_experts {
@@ -118,4 +119,8 @@ private:
 
     std::vector<uint8_t> tmp;
     std::mutex mtx;
+
+    // trace file: records of {int32 -1, uint32 n_tokens} per ubatch, then {int32 layer, uint32 n, int16 ids[n]} per layer
+    FILE * trace = nullptr;
+    std::vector<int16_t> trace_buf;
 };
