@@ -104,3 +104,8 @@ gains little from the hot set (it streams all 512 experts per ubatch anyway; the
   streams the experts (155 t/s for 2048-token chunks). Break-even is somewhere around 600-800 tokens per chunk.
 - Launcher (`release.sh`) now: `-c 160000 -ub 2048`, `LLAMA_HOT_EXPERTS_ALIAS=1`, `GGML_OP_OFFLOAD_MIN_BATCH=512`,
   the 4 GB placement; ~12.9 GB of VRAM, so there is room for a bigger placement or a second GPU consumer.
+
+## Final commit list
+
+- 1fdd1bd9e llama : hot experts parked in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS)
+- 6b858f249 customware: entry 005 measurements, launcher back to 160k with the parked hot experts

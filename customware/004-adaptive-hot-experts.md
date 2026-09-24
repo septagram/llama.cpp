@@ -143,3 +143,16 @@ construct the runtime object.
   41 of 48 tokens identical to the classic hot run, mean |delta| 0.015 nats over the prefix (0.002 vs plain up to the
   known near-tie at token 2). Small-context perplexity runs could not exercise the parked path (the compute buffer at
   8k-32k context is 290-980 MiB, too small to park even a 600 MiB set); each of them matched its reference exactly.
+- With the seed (160k, alias, 256-token windows, code prompt twice): decode-window coverage 37.0% then 39.4% with 10
+  and 4 swaps per window (stable, slowly improving), 170.6 t/s prefill, 12.61 / 12.97 t/s decode; 142 swaps during the
+  first prefill instead of 768. The released launcher (`verify-launcher.sh`): placement from the seed = the shipped
+  1348 experts (predicted 42.4%), 181 / 12.2 t/s on the first run of the evening, 171 / 12.8 after the seed fix,
+  12.9 GB VRAM, and the learned stats file (79 KB after one session) survives a re-release.
+- What is not measured yet: the long-run gain of a set learned from the user's own sessions (the offline mixed
+  placement was fitted to the two test prompts, so on them the adaptive set cannot beat it by much). The mechanism
+  and its cost are: ~2 MB of PCIe copies per generated token at the swap budget, one 0.65 s restore per big prompt.
+
+## Final commit list
+
+- 35299131e llama : adaptive hot experts (LLAMA_HOT_EXPERTS_STATS, runtime swaps, placement from stats)
+- a14357033 customware: seed the adaptive hot experts with the placement's own statistics
