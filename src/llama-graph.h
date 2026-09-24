@@ -814,6 +814,9 @@ struct llm_graph_params {
     // while the hot tensors' storage is borrowed by a big prefill ubatch (LLAMA_HOT_EXPERTS_ALIAS)
     bool hot_experts = true;
 
+    // customware: export every MoE layer's routing ids as graph outputs (adaptive hot experts, entry 004)
+    bool moe_stats = false;
+
     // return true if the "other" params would result in a graph with the same topology as with the current params
     //   having the same topology allows us to reuse the graph in some cases
     bool allow_reuse(const llm_graph_params & other) const {
@@ -944,6 +947,9 @@ public:
 
     std::vector<ggml_tensor *> t_layer_inp;
 
+    // customware: (layer, contiguous I32 [n_expert_used, n_tokens]) routing ids, read back after the ubatch
+    std::vector<std::pair<int, ggml_tensor *>> t_moe_sel;
+
     std::vector<ggml_tensor *> t_sampled;
     std::vector<ggml_tensor *> t_sampled_probs;
     std::vector<ggml_tensor *> t_sampled_logits;
@@ -1042,6 +1048,7 @@ struct llm_graph_context {
     ggml_cgraph  * gf   = nullptr;
 
     const bool hot_experts; // customware: see llm_graph_params::hot_experts
+    const bool moe_stats;   // customware: see llm_graph_params::moe_stats
 
     llm_graph_context(const llm_graph_params & params);
     virtual ~llm_graph_context() = default;

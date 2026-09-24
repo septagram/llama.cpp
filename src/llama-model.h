@@ -766,6 +766,9 @@ struct llama_model {
     void   hot_alias_place(ggml_backend_buffer_t buf, size_t offset) const; // (re)bind the hot tensors to buf at offset
     size_t hot_fill() const;                                                // copy the experts in, returns bytes copied
 
+    // customware: adaptive hot experts runtime (LLAMA_HOT_EXPERTS_STATS / _MIB / _SWAP), nullptr when not configured
+    class llama_hot_experts * hot_experts() const;
+
     const struct ggml_tensor * get_tensor(const char * name) const;
 
     float get_rope_freq_base (const llama_cparams & cparams, int il) const;

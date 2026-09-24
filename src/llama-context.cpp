@@ -9,6 +9,7 @@
 #include "llama-memory.h"
 #include "llama-mmap.h"
 #include "llama-model.h"
+#include "llama-hot-experts.h"
 #include "llama-ext.h"
 #include "llama-sampler.h"
 #include "llama.h"
@@ -818,6 +819,10 @@ void llama_context::hot_alias_place() {
 }
 
 bool llama_context::hot_alias_check(bool decode_mode, uint32_t n_tokens) {
+    if (!hot_buf) {
+        // parking was refused (compute buffer too small): every graph is plain, nothing to check or re-park
+        return !decode_mode;
+    }
     ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched.get(), hot_backend);
     if (buf != hot_buf || (buf && ggml_backend_buffer_get_size(buf) != hot_buf_size)) {
         LLAMA_LOG_WARN("%s: the %s compute buffer was reallocated (%.1f MiB), re-parking the hot experts\n", __func__,
@@ -854,6 +859,38 @@ void llama_context::hot_refill() {
 
     LLAMA_LOG_INFO("%s: hot experts restored: %.1f MiB in %.0f ms (refill #%" PRId64 ")\n", __func__,
             bytes / 1024.0 / 1024.0, (ggml_time_us() - t0) / 1000.0, hot_n_refills);
+}
+
+void llama_context::hot_observe(const llm_graph_result * res, const llama_ubatch & ubatch) {
+    llama_hot_experts * hot = model.hot_experts();
+    if (!hot || res->t_moe_sel.empty()) {
+        return;
+    }
+
+    size_t total = 0;
+    for (const auto & [il, t] : res->t_moe_sel) {
+        total += (size_t) ggml_nelements(t);
+    }
+    hot_ids_buf.resize(total);
+
+    size_t off = 0;
+    for (const auto & [il, t] : res->t_moe_sel) {
+        ggml_backend_t backend = ggml_backend_sched_get_tensor_backend(sched.get(), t);
+        ggml_backend_tensor_get_async(backend, t, hot_ids_buf.data() + off, 0, ggml_nbytes(t));
+        off += (size_t) ggml_nelements(t);
+    }
+    ggml_backend_sched_synchronize(sched.get());
+
+    off = 0;
+    hot->begin_ubatch(ubatch.n_tokens);
+    for (const auto & [il, t] : res->t_moe_sel) {
+        const size_t n = (size_t) ggml_nelements(t);
+        hot->observe(il, hot_ids_buf.data() + off, n);
+        off += n;
+    }
+
+    // swaps may only touch the hot tensors while their storage is valid (entry 005 parks them during big prefills)
+    hot->tick(ubatch.n_tokens, !(hot_alias && hot_dirty));
 }
 
 void llama_context::synchronize() {
@@ -2033,6 +2070,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
         //    ggml_graph_dump_dot(gf, NULL, "llama.dot");
         //}
 
+        // customware (entry 004): this ubatch's routing goes to the adaptive hot experts
+        hot_observe(res, ubatch);
+
         auto * t_logits  = res->get_logits();
         auto * t_embd    = cparams.embeddings       ? res->get_embd()     : nullptr;
         auto * t_h_nextn = cparams.embeddings_nextn ? res->get_h_nextn()  : nullptr;
@@ -2679,6 +2719,7 @@ llm_graph_params llama_context::graph_params(
         /*.cb          =*/ graph_get_cb(),
         /*.res         =*/ res,
         /*.hot_experts =*/ hot_mode_next,
+        /*.moe_stats   =*/ model.hot_experts() != nullptr,
     };
 }
 

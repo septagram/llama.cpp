@@ -1330,6 +1330,8 @@ void llm_graph_result::reset() {
     t_layer_inp.resize(LLAMA_MAX_LAYERS + 1);
     std::fill(t_layer_inp.begin(), t_layer_inp.end(), nullptr);
 
+    t_moe_sel.clear();
+
     t_sampled.clear();
     t_sampled_probs.clear();
     t_sampled_logits.clear();
@@ -1371,6 +1373,9 @@ void llm_graph_result::set_outputs(const llm_graph_params & params) {
     }
     if (t_h_nextn != nullptr) {
         ggml_set_output(t_h_nextn);
+    }
+    for (auto & [il, t] : t_moe_sel) {
+        ggml_set_output(t);
     }
     {
         const auto & embeddings_layer_inp = params.cparams.embeddings_layer_inp;
@@ -1494,7 +1499,8 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     res              (params.res),
     ctx0             (res->get_ctx()),
     gf               (res->get_gf()),
-    hot_experts      (params.hot_experts) {
+    hot_experts      (params.hot_experts),
+    moe_stats        (params.moe_stats) {
         res->set_params(params);
     }
 
@@ -2163,6 +2169,15 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
     // to the GPU by the scheduler for large ones). In each half the slots that belong to the other half carry the id
     // -1, which the mul_mat_id kernels treat as "skip, leave zeros" (op_params[3] = 1 marks such ids). Both halves
     // are masked by the routing weights and added.
+    // customware (entry 004): export this layer's routing ids; the context reads them back after the ubatch
+    ggml_tensor * sel_out = nullptr;
+    if (moe_stats && il >= 0) {
+        sel_out = ggml_is_contiguous(selected_experts) ? selected_experts : ggml_cont(ctx0, selected_experts);
+        cb(sel_out, "ffn_moe_sel_out", il);
+        ggml_build_forward_expand(gf, sel_out);
+        res->t_moe_sel.emplace_back(il, sel_out);
+    }
+
     const bool hot_simple = hot && hot->valid() && gate_exps && !gate_up_exps &&
         !up_exps_b && !gate_exps_b && !down_exps_b && !up_exps_s && !gate_exps_s && !down_exps_s &&
         type_op == LLM_FFN_SILU && !weight_before_ffn && (il < 0 || hparams.swiglu_clamp_exp[il] <= 1e-6f);
@@ -2171,7 +2186,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
         ggml_tensor * cold_map = hot->cold_map;
 
         // the maps have no token dimension, so look them up with a flat index and restore the shape after
-        ggml_tensor * sel = selected_experts;
+        ggml_tensor * sel = sel_out ? sel_out : selected_experts;
         if (!ggml_is_contiguous(sel)) {
             sel = ggml_cont(ctx0, sel);
         }

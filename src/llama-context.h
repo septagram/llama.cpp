@@ -365,6 +365,10 @@ private:
     bool hot_alias_check(bool decode_mode, uint32_t n_tokens);       // after alloc: false = rebuild in prefill mode
     void hot_refill();                                               // copy the experts back in
 
+    // customware (entry 004): feed the ubatch's routing ids to the adaptive hot experts runtime
+    void hot_observe(const llm_graph_result * res, const llama_ubatch & ubatch);
+    std::vector<int32_t> hot_ids_buf;
+
     ggml_backend_t backend_cpu = nullptr;
     std::vector<ggml_backend_ptr> backends;
 

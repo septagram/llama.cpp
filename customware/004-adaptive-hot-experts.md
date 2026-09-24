@@ -105,3 +105,25 @@ construct the runtime object.
 
 - Implementer: the planner (Fable). Commits per step on `master`, `Assisted-by: Claude Fable 5.1`,
   `Plan: 26c-tremor-fade-shell`. No review mid-way; stop and report before any review when the work is measured.
+
+## Implementation notes (what actually shipped)
+
+- Shipped as planned: `src/llama-hot-experts.{h,cpp}` (histograms, in-layer swaps, stats file, placement from stats),
+  the routing ids exported per layer as graph outputs (`llm_graph_result::t_moe_sel`, built when the model has the
+  runtime object), read back in `llama_context::hot_observe` after each ubatch, `tick` runs the swap policy every 64
+  decoded tokens and after every prefill ubatch. The slot lists the runtime edits are the model's placement spec, so
+  a refill of parked tensors (entry 005) copies the current set; while the tensors are parked out, a swap updates the
+  spec and the maps only. Env: `LLAMA_HOT_EXPERTS_STATS=<file>` (read at start, rewritten every 8192 tokens and at
+  exit, `cpu-prof-experts:` line format so `expert-place.py` reads it too), `LLAMA_HOT_EXPERTS_MIB=<n>` (placement
+  from the stats within that budget; the placement file is the first-start fallback), `LLAMA_HOT_EXPERTS_SWAP=0`
+  (collect only), `LLAMA_HOT_EXPERTS_LOG=<tokens>` (coverage / swap log cadence).
+- First run at the launcher config (160k, alias, 4 GB): mechanics all work. Code prompt twice, prose prompt twice:
+  1392 swaps, 48 per tick during prefill (maps only, 0 bytes), 141-1417 MiB of copies during the decode windows, four
+  refills at 0.65-0.70 s, no errors. The stats file (97 KB) was written, and a restart with `LLAMA_HOT_EXPERTS_MIB=4000`
+  and no placement file computed its own set from it (1352 experts on 47 layers, predicted coverage 32.6%).
+- Deviation found in that run: a 22k prefill floods the recent histogram (half-life 4096 tokens) with prefill routing,
+  so the set is tuned to the document by the time generation starts, and the decode-time coverage of the shipped
+  placement dropped rather than rose. Prefill observations (ubatches of 32+ tokens) now weigh 1/16 in both histograms
+  and in the decay clock, so generation dominates what the set adapts to; that is also what the offline placements
+  were measured on (the CPU profiler only saw decode). The log cadence for the test is 256 tokens so the decode
+  windows are visible.

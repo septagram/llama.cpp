@@ -7,6 +7,9 @@
 #include "llama-mmap.h"
 #include "llama-cparams.h"
 #include "llama-model-loader.h"
+#include "llama-hot-experts.h"
+
+#include <unordered_set>
 
 #include "llama-kv-cache.h"
 #include "llama-kv-cache-iswa.h"
@@ -1215,6 +1218,7 @@ struct llama_model::impl {
     std::map<int, std::vector<int32_t>> hot_spec;
     bool                                hot_alias = false;
     ggml_context_ptr                    hot_ctx;
+    std::unique_ptr<llama_hot_experts>  hot_rt;   // entry 004: collector + runtime swaps
 };
 
 // customware: copy the listed experts of one layer from the (host) full tensors into the compacted hot tensors
@@ -1791,7 +1795,51 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
     ml.done_getting_tensors();
 
     // customware: hot experts get a GPU copy next to the host tensors (metadata now, data after the load)
-    const llama_hot_experts_spec hot_spec = llama_hot_experts_read();
+    llama_hot_experts_spec hot_spec = llama_hot_experts_read();
+
+    // customware (entry 004): the adaptive runtime. With a stats file and a budget the placement comes from the
+    // accumulated routing history instead of the placement file.
+    {
+        llama_hot_experts_config hcfg;
+        if (const char * p = getenv("LLAMA_HOT_EXPERTS_STATS"); p && *p) { hcfg.stats_path = p; }
+        if (const char * p = getenv("LLAMA_HOT_EXPERTS_MIB");   p && *p) { hcfg.budget_bytes = (size_t) atoll(p) * 1024 * 1024; }
+        if (const char * p = getenv("LLAMA_HOT_EXPERTS_SWAP");  p && *p) { hcfg.swaps_enabled = *p != '0'; }
+        if (const char * p = getenv("LLAMA_HOT_EXPERTS_LOG");   p && *p) { hcfg.log_tokens = (uint32_t) atoi(p); }
+        if (!hcfg.stats_path.empty() || !hot_spec.layers.empty()) {
+            pimpl->hot_rt.reset(new llama_hot_experts((int) hparams.n_layer(), (int) hparams.n_expert, hcfg));
+            if (pimpl->hot_rt->load_stats() && hcfg.budget_bytes > 0 && !devices.empty()) {
+                // eligible: layers whose routed experts live on a host buffer type
+                std::unordered_set<const ggml_tensor *> host_tensors;
+                for (const auto & [ctx_key, ctx_ptr] : ml.ctx_map) {
+                    if (!ggml_backend_buft_is_host(ctx_key.buft)) {
+                        continue;
+                    }
+                    for (ggml_tensor * t = ggml_get_first_tensor(ctx_ptr.get()); t; t = ggml_get_next_tensor(ctx_ptr.get(), t)) {
+                        host_tensors.insert(t);
+                    }
+                }
+                std::map<int, size_t> bytes;
+                for (size_t il = 0; il < layers.size(); il++) {
+                    const auto & layer = layers[il];
+                    if (layer.ffn_gate_exps && layer.ffn_up_exps && layer.ffn_down_exps && host_tensors.count(layer.ffn_gate_exps)) {
+                        bytes[(int) il] = layer.ffn_gate_exps->nb[2] + layer.ffn_up_exps->nb[2] + layer.ffn_down_exps->nb[2];
+                    }
+                }
+                auto spec = pimpl->hot_rt->placement(bytes, hcfg.budget_bytes);
+                size_t n = 0;
+                for (const auto & [il, v] : spec) {
+                    n += v.size();
+                }
+                LLAMA_LOG_INFO("%s: hot experts: placement from %s: %zu experts on %zu layers within %zu MiB, predicted coverage %.1f%% (placement file ignored)\n",
+                        __func__, hcfg.stats_path.c_str(), n, spec.size(), hcfg.budget_bytes / 1024 / 1024, 100.0 * pimpl->hot_rt->coverage(spec));
+                hot_spec.layers = std::move(spec);
+            } else if (!hcfg.stats_path.empty()) {
+                LLAMA_LOG_INFO("%s: hot experts: no usable stats at %s yet, %s; the file is written as the model runs\n", __func__,
+                        hcfg.stats_path.c_str(), hot_spec.layers.empty() ? "no hot experts this run" : "using the placement file");
+            }
+        }
+    }
+
     if (!hot_spec.layers.empty()) {
         if (devices.empty()) {
             LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS set but there is no GPU device, ignored\n", __func__);
@@ -2049,6 +2097,15 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
         LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s%s\n", __func__,
                 n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev),
                 pimpl->hot_alias ? " (storage borrowed from the compute buffer, filled at context creation)" : "");
+
+        // entry 004: the runtime edits the slot lists in place and re-uploads the maps when it swaps
+        if (pimpl->hot_rt) {
+            for (auto & [il, slots] : pimpl->hot_spec) {
+                if (layers[il].ffn_gate_hot) {
+                    pimpl->hot_rt->bind_layer(il, &layers[il], &slots);
+                }
+            }
+        }
     }
 
     // customware: LLAMA_LOCK_TENSORS=<regex> keeps only the matching host tensors resident (e.g. a sparsely and
@@ -2440,6 +2497,10 @@ ggml_backend_buffer_type_t llama_model::select_buft(int il) const {
 
 bool llama_model::hot_alias() const {
     return pimpl->hot_alias && !pimpl->hot_spec.empty();
+}
+
+llama_hot_experts * llama_model::hot_experts() const {
+    return pimpl->hot_rt.get();
 }
 
 size_t llama_model::hot_alias_bytes(ggml_backend_buffer_t buf) const {

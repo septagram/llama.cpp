@@ -26,6 +26,10 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 #   -ub 2048 -b 2048           expert weights are streamed to the GPU once per ubatch, bigger ubatches = faster prefill
 #   GGML_OP_OFFLOAD_MIN_BATCH  prompt chunks below 512 tokens run on the CPU with the hot experts (faster than
 #                              streaming 65 GB of experts for a short turn, and no restore afterwards)
+#   LLAMA_HOT_EXPERTS_STATS    the server learns which experts your sessions use: it swaps experts in and out of
+#   LLAMA_HOT_EXPERTS_MIB      the GPU slots while running and rewrites this stats file every 8192 tokens; at the
+#                              next start the placement is computed from it within the MiB budget (the placement
+#                              file above is only used until the stats exist). Delete the stats file to start over.
 # Fallbacks:
 #   GPU shared with other work (diffusion etc): a smaller placement (--budget-mib 3000), or drop both LLAMA_HOT_EXPERTS
 #   lines and use -ot "blk\.(2[8-9]|30)\..*_exps=CUDA0,.*_exps=CPU" with -ub 1024 instead of -ot ".*_exps=CPU"
@@ -34,6 +38,8 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 cat $0
 export LLAMA_HOT_EXPERTS=../llama.cpp-customware/hot-experts.txt
 export LLAMA_HOT_EXPERTS_ALIAS=1
+export LLAMA_HOT_EXPERTS_STATS=../llama.cpp-customware/hot-experts.stats
+export LLAMA_HOT_EXPERTS_MIB=4000
 export GGML_OP_OFFLOAD_MIN_BATCH=512
 ../llama.cpp-customware/llama-server \
 	-m user_data/models/Qwen3.8-Flash-Next-GGUF-UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf \
