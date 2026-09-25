@@ -156,3 +156,20 @@ construct the runtime object.
 
 - 35299131e llama : adaptive hot experts (LLAMA_HOT_EXPERTS_STATS, runtime swaps, placement from stats)
 - a14357033 customware: seed the adaptive hot experts with the placement's own statistics
+
+## First agentic trace (2026-09-25, pi driving the 120k launcher on a Rust refactor task, 10 minutes)
+
+- 16 requests, 7009 generated tokens, 49k prefill tokens, conversation depth up to 44k. Live decode-window coverage
+  36-47% with the 6 GB set placed from the learned stats; the run crashed on pi's side (its bash tool spawns
+  `/bin/sh`, which does not exist when pi is started from cmd), not on the server's.
+- Simulator sweep on that trace (placement approximated from the post-run stats): fixed set 39.1%, half-life 1024
+  41.7% (0.9 MB of copies per generated token), 2048 40.8%, 4096 40.1%, 16384 39.6%, hindsight optimum 43.6%. On
+  agentic traffic a shorter half-life is worth about +1.5 points of coverage (~1% of decode) for six times the
+  copies, still cheap. The band is 2-4 points under the ceiling; the set and the per-layer budgets matter more
+  than the half-life.
+- Decode slows with depth: 83 ms per token at ~6k, 86 at ~12k, 95 at ~44k (the synthetic 22k prompt runs at 73).
+  Suspects: the QSA indexer scoring and top-k selection over the whole context per token per layer (a full argsort
+  of 44k positions per head), and the n-gram table under memory pressure. To profile at depth (H16).
+- Prompt cache entries are huge with the hybrid model's checkpoints: one idle 12k-token slot saved 2.5 GB (20
+  checkpoints of 112 MB). With `--cache-ram 16384` that is RAM taken from the page cache the cold experts live in;
+  `--cache-ram 4096` or fewer checkpoints may be the better daily setting (H17, to measure).
