@@ -182,3 +182,20 @@ construct the runtime object.
 - Run 2 per-token decode by depth (same session, so RAM pressure grows along with depth): 73-76 ms below ~5k,
   78-80 at 10-20k, 86-94 at 40-55k. Decode-window coverage 23-47%, mostly 30-36%: the learned stats still mostly
   know the synthetic prompts; the set follows the agent's traffic as it accumulates.
+- Depth series on the launcher after the agent session (prompt cache full, free RAM 6.1 GB), 45 greedy tokens each,
+  cached prompt: 22k 83.2 ms/token, 44k 88.7, 92k 109.2 (about 0.36 ms per 1k tokens of context; ~8.5 t/s
+  extrapolated at 120k). Prefill of the big chunks 270-300 t/s. The same series on a fresh launcher (empty prompt
+  cache) separates the depth effect from the RAM effect.
+- Fresh launcher (empty prompt cache), 22k cached: 80.8 ms/token, vs 83.2 with the full cache and 73 this afternoon.
+  Most of the afternoon-to-now gap is the set, not RAM: the placement at this start came from stats now dominated by
+  the agent's traffic and covers the code prompt less (prefill windows 15-19% vs 20-22%). Adaptation working as
+  designed, pointed at a different workload than the one being measured.
+
+## Handover (if the session ends here)
+
+Open, in order of value: H17 A/B (`--cache-ram 4096 --ctx-checkpoints 8` vs today's 16384 in an agent session);
+H16 profile at depth (which op grows: indexer scores, top-k argsort, or the n-gram table); half-life / hysteresis
+sweep with `customware/hot-sim.py` on real traces (`LLAMA_HOT_EXPERTS_TRACE`, both launchers can record); the fused
+CPU expert op and the small-batch expert kernel (unlocks speculation and `-np 2`); the CPU/GPU overlap of the two
+expert halves (~3-5%); steering with a per-token ramp (parked). Tooling: `test-next.sh`, `test-spec.sh`,
+`test-depth.sh`, `test-adapt.sh`, `verify-launcher.sh`, `run-pi-task.ps1` (pi needs `SHELL` pointed at Git Bash).
