@@ -109,3 +109,27 @@ gains little from the hot set (it streams all 512 experts per ubatch anyway; the
 
 - 1fdd1bd9e llama : hot experts parked in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS)
 - 6b858f249 customware: entry 005 measurements, launcher back to 160k with the parked hot experts
+
+## Follow-up experiments (2026-09-25, quiet box, launcher's learned stats, swaps on)
+
+| config | code prompt prefill | decode (code / cached / prose) | decode coverage | VRAM |
+|---|---|---|---|---|
+| 160k, ub 2048, 4 GB set (launcher) | 174 t/s | 13.1 / 13.3 / 13.2 | 40% code, 31% prose | 12.9-13.4 GB |
+| same + `--spec-type ngram-mod` | 171 t/s | 12.6 / 12.3 / 12.7 | | |
+| 120k, ub 4096, 6 GB set | 247 t/s (prose 292) | 13.7 / 13.9 / 13.4 | 49% code, 35% prose | 15.0-15.45 GB |
+
+- ub 4096 with the 6 GB set is the fastest config measured: +42% prefill and +5% decode over the launcher, for 40k
+  of context and a VRAM margin under 1 GB (the second slot's KV took it from 15.0 to 15.45 GB). Anything else on the
+  4060 Ti tips that into WDDM paging, so it ships as a second launcher with a 5.5 GB set, not as the default.
+- n-gram speculation (`ngram-mod`, n_match 24) drafts nothing on explanation-style answers (3 of 64 drafted tokens
+  accepted in one run, none in the others) and costs 4-5% of decode through the per-token recurrent checkpoints it
+  needs. It can only pay on answers that echo the input (edits, refactors); measured separately with an echo request.
+- Speculation on an echo-style request (return a 60 KB file with a comment above every function, thinking off,
+  greedy, 1500 tokens): `--spec-type ngram-mod` 12.75 / 13.90 t/s vs 11.87 / 11.79 without, +7% and +18%, draft
+  acceptance 55-56%, mean accepted run 36 tokens. The verify step is a ~65-token ubatch on the CPU (below the offload
+  threshold) that touches nearly every cold expert once, so its cost floor is the same ~1.5 s whatever the draft
+  length; that floor, not the drafter, caps the gain. With thinking on (the agents' default) the reasoning tokens
+  dominate and speculation costs 4-5%, so it stays off by default; `--spec-type ngram-mod` is the flag to add for
+  edit-heavy sessions. The small-batch CPU expert path (H12) is the enabler for both this and `-np 2`.
+- Both launchers are released: `...customware.sh` (160k, ub 2048, 4 GB set) and `...customware-120k.sh` (120k,
+  ub 4096, 6 GB set), same binary and learned stats file.

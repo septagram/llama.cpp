@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.."
 repo=$PWD
 LOG=$repo/customware/launcher-verify.log
 : > "$LOG"
-(cd /c/dev/textgen && bash ./Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh >> "$LOG" 2>&1 &)
+LAUNCHER=${LAUNCHER:-Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh}
+(cd /c/dev/textgen && bash "./$LAUNCHER" >> "$LOG" 2>&1 &)
 for i in $(seq 1 180); do
   sleep 5
   if curl -s -m 2 http://127.0.0.1:5000/health 2>/dev/null | grep -q '"ok"'; then echo "health ok after $((i*5)) s"; break; fi
