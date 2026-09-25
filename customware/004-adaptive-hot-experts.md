@@ -173,3 +173,12 @@ construct the runtime object.
 - Prompt cache entries are huge with the hybrid model's checkpoints: one idle 12k-token slot saved 2.5 GB (20
   checkpoints of 112 MB). With `--cache-ram 16384` that is RAM taken from the page cache the cold experts live in;
   `--cache-ram 4096` or fewer checkpoints may be the better daily setting (H17, to measure).
+- H17 confirmed after the second agent run (30 minutes, 59 turns, depth to 55k, the worktree untouched: the model
+  read and deliberated for the whole budget): the prompt cache held four entries of 2.5 + 2.9 + 4.5 + 0.65 GB
+  (19-31 checkpoints of 112 MB each), free RAM fell from ~17 to 6.4 GB, and the 22k code request that decoded at
+  73 ms per token on the fresh launcher took 83 ms cached and 85 uncached. The cold experts and the n-gram table
+  lose page cache to the prompt cache. Candidate daily setting: `--cache-ram 4096` and `--ctx-checkpoints 8`; to
+  be measured with an agent session against the current 16384.
+- Run 2 per-token decode by depth (same session, so RAM pressure grows along with depth): 73-76 ms below ~5k,
+  78-80 at 10-20k, 86-94 at 40-55k. Decode-window coverage 23-47%, mostly 30-36%: the learned stats still mostly
+  know the synthetic prompts; the set follows the agent's traffic as it accumulates.
