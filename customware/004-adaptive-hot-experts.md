@@ -199,3 +199,7 @@ sweep with `customware/hot-sim.py` on real traces (`LLAMA_HOT_EXPERTS_TRACE`, bo
 CPU expert op and the small-batch expert kernel (unlocks speculation and `-np 2`); the CPU/GPU overlap of the two
 expert halves (~3-5%); steering with a per-token ramp (parked). Tooling: `test-next.sh`, `test-spec.sh`,
 `test-depth.sh`, `test-adapt.sh`, `verify-launcher.sh`, `run-pi-task.ps1` (pi needs `SHELL` pointed at Git Bash).
+- Clean depth series (fresh launcher, set placed from agent-dominated stats), cached prompts, 45 greedy tokens:
+  22k 80.8 ms/token, 44k 94.8, 92k see chain22.log. Slope ~0.4-0.6 ms per 1k tokens of context; the RAM relief
+  (free 17 GB vs 6 GB) is worth less than the few points of coverage the set lost on these prompts. H16 is real and
+  the biggest remaining decode lever for long agent sessions; H17 is second-order on decode but still costs RAM.
