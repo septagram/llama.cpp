@@ -3,14 +3,15 @@
 Resume from here when the queueing/preemption work (entry 006) and the concurrent-prefill fix are done. Order is
 by expected value on the user's real workload (agent sessions at 40-120k depth on the 120k launcher).
 
-1. **H16: decode cost at depth** (entry 008, in progress). Measured on the fresh launcher: 80.8 ms/token at 22k,
-   94.8 at 44k, 116.2 at 92k (~0.5 ms per 1k tokens of context). The per-node profile (`GGML_SCHED_PROFILE_NODES=1`,
-   `test-depth-prof.sh`, `prof1.out`) says: the flash attention (0.15 -> 0.68 -> 1.31 ms per layer, 12 layers), then
-   the indexer pooling copies (2 -> 5 ms per token); `top_k` stays under 2 ms. Cause: with a q8_0 cache the CUDA
-   dispatcher takes the vector kernel for decode, which walks the whole context; the sparse index-list path only
-   exists in the f16 MMA kernel. Fix being built: gather the selected cells into f16 scratch and run the dense MMA
-   kernel (`BEST_FATTN_KERNEL_MMA_F16_GATHER`), `ggml_pool_2d` for the pooling. Left after that: `set_input_qsa`'s
-   CPU scan (0.7 -> 2.8 ms per token) and the prefill-side sort over `ub x n_kv` rows (~5% of a ubatch at 88k).
+1. **H16: decode cost at depth** (entry 008, done 2026-09-29). The per-node profile (`GGML_SCHED_PROFILE_NODES=1`,
+   `test-depth-prof.sh`, `prof1.out`) put the slope in the flash attention (with a q8_0 cache the CUDA dispatcher
+   took the vector kernel, which walks the whole context) and the indexer pooling copies; `top_k` was under 2 ms.
+   Fixed: `BEST_FATTN_KERNEL_MMA_F16_GATHER` + `ggml_pool_2d`: decode 97.9 / 100.7 / 119.2 -> 95.5 / 93.7 / 102.5
+   ms/token at 22k / 44k / 88k, slope 0.32 -> 0.11 ms per 1k tokens. **Still on the slope** (in order of size at
+   88k): `set_input_qsa`'s CPU scan of every cell per ubatch (0.7 -> 2.8 ms per token: make the block tables
+   incremental), the indexer's `get_rows` over every cell (12 MB read, 46 MB written per layer: a block-key cache or
+   a fused gather-and-mean), the mask fill / set_rows / add over `n_kv` per layer, the per-token mask upload. On the
+   prefill side the sort over `ub x n_kv` rows costs ~5% of a ubatch at 88k (27 ms per layer per 2048 tokens).
 2. **H17: prompt cache vs page cache.** Each idle-slot save carries 19-31 checkpoints of 112 MB; after a 30-minute
    agent session the cache held 10.6 GB of host RAM and free RAM fell to 6 GB. Measure `--cache-ram 4096` and
    `--ctx-checkpoints 8` against today's 16384 in an agent session; second-order on decode, first-order on RAM.

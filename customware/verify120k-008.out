@@ -1,0 +1,34 @@
+health ok after 25 s
+0.01.078.844 I load_tensors: hot experts: placement from ../llama.cpp-customware/hot-experts.stats: 2026 experts on 48 layers within 6000 MiB, predicted coverage 29.5% (placement file ignored)
+0.09.015.559 I load_tensors: hot experts: 2026 experts on 48 layers, 5998.63 MiB on CUDA0 (storage borrowed from the compute buffer, filled at context creation)
+0.09.030.057 I llama_kv_cache:      CUDA0 KV buffer size =  1494.94 MiB
+0.09.075.701 I llama_kv_cache:      CUDA0 KV buffer size =   186.87 MiB
+0.09.658.451 I sched_reserve:      CUDA0 compute buffer size =  7347.38 MiB
+0.09.658.465 I sched_reserve:  CUDA_Host compute buffer size =  1529.06 MiB
+0.09.658.516 I hot_alias_place: hot experts parked at [1348.7, 7347.4) MiB of the 7347.4 MiB CUDA0 compute buffer; decode mode for ubatches up to 2048 tokens, refined as graphs are allocated
+0.19.119.688 I hot_refill: hot experts restored: 5998.6 MiB in 5089 ms (refill #1)
+vram: 15392 MiB
+== greedy log-probs vs classic hot (160k / ub 1024)
+tokens: 48 vs 48, identical prefix: 41 tokens
+first divergence at token 41: A=' likely' (-1.161) B=' include' (-1.098)
+  A side: ' likely'=-1.1609691381454468, ' include'=-1.168816089630127
+  B side: ' likely'=-1.1211285591125488, ' include'=-1.0978798866271973
+mean |delta logprob| over identical prefix: 0.0173 (max 0.1780)
+== greedy log-probs vs plain 3 layers
+tokens: 48 vs 48, identical prefix: 2 tokens
+first divergence at token 2: A=' answer' (-0.631) B=' to' (-0.915)
+  A side: ' answer'=-0.6307438015937805, ' to'=-1.1521251201629639
+  B side: ' answer'=-0.9391233921051025, ' to'=-0.914661705493927
+mean |delta logprob| over identical prefix: 0.0007 (max 0.0013)
+launcher code prompt: prompt_n=22245 (203.4 t/s) predicted_n=300 (12.25 t/s)
+vram: 15784 MiB
+0.19.119.688 I hot_refill: hot experts restored: 5998.6 MiB in 5089 ms (refill #1)
+1.10.098.170 I hot experts: 4265 tokens, coverage 15.5% over the last 4265 (2026 resident), 0 swaps (0.0 MiB), 0 total
+1.28.421.740 I hot experts: 8361 tokens, coverage 17.2% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+1.43.767.876 I hot experts: 12457 tokens, coverage 16.2% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+1.59.923.360 I hot experts: 16553 tokens, coverage 17.1% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+1.59.939.426 I hot_alias_check: a 1723-token ubatch needs 1733.4 MiB of the compute buffer, past the hot experts at 1348.7 MiB: prefill mode for ubatches above 1722 tokens
+2.27.477.150 I hot experts: 22368 tokens, coverage 13.6% over the last 5815 (2026 resident), 0 swaps (0.0 MiB), 0 total
+2.28.539.579 I hot_refill: hot experts restored: 5998.6 MiB in 1017 ms (refill #2)
+-rw-r--r-- 1 septa 197609 124874 Sep 29 19:07 /c/dev/llama.cpp-customware/hot-experts.stats
+verify done

@@ -114,3 +114,14 @@ exists only in the f16 MMA kernel, and taking it with a quantized cache would fi
   sum, so near-ties can flip. What remains of the slope: `set_inputs` (the QSA block tables, 0.7 -> 2.8 ms), the
   indexer's `get_rows` over every cell (12 MB read, 46 MB written per layer at 88k), the mask fill/set_rows/add
   over `n_kv`, and the per-token mask upload.
+- **The op alone** (`test-backend-ops perf -o FLASH_ATTN_EXT`, 256/256, gqa 12, q8_0 K/V, one query, per layer):
+
+  | cells  | vector kernel (n_kv_max 0) | gather (n_kv_max 2048) |
+  |--------|----------------------------|------------------------|
+  | 24576  | 324 us                     | 44 us                  |
+  | 49152  | 685 us                     | 50 us                  |
+  | 90112  | 1327 us                    | 61 us                  |
+
+  Twelve layers at 88k: 15.9 ms -> 0.7 ms per token; the op no longer depends on the context to speak of.
+- Launcher verification of the 008 release (8a3a84e8c): 120k launcher up in 25 s, 22k code prompt 203.4 t/s
+  prefill / 12.25 t/s generation at 15.4-15.8 GB (11.55 t/s with the previous binary in the same VRAM state).
