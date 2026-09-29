@@ -359,6 +359,7 @@ private:
     bool                  hot_dirty     = true;
     uint32_t              hot_threshold = 0;     // decode mode for ubatches up to this many tokens
     bool                  hot_mode_next = true;  // read by graph_params(): build the hot split or not
+    bool                  hot_batch_prefill = false; // the whole batch of the current decode() is a prefill: no hot split for any of its ubatches
     int64_t               hot_n_refills = 0;
 
     void hot_alias_place();                                          // (re)bind the hot tensors to the current compute buffer

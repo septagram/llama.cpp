@@ -41,6 +41,7 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 # Note: anything else rendering on the 4060 Ti or spinning a core (a GUI app with continuous repaint, for example)
 #   costs up to a third of the token rate; check Task Manager's GPU column if generation is slower than ~12 t/s.
 cat $0
+mkdir -p ../llama.cpp-customware/logs
 export LLAMA_HOT_EXPERTS=../llama.cpp-customware/hot-experts.txt
 export LLAMA_HOT_EXPERTS_ALIAS=1
 export LLAMA_HOT_EXPERTS_STATS=../llama.cpp-customware/hot-experts.stats
@@ -63,6 +64,7 @@ export GGML_OP_OFFLOAD_MIN_BATCH=512
 	--cache-ram 16384 \
 	--host 0.0.0.0 --port 5000 \
 	-lv 4 \
+	--log-file "../llama.cpp-customware/logs/server-$(date +%Y%m%d-%H%M%S).log" \
 	-t 6
 LAUNCH
 chmod +x /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh
@@ -77,6 +79,7 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware-120k.sh <<'LAUNCH'
 # Everything else is as in Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh (see the comments there); both launchers share
 # the binary and the learned stats file in C:\dev\llama.cpp-customware.
 cat $0
+mkdir -p ../llama.cpp-customware/logs
 export LLAMA_HOT_EXPERTS=../llama.cpp-customware/hot-experts.txt
 export LLAMA_HOT_EXPERTS_ALIAS=1
 export LLAMA_HOT_EXPERTS_STATS=../llama.cpp-customware/hot-experts.stats
@@ -99,6 +102,7 @@ export GGML_OP_OFFLOAD_MIN_BATCH=512
 	--cache-ram 16384 \
 	--host 0.0.0.0 --port 5000 \
 	-lv 4 \
+	--log-file "../llama.cpp-customware/logs/server-$(date +%Y%m%d-%H%M%S).log" \
 	-t 6
 LAUNCH
 chmod +x /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware-120k.sh

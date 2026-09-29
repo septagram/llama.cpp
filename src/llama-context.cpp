@@ -1529,7 +1529,10 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
 
     // customware: hot experts in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS): decode mode only for ubatches that
     // are known to leave the tail alone; a bigger ubatch runs the plain path and dirties the tail
-    hot_mode_next = hot_alias ? (hot_buf != nullptr && ubatch.n_tokens <= hot_threshold) : true;
+    // a batch that is a prefill as a whole (a big prompt chunk, possibly with another slot's single token in front) runs
+    // every ubatch without the split: the small ubatch would otherwise restore the parked experts (0.66 s) only for the
+    // next ubatch to evict them again
+    hot_mode_next = hot_alias ? (hot_buf != nullptr && ubatch.n_tokens <= hot_threshold && !hot_batch_prefill) : true;
 
     // the new graph parameters
     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
@@ -1942,6 +1945,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
         t_compute_start_us = ggml_time_us();
     }
     n_queued_tokens += n_tokens_all;
+
+    // customware: a prefill-sized batch runs all of its ubatches without the hot split (see process_ubatch)
+    hot_batch_prefill = hot_alias && hot_buf != nullptr && n_tokens_all > hot_threshold;
 
     output_swaps.clear();
 
