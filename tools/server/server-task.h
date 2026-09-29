@@ -598,6 +598,9 @@ struct server_prompt_cache_state {
     server_prompt prompt;
     server_prompt_data data;
 
+    // customware: the saved state of a suspended (preempted) slot; never evicted, erased on resume
+    bool pinned = false;
+
     size_t size() const {
         size_t res = data.size();
 
@@ -632,6 +635,21 @@ struct server_prompt_cache {
     bool load(server_prompt & prompt, const server_tokens & tokens_new, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
 
     void update();
+
+    // customware: suspended slots park their sequence state here, in the same RAM budget as the cached prompts.
+    // A pinned entry carries the state only (the slot keeps its tokens and checkpoints), is never evicted, and is
+    // erased by load_exact() or erase().
+    server_prompt_cache_state * alloc_pinned(size_t state_size_main, size_t state_size_drft);
+
+    bool load_exact(server_prompt_cache_state * state, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
+
+    void erase(server_prompt_cache_state * state);
+
+    size_t n_pinned() const;
+
+private:
+    // evict the oldest entry that is not pinned; false if there is none
+    bool evict_oldest();
 };
 
 // used exclusively by router mode

@@ -812,6 +812,9 @@ extern "C" {
     // Check if the memory supports shifting
     LLAMA_API bool llama_memory_can_shift(llama_memory_t mem);
 
+    // customware: cells in use in the attention cache behind this memory (the unified pool's occupancy); 0 if unknown
+    LLAMA_API uint32_t llama_memory_n_cells_used(llama_memory_t mem);
+
     //
     // State / sessions
     //

@@ -7,6 +7,8 @@
 #include "llama-batch.h"
 #include "llama-io.h"
 #include "llama-memory.h"
+#include "llama-memory-hybrid.h"
+#include "llama-kv-cache.h"
 #include "llama-mmap.h"
 #include "llama-model.h"
 #include "llama-hot-experts.h"
@@ -4354,6 +4356,24 @@ bool llama_memory_can_shift(llama_memory_t mem) {
     }
 
     return mem->get_can_shift();
+}
+
+uint32_t llama_memory_n_cells_used(llama_memory_t mem) {
+    if (!mem) {
+        return 0;
+    }
+
+    const llama_kv_cache * kv = nullptr;
+    if (auto * hybrid = dynamic_cast<llama_memory_hybrid *>(mem)) {
+        kv = hybrid->get_mem_attn();
+    } else {
+        kv = dynamic_cast<llama_kv_cache *>(mem);
+    }
+    if (!kv) {
+        return 0;
+    }
+
+    return kv->get_cells(0).get_used();
 }
 
 // llama state API

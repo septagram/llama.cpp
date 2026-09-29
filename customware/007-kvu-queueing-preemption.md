@@ -67,3 +67,54 @@ One primitive, "suspend a slot / resume a slot", used by the overflow path now a
 
 - Implementer: the planner (Fable). Commits per step on `master`, `Assisted-by: Claude Fable 5.1`,
   `Plan: 26c-update-saucy-wing`. No review mid-way; stop and report when measured.
+
+## Implementation notes (what actually shipped)
+
+- Shipped as planned: `SLOT_STATE_SUSPENDED`, `server_slot::suspend()` / `resume()`, pinned entries in
+  `server_prompt_cache` (`alloc_pinned`, `load_exact`, `erase`, eviction skips pinned), the KV accounting helpers
+  (`kv_pool_size`, `kv_need`, `kv_resident`), the admission check in the completion path (deferral with a log
+  line), `pick_victim()` + `try_preempt(off)` in the decode failure path (before the collective error, only under
+  `--kv-unified`, only when a 1-token batch still finds no cells and no idle slot could be purged),
+  `try_resume_suspended()` at the top of `update_slots` (oldest first, purging idle slots to make room),
+  `server_batch::remove_slot_tokens()` with the batch-index shift for the other slots, `"suspended"` in `/slots`,
+  a cancelled suspended slot drops its parked state and its token list.
+- Scenarios on a 32k pool (`customware/test-kvu.sh`, classic hot experts, prompt cache 8 GB):
+  1. 22k prompt generating, 12k request arrives: "task 4 needs 12641 cells (prompt 12341) but 22481 of 32768 are
+     spoken for: waiting for cells", admitted after the first finished, completed normally, no error.
+  3. idle retained 22k slot, a new 22k request: purged and run, no wait, no error.
+  4. 44k prompt on the 32k pool: `exceed_context_size_error` immediately, slots idle after.
+  2. first attempt did not overflow (both answers ended early); rerun with `ignore_eos` and a 24k pool, below.
+- Scenario 2 rerun (24k pool, 12k + 10k prompts, 1500 forced tokens each): the overflow fired as designed, the
+  smaller sequence (11217 tokens, 270 MiB) was parked and the other ran to completion. The resume then failed:
+  the finished sequence stayed resident as an idle retained slot, and the resume check did not count idle retained
+  cells, so the restore ran into a nearly full pool (`state_seq_set_data: failed to restore kv cache`) and the
+  request got an error, the exact outcome this entry exists to prevent. Fixes: `kv_idle_retained()` is counted
+  and idle slots are purged one by one before a resume; `load_exact` keeps the parked state on failure; a failed
+  restore is retried on later passes and only after 8 failures does the client see an error. The restore itself
+  does not need contiguous cells (`find_slot(..., false)`), so fragmentation cannot break it.
+- Hardening from the mid-prefill question: the victim is always a generating slot (a slot in prompt processing is
+  never parked, its prefill continues), suspended slots are excluded from the old collective-kill path, and a
+  resumed sequence needs `LLAMA_KV_RESUME_MARGIN` (1024) of headroom so two sequences that cannot coexist do not
+  ping-pong through RAM every few hundred tokens. `LLAMA_KV_MARGIN` (256) is the growth margin per active sequence;
+  a negative value makes admission optimistic, which is how scenario 5 forces an overflow during a prefill.
+- Final accounting: `llama_memory_n_cells_used()` (new customware API, the attention cache's occupancy behind the
+  hybrid memory) replaces the bookkeeping for the present; admission adds the rest of prompts in flight, a growth
+  margin per active sequence (`LLAMA_KV_MARGIN`, 256) and the suspended sequences; resume uses the occupancy plus the
+  rest of prompts in flight plus the resume headroom (`LLAMA_KV_RESUME_MARGIN`, 1024), purging idle retained slots one
+  by one, and retries a failed restore only after the occupancy has dropped.
+- Results on the fixed build (24k pool unless noted):
+  - Scenario 5 (overflow while the second request had just finished its prefill, forced with `LLAMA_KV_MARGIN=-2000`):
+    the smaller sequence parked at 12343 tokens (286 MiB), the other finished its 800 tokens, the parked one resumed
+    after 83 s and completed, no error.
+  - Scenario 2, three runs: parked at 11217 tokens (270 MiB), resumed after 47-51 s, completed 1500 tokens, no error,
+    identical 4969-character output every time.
+  - Exactness: the same concurrent pair on a 32k pool (no overflow) produced byte-identical output for both the
+    parked sequence (4969/4969 characters) and the survivor (5525/5525). A solo run of the same request differs from
+    character 31 on: llama.cpp's logits depend on the batch composition (one sequence per batch vs two), which is
+    outside what any server can promise; the comparison that isolates the preemption is the concurrent one.
+  - Scenarios 1, 3, 4 as before (waited and completed; idle retained purged; context-size error only for the
+    44k prompt).
+
+## Final commit list
+
+- see the server commit below (batch-cut change of entry 006 included, same file)

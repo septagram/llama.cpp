@@ -60,3 +60,13 @@ experts (0.66 s) that the next prefill batch evicts again (16 restores in the te
   at batch starts with the same spacing, so a prefix mismatch inside a batch re-prefills up to one batch more.
 - Launcher logs: `--log-file ../llama.cpp-customware/logs/server-<timestamp>.log` in both launchers; the file is plain
   text, the console keeps its colours.
+- After both changes (chain26, 120k launcher): agentic 20k prompt alone 251 t/s in 6 batches (4096, 4096, 4096,
+  3973, 4073, 19: only the last-user and end-of-prompt cuts remain), with a generator in flight 300 t/s (warm);
+  plain 22k prompt alone 287, with a generator 281 (from 251); the generator averaged 7.4 t/s over its 1500-token
+  run (from 6.1), still one token per prompt batch during the prefill, stream alive throughout. Restores per run
+  16 -> 6 (one per prompt plus one per follow-up, as designed).
+
+## Final commit list
+
+- 8866fc27e llama : no hot-expert restore inside a prefill batch; launcher logs; entry 006/007 plans
+- (the server-side batch-cut change lands with entry 007's server commit)
