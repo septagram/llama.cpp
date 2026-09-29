@@ -1792,9 +1792,17 @@ private:
         return margin;
     }
 
-    // cells a request needs: its prompt plus room to generate (its n_predict when set, else the margin)
+    // room to generate that admission demands beyond the prompt: the request's n_predict, capped (clients send
+    // max_tokens of 32k as a matter of course; a real overflow is handled by preemption, so the cap only has to
+    // cover a short head start), else the margin. env LLAMA_KV_RESERVE, default 2048.
+    static int32_t kv_reserve_cap() {
+        static const int32_t cap = getenv("LLAMA_KV_RESERVE") ? atoi(getenv("LLAMA_KV_RESERVE")) : 2048;
+        return cap;
+    }
+
+    // cells a request needs: its prompt plus the generation reserve
     static int32_t kv_need(int32_t n_prompt, int32_t n_predict) {
-        return n_prompt + (n_predict > 0 ? n_predict : kv_margin());
+        return n_prompt + (n_predict > 0 ? std::min(n_predict, kv_reserve_cap()) : kv_margin());
     }
 
     // cells spoken for: active slots (their prompt, or the full prompt still being processed, plus the growth
@@ -2746,11 +2754,14 @@ private:
                     // customware (entry 007): under --kv-unified a request starts only when it fits next to the active
                     // and suspended sequences; otherwise it waits in the deferred queue (retried when a slot releases).
                     // Latency, never an error: a prompt too large for the pool alone still fails at launch as before.
+                    // A request only ever waits for cells that other sequences hold: with nothing committed there is
+                    // nothing to wait for, so it starts even when prompt + reserve exceeds the pool (the prompt fits,
+                    // and generation ends at the pool like any context limit).
                     if (params_base.kv_unified && task.n_tokens() <= n_ctx_slot()) {
                         const int32_t need = kv_need(task.n_tokens(), task.params.n_predict);
                         const int32_t used = kv_committed(true);
                         const int32_t pool = kv_pool_size();
-                        if (used + need > pool) {
+                        if (used > 0 && used + need > pool) {
                             SRV_WRN("task %d needs %d cells (prompt %d) but %d of %d are spoken for: waiting for cells\n",
                                     id_task, need, task.n_tokens(), used, pool);
                             n_kv_deferred++;

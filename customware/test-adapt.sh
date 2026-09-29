@@ -19,7 +19,7 @@ start() { # <phase> <env...>
   for i in $(seq 1 180); do
     sleep 5
     if curl -s -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"ok"'; then echo "health ok after $((i*5)) s"; break; fi
-    if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT" "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT" "$log" | head -3; taskkill //F //IM llama-server.exe >/dev/null 2>&1; exit 1; fi
+    if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT" "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT" "$log" | head -3; bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; exit 1; fi
   done
   grep -E "hot experts|placement from|no usable stats|compute buffer size" "$log" | cut -c1-220
 }
@@ -33,7 +33,7 @@ print('$label $1: prompt_n=%d (%.1f t/s) predicted_n=%d (%.2f t/s)' % (t.get('pr
 " 2>&1 | head -2
   grep -E "^.{0,16}hot experts: [0-9]+ tokens" "$log" | tail -2 | cut -c1-200
 }
-stop() { taskkill //F //IM llama-server.exe >/dev/null 2>&1; sleep 3; }
+stop() { bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; sleep 3; }
 
 echo "== $label phase A: shipped placement + fresh stats (ctx=$CTX ub=$UB)"
 start A LLAMA_HOT_EXPERTS=customware/hot-experts-mixed-4000.txt

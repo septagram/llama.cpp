@@ -112,5 +112,5 @@ kvlog 3
 fi
 
 curl -s "http://127.0.0.1:$PORT/slots" | python -c "import json,sys; s=json.load(sys.stdin); print('slots:', [(x['id'], x['is_processing'], x.get('suspended')) for x in s])"
-taskkill //F //IM llama-server.exe >/dev/null 2>&1
+bash customware/kill-port.sh "$PORT" > /dev/null 2>&1
 echo "== $label done"

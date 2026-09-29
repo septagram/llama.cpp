@@ -1669,6 +1669,41 @@ static int ggml_sched_prof_level() {
     return level;
 }
 
+// GGML_SCHED_PROFILE_NODES=1 computes the dumped graphs node by node with a sync after each and ranks the ops by time.
+// The sync exposes launch latency, so this ranks the costs rather than measuring them exactly.
+static bool ggml_sched_prof_nodes() {
+    static const bool nodes = [] {
+        const char * env = getenv("GGML_SCHED_PROFILE_NODES");
+        return env ? atoi(env) > 0 : false;
+    }();
+    return nodes;
+}
+
+struct ggml_sched_prof_node_acc {
+    int64_t us = 0;
+    int     n  = 0;
+    int     backend_id = -1;
+};
+
+// nodes of one op whose names differ only in the "-<layer>" suffix share a row; unnamed nodes ("node_1234") too
+static std::string ggml_sched_prof_node_key(const ggml_tensor * node) {
+    std::string name = node->name;
+    const auto digits = [](std::string::const_iterator a, std::string::const_iterator b) {
+        return a != b && std::all_of(a, b, [](char c) { return c >= '0' && c <= '9'; });
+    };
+    const size_t dash = name.rfind('-');
+    if (dash != std::string::npos && digits(name.begin() + dash + 1, name.end())) {
+        name.erase(dash);
+    }
+    if (name.rfind("node_", 0) == 0 && digits(name.begin() + 5, name.end())) {
+        name.clear();
+    }
+    if (name.empty()) {
+        name = "?";
+    }
+    return std::string(ggml_op_desc(node)) + " " + name;
+}
+
 static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     GGML_ASSERT(sched);
     struct ggml_backend_sched_split * splits = sched->splits;
@@ -1685,6 +1720,8 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
     const int64_t prof_t_graph = prof ? ggml_time_us() : 0;
     ggml_sched_prof_backend prof_b[GGML_SCHED_MAX_BACKENDS];
     std::vector<ggml_sched_prof_row> prof_rows;
+    const bool prof_nodes = prof_dump && ggml_sched_prof_nodes();
+    std::unordered_map<std::string, ggml_sched_prof_node_acc> prof_node_accs;
 
     for (int split_id = 0; split_id < sched->n_splits; split_id++) {
         struct ggml_backend_sched_split * split = &splits[split_id];
@@ -1839,7 +1876,21 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
             prof_t1 = ggml_time_us();
         }
 
-        if (!sched->callback_eval) {
+        if (prof_nodes) {
+            for (int j = 0; j < split->graph.n_nodes; j++) {
+                struct ggml_cgraph gv = ggml_graph_view(&split->graph, j, j + 1);
+                const int64_t t0 = ggml_time_us();
+                enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &gv);
+                if (ec != GGML_STATUS_SUCCESS) {
+                    return ec;
+                }
+                ggml_backend_synchronize(split_backend);
+                ggml_sched_prof_node_acc & acc = prof_node_accs[ggml_sched_prof_node_key(split->graph.nodes[j])];
+                acc.us += ggml_time_us() - t0;
+                acc.n  += 1;
+                acc.backend_id = split_backend_id;
+            }
+        } else if (!sched->callback_eval) {
             enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &split->graph);
             if (ec != GGML_STATUS_SUCCESS) {
                 return ec;
@@ -1907,6 +1958,21 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                 const ggml_sched_prof_row & r = prof_rows[i];
                 fprintf(stderr, "sched-prof:   split %3zu %-6s nodes=%4d copy=%8.1f us comp=%8.1f us  %s\n",
                         i, ggml_backend_name(sched->backends[r.backend_id]), r.n_nodes, (double) r.us_copy, (double) r.us_comp, r.name);
+            }
+            if (!prof_node_accs.empty()) {
+                std::vector<std::pair<std::string, ggml_sched_prof_node_acc>> rows(prof_node_accs.begin(), prof_node_accs.end());
+                std::sort(rows.begin(), rows.end(), [](const auto & a, const auto & b) { return a.second.us > b.second.us; });
+                int64_t us_nodes = 0;
+                for (const auto & r : rows) {
+                    us_nodes += r.second.us;
+                }
+                fprintf(stderr, "sched-prof:   nodes: %zu kinds, %.2f ms with a sync after every node\n", rows.size(), us_nodes / 1000.0);
+                for (size_t i = 0; i < rows.size() && i < 48; i++) {
+                    const auto & r = rows[i];
+                    fprintf(stderr, "sched-prof:   node %-6s n=%4d total=%9.1f us mean=%8.1f us  %s\n",
+                            ggml_backend_name(sched->backends[r.second.backend_id]), r.second.n, (double) r.second.us,
+                            (double) r.second.us / r.second.n, r.first.c_str());
+                }
             }
         }
         std::string line;

@@ -1,66 +1,89 @@
-#!/usr/bin/env python3
-"""Summarize GGML_SCHED_PROFILE / GGML_CPU_PROFILE output captured from stderr.
+#!/usr/bin/env python
+"""Summarise a server log written with GGML_SCHED_PROFILE=N GGML_SCHED_PROFILE_NODES=1 (customware/test-depth-prof.sh).
 
-usage: prof-summary.py <log> [--skip N] [--min-splits N]
-  --skip N        ignore the first N sched-prof graphs (warmup / prompt)
-  --min-splits N  only count graphs with at least N splits (drop tiny graphs like sampling)
-Prints mean per-graph totals and per-backend copy/compute time, and the per-split rows of the
-largest dumped graph grouped by backend. The cpu-prof table (last one in the log) is echoed as-is.
-"""
-import re, sys, collections, statistics
+usage: prof-summary.py <log> <label>:<first line>-<end line> ...
+Per range: the decode graphs (ubatches of one token) - mean graph time, per-backend copy/compute, mean set_inputs -
+and the node ranking of the dumped decode graphs, averaged per graph."""
+import re
+import sys
+from collections import defaultdict
 
-args = sys.argv[1:]
-path = args[0]
-skip = int(args[args.index('--skip') + 1]) if '--skip' in args else 0
-min_splits = int(args[args.index('--min-splits') + 1]) if '--min-splits' in args else 2
+RE_INPUTS = re.compile(r"sched-prof: set_inputs ([0-9.]+) ms for (\d+) tokens")
+RE_NODE   = re.compile(r"sched-prof:\s+node (\S+)\s+n=\s*(\d+) total=\s*([0-9.]+) us mean=\s*([0-9.]+) us\s+(.*)$")
+RE_GRAPH  = re.compile(r"sched-prof: graph (\d+) total=([0-9.]+) ms splits=(\d+)(.*)$")
+RE_BACK   = re.compile(r"\| (\S+) n=(\d+) nodes=(\d+) copy=([0-9.]+) comp=([0-9.]+)")
 
-graph_re = re.compile(r'sched-prof: graph (\d+) total=([\d.]+) ms splits=(\d+)(.*)')
-be_re = re.compile(r'\| (\S+) n=(\d+) nodes=(\d+) copy=([\d.]+) comp=([\d.]+)')
-split_re = re.compile(r'sched-prof:\s+split\s+(\d+) (\S+)\s+nodes=\s*(\d+) copy=\s*([\d.]+) us comp=\s*([\d.]+) us\s+(.*)')
 
-graphs = []
-cur_rows = []
-last_dump = []
-cpu_prof = []
-for line in open(path, errors='replace'):
-    m = graph_re.match(line.strip())
-    if m:
-        g = {'id': int(m.group(1)), 'total': float(m.group(2)), 'splits': int(m.group(3)), 'be': {}}
-        for b in be_re.finditer(m.group(4)):
-            g['be'][b.group(1)] = (int(b.group(2)), int(b.group(3)), float(b.group(4)), float(b.group(5)))
-        graphs.append(g)
-        if cur_rows:
-            last_dump = cur_rows
-            cur_rows = []
-        continue
-    m = split_re.match(line)
-    if m:
-        cur_rows.append((int(m.group(1)), m.group(2), int(m.group(3)), float(m.group(4)), float(m.group(5)), m.group(6).strip()))
-        continue
-    if line.startswith('cpu-prof:'):
-        cpu_prof.append(line.rstrip())
+def summarise(lines, label):
+    ntok = None
+    t_inputs = []
+    graphs = []          # (total_ms, {backend: (copy, comp)})
+    dumps = []           # list of {key: (n, total_us)}
+    cur_nodes = {}
+    for line in lines:
+        m = RE_INPUTS.search(line)
+        if m:
+            ntok = int(m.group(2))
+            if ntok == 1:
+                t_inputs.append(float(m.group(1)))
+            continue
+        m = RE_NODE.search(line)
+        if m:
+            # unnamed nodes (node_1234) differ only by their number: one row per op
+            key = re.sub(r"\bnode_\d+$", "?", m.group(5).strip())
+            prev = cur_nodes.get(key)
+            n, us = int(m.group(2)), float(m.group(3))
+            if prev:
+                n, us = prev[1] + n, prev[2] + us
+            cur_nodes[key] = (m.group(1), n, us)
+            continue
+        m = RE_GRAPH.search(line)
+        if m:
+            if ntok == 1:
+                backs = {b.group(1): (float(b.group(4)), float(b.group(5))) for b in RE_BACK.finditer(m.group(4))}
+                graphs.append((float(m.group(2)), backs))
+                if cur_nodes:
+                    dumps.append(cur_nodes)
+            cur_nodes = {}
+    print(f"== {label}: {len(graphs)} decode graphs, {len(dumps)} dumped node by node")
+    if not graphs:
+        return
+    # the node-by-node graphs are slower; report the mean of the others as the graph time
+    plain = [g for g in graphs if True]
+    mean_total = sum(g[0] for g in plain) / len(plain)
+    backs = defaultdict(lambda: [0.0, 0.0, 0])
+    for _, b in plain:
+        for name, (copy, comp) in b.items():
+            backs[name][0] += copy
+            backs[name][1] += comp
+            backs[name][2] += 1
+    back_s = "  ".join(f"{n}: copy {v[0]/v[2]:.2f} comp {v[1]/v[2]:.2f} ms" for n, v in backs.items())
+    inp = sum(t_inputs) / len(t_inputs) if t_inputs else 0.0
+    print(f"   graph mean {mean_total:.2f} ms (with a sync per split; the dumped ones included)  {back_s}  set_inputs {inp:.2f} ms")
+    if not dumps:
+        return
+    acc = defaultdict(lambda: [None, 0, 0.0])
+    for d in dumps:
+        for key, (backend, n, us) in d.items():
+            acc[key][0] = backend
+            acc[key][1] += n
+            acc[key][2] += us
+    rows = sorted(acc.items(), key=lambda kv: -kv[1][2])
+    total = sum(v[2] for v in acc.values()) / len(dumps)
+    print(f"   node ranking, per dumped graph (sum {total/1000:.2f} ms with a sync after every node):")
+    for key, (backend, n, us) in rows[:30]:
+        print(f"   {backend:6s} n={n/len(dumps):5.1f} {us/len(dumps)/1000:8.3f} ms  {us/n:8.1f} us/node  {key}")
 
-sel = [g for g in graphs[skip:] if g['splits'] >= min_splits]
-print(f'{len(graphs)} graphs in log, {len(sel)} selected (skip={skip}, min_splits={min_splits})')
-if sel:
-    tot = [g['total'] for g in sel]
-    print(f'per-graph total: mean {statistics.mean(tot):.2f} ms, median {statistics.median(tot):.2f}, min {min(tot):.2f}, max {max(tot):.2f}, splits {sel[0]["splits"]}..{sel[-1]["splits"]}')
-    names = sorted({n for g in sel for n in g['be']})
-    for n in names:
-        rows = [g['be'][n] for g in sel if n in g['be']]
-        print(f'  {n:6s} splits={statistics.mean(r[0] for r in rows):6.1f} nodes={statistics.mean(r[1] for r in rows):7.1f} copy={statistics.mean(r[2] for r in rows):7.2f} ms comp={statistics.mean(r[3] for r in rows):7.2f} ms')
-if last_dump:
-    print(f'\nlast dumped graph: {len(last_dump)} splits')
-    by_be = collections.defaultdict(lambda: [0, 0.0, 0.0, 0])
-    for _, be, nodes, copy, comp, _ in last_dump:
-        by_be[be][0] += 1; by_be[be][1] += copy; by_be[be][2] += comp; by_be[be][3] += nodes
-    for be, (n, copy, comp, nodes) in by_be.items():
-        print(f'  {be:6s} splits={n:4d} nodes={nodes:5d} copy={copy/1000:7.2f} ms comp={comp/1000:7.2f} ms  avg comp/split={comp/n:7.1f} us')
-    top = sorted(last_dump, key=lambda r: -r[4])[:12]
-    print('  slowest splits:')
-    for i, be, nodes, copy, comp, name in top:
-        print(f'    #{i:3d} {be:6s} nodes={nodes:4d} copy={copy:8.1f} comp={comp:8.1f}  {name}')
-if cpu_prof:
-    # print only the last table
-    starts = [i for i, l in enumerate(cpu_prof) if 'graph computes' in l]
-    print('\n' + '\n'.join(cpu_prof[starts[-1]:] if starts else cpu_prof))
+
+def main():
+    log = sys.argv[1]
+    with open(log, encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+    for arg in sys.argv[2:]:
+        label, rng = arg.split(":")
+        a, b = (int(x) for x in rng.split("-"))
+        summarise(lines[a:b], label)
+
+
+if __name__ == "__main__":
+    main()

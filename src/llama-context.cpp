@@ -1596,12 +1596,19 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
 
     // set the input data for the input tensors
     {
-        //const auto t_start_us = ggml_time_us();
+        // customware: the CPU side of a ubatch (masks, QSA block tables) under the same variable as the node profile
+        static const bool prof_inputs = [] {
+            const char * env = getenv("GGML_SCHED_PROFILE_NODES");
+            return env ? atoi(env) > 0 : false;
+        }();
+        const auto t_start_us = prof_inputs ? ggml_time_us() : 0;
 
         // FIXME this call causes a crash if any model inputs were not used in the graph and were therefore not allocated
         res->set_inputs(&ubatch);
 
-        //LLAMA_LOG_INFO("graph set inputs time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
+        if (prof_inputs) {
+            LLAMA_LOG_INFO("sched-prof: set_inputs %.3f ms for %u tokens\n", (ggml_time_us() - t_start_us)/1000.0, ubatch.n_tokens);
+        }
     }
 
     const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);

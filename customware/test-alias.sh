@@ -14,7 +14,7 @@ echo "== $label: ctx=$CTX ub=$UB placement=$PLACEMENT alias=$ALIAS"
 for i in $(seq 1 180); do
   sleep 5
   if curl -s -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"ok"'; then echo "health ok after $((i*5)) s"; break; fi
-  if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT" "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT" "$log" | head -3; taskkill //F //IM llama-server.exe >/dev/null 2>&1; exit 1; fi
+  if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT" "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT" "$log" | head -3; bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; exit 1; fi
 done
 grep -E "hot experts|compute buffer size|KV buffer size" "$log" | cut -c1-220
 echo "vram: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader -i 1)"
@@ -43,5 +43,5 @@ EOF
 req run3 customware/smoke-request-followup.json
 echo "vram: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader -i 1)"
 grep -E "hot experts|prefill mode|restored|re-parking|reallocated" "$log" | cut -c1-200 | tail -12
-taskkill //F //IM llama-server.exe >/dev/null 2>&1
+bash customware/kill-port.sh "$PORT" > /dev/null 2>&1
 echo "== $label done"

@@ -1,0 +1,104 @@
+server up after 10 s
+22k: prompt_n=22220 (158.9 t/s) predicted_n=46 120.2 ms/token
+44k: prompt_n=44428 (183.0 t/s) predicted_n=45 120.9 ms/token
+88k: prompt_n=46450 (169.9 t/s) predicted_n=45 141.2 ms/token
+== 22k: 45 decode graphs, 3 dumped node by node
+   graph mean 116.56 ms (with a sync per split; the dumped ones included)  CUDA0: copy 4.59 comp 60.58 ms  CPU: copy 4.08 comp 47.29 ms  set_inputs 0.74 ms
+   node ranking, per dumped graph (sum 142.02 ms with a sync after every node):
+   CPU    n= 48.0   19.847 ms     413.5 us/node  MUL_MAT_ID ffn_moe_down
+   CPU    n= 48.0   14.096 ms     293.7 us/node  MUL_MAT_ID ffn_moe_gate
+   CPU    n= 48.0   13.788 ms     287.2 us/node  MUL_MAT_ID ffn_moe_up
+   CUDA0  n= 97.0    5.766 ms      59.4 us/node  MUL_MAT hc_gate
+   CUDA0  n= 36.0    4.523 ms     125.6 us/node  MUL_MAT linear_attn_out
+   CUDA0  n= 96.0    4.366 ms      45.5 us/node  MUL_MAT hc_inject
+   CUDA0  n= 96.0    3.815 ms      39.7 us/node  DSV4_HC_PRE hc_mixed
+   CUDA0  n= 48.0    3.791 ms      79.0 us/node  MUL ffn_moe_weighted
+   CUDA0  n= 36.0    3.760 ms     104.4 us/node  MUL_MAT z
+   CUDA0  n= 84.0    3.297 ms      39.3 us/node  RMS_NORM norm
+   CUDA0  n= 48.0    2.985 ms      62.2 us/node  MUL_MAT ffn_moe_logits
+   CUDA0  n= 48.0    2.772 ms      57.7 us/node  MUL_MAT ffn_gate
+   CUDA0  n=  1.0    2.529 ms    2528.7 us/node  MUL_MAT result_output
+   CUDA0  n= 48.0    2.467 ms      51.4 us/node  MUL_MAT ffn_shexp
+   CUDA0  n= 48.0    2.390 ms      49.8 us/node  MUL_MAT ffn_up
+   CUDA0  n= 49.0    2.383 ms      48.6 us/node  CONT  (view) (cont)
+   CUDA0  n= 48.0    2.290 ms      47.7 us/node  ARGSORT ffn_moe_argsort
+   CUDA0  n= 48.0    2.169 ms      45.2 us/node  SOFT_MAX ffn_moe_probs
+   CUDA0  n= 48.0    2.114 ms      44.0 us/node  MUL ffn_shexp_gated
+   CUDA0  n= 48.0    2.100 ms      43.8 us/node  ADD ffn_moe_out
+   CUDA0  n= 48.0    2.057 ms      42.8 us/node  DIV ffn_moe_weights_norm
+   CUDA0  n= 48.0    2.055 ms      42.8 us/node  DSV4_HC_POST hc_combine
+   CUDA0  n= 48.0    2.055 ms      42.8 us/node  SUM_ROWS ffn_moe_weights_sum
+   CUDA0  n= 49.0    2.039 ms      41.6 us/node  CONT  (reshaped) (view) (cont)
+   CUDA0  n= 12.0    2.033 ms     169.4 us/node  MUL_MAT Qcur_full
+   CUDA0  n= 48.0    2.024 ms      42.2 us/node  CLAMP ffn_moe_weights_sum_clamped
+   CUDA0  n= 48.0    2.014 ms      42.0 us/node  ADD ffn_out
+   CUDA0  n= 48.0    1.972 ms      41.1 us/node  SIGMOID shared_expert_gate_sigmoid
+   CUDA0  n= 48.0    1.967 ms      41.0 us/node  DSV4_HC_POST l_last
+   CUDA0  n= 48.0    1.936 ms      40.3 us/node  MUL_MAT shared_expert_gate
+== 44k: 44 decode graphs, 2 dumped node by node
+   graph mean 116.72 ms (with a sync per split; the dumped ones included)  CUDA0: copy 4.59 comp 61.70 ms  CPU: copy 4.04 comp 46.37 ms  set_inputs 1.41 ms
+   node ranking, per dumped graph (sum 132.98 ms with a sync after every node):
+   CPU    n= 48.0   18.282 ms     380.9 us/node  MUL_MAT_ID ffn_moe_down
+   CPU    n= 48.0   13.792 ms     287.3 us/node  MUL_MAT_ID ffn_moe_gate
+   CPU    n= 48.0   12.873 ms     268.2 us/node  MUL_MAT_ID ffn_moe_up
+   CUDA0  n= 97.0    5.345 ms      55.1 us/node  MUL_MAT hc_gate
+   CUDA0  n= 36.0    4.361 ms     121.1 us/node  MUL_MAT linear_attn_out
+   CUDA0  n= 96.0    3.942 ms      41.1 us/node  MUL_MAT hc_inject
+   CUDA0  n= 36.0    3.692 ms     102.6 us/node  MUL_MAT z
+   CUDA0  n= 96.0    3.596 ms      37.5 us/node  DSV4_HC_PRE hc_mixed
+   CUDA0  n= 48.0    3.267 ms      68.1 us/node  MUL ffn_moe_weighted
+   CUDA0  n= 84.0    3.089 ms      36.8 us/node  RMS_NORM norm
+   CUDA0  n=  1.0    3.019 ms    3019.5 us/node  MUL_MAT result_output
+   CUDA0  n= 48.0    2.849 ms      59.3 us/node  MUL_MAT ffn_moe_logits
+   CUDA0  n= 48.0    2.525 ms      52.6 us/node  MUL_MAT ffn_shexp
+   CUDA0  n= 48.0    2.470 ms      51.5 us/node  MUL_MAT ffn_gate
+   CUDA0  n= 49.0    2.318 ms      47.3 us/node  CONT  (view) (cont)
+   CUDA0  n= 49.0    2.260 ms      46.1 us/node  CONT  (reshaped) (view) (cont)
+   CUDA0  n= 48.0    2.074 ms      43.2 us/node  MUL_MAT ffn_up
+   CUDA0  n= 48.0    2.051 ms      42.7 us/node  ARGSORT ffn_moe_argsort
+   CUDA0  n= 12.0    1.991 ms     165.9 us/node  MUL_MAT Qcur_full
+   CUDA0  n= 48.0    1.984 ms      41.3 us/node  SOFT_MAX ffn_moe_probs
+   CUDA0  n= 48.0    1.933 ms      40.3 us/node  DSV4_HC_POST hc_combine
+   CUDA0  n= 48.0    1.896 ms      39.5 us/node  DSV4_HC_POST l_last
+   CUDA0  n= 48.0    1.804 ms      37.6 us/node  MUL ffn_shexp_gated
+   CUDA0  n= 48.0    1.803 ms      37.6 us/node  CLAMP ffn_moe_weights_sum_clamped
+   CUDA0  n= 48.0    1.802 ms      37.6 us/node  SIGMOID shared_expert_gate_sigmoid
+   CUDA0  n= 48.0    1.778 ms      37.0 us/node  DIV ffn_moe_weights_norm
+   CUDA0  n= 48.0    1.758 ms      36.6 us/node  ADD ffn_out
+   CUDA0  n= 48.0    1.706 ms      35.5 us/node  ADD ffn_moe_out
+   CUDA0  n= 48.0    1.685 ms      35.1 us/node  MUL_MAT shared_expert_gate
+   CUDA0  n= 48.0    1.669 ms      34.8 us/node  SUM_ROWS ffn_moe_weights_sum
+== 88k: 44 decode graphs, 3 dumped node by node
+   graph mean 135.38 ms (with a sync per split; the dumped ones included)  CUDA0: copy 4.66 comp 81.40 ms  CPU: copy 4.02 comp 45.28 ms  set_inputs 2.78 ms
+   node ranking, per dumped graph (sum 142.11 ms with a sync after every node):
+   CPU    n= 48.0   18.604 ms     387.6 us/node  MUL_MAT_ID ffn_moe_down
+   CPU    n= 48.0   13.857 ms     288.7 us/node  MUL_MAT_ID ffn_moe_gate
+   CPU    n= 48.0   12.899 ms     268.7 us/node  MUL_MAT_ID ffn_moe_up
+   CUDA0  n= 97.0    5.505 ms      56.8 us/node  MUL_MAT hc_gate
+   CUDA0  n= 49.0    5.269 ms     107.5 us/node  CONT  (reshaped) (view) (cont)
+   CUDA0  n= 36.0    4.321 ms     120.0 us/node  MUL_MAT linear_attn_out
+   CUDA0  n= 96.0    4.005 ms      41.7 us/node  MUL_MAT hc_inject
+   CUDA0  n= 84.0    3.744 ms      44.6 us/node  RMS_NORM norm
+   CUDA0  n= 36.0    3.669 ms     101.9 us/node  MUL_MAT z
+   CUDA0  n= 96.0    3.473 ms      36.2 us/node  DSV4_HC_PRE hc_mixed
+   CUDA0  n= 48.0    3.284 ms      68.4 us/node  MUL ffn_moe_weighted
+   CUDA0  n= 48.0    2.905 ms      60.5 us/node  MUL_MAT ffn_moe_logits
+   CUDA0  n= 48.0    2.623 ms      54.6 us/node  MUL_MAT ffn_gate
+   CUDA0  n=  1.0    2.530 ms    2529.7 us/node  MUL_MAT result_output
+   CUDA0  n= 48.0    2.314 ms      48.2 us/node  MUL_MAT ffn_shexp
+   CUDA0  n= 49.0    2.242 ms      45.8 us/node  CONT  (view) (cont)
+   CUDA0  n= 48.0    2.215 ms      46.1 us/node  MUL_MAT ffn_up
+   CUDA0  n= 48.0    2.187 ms      45.6 us/node  ARGSORT ffn_moe_argsort
+   CUDA0  n= 12.0    1.953 ms     162.8 us/node  MUL_MAT Qcur_full
+   CUDA0  n= 48.0    1.906 ms      39.7 us/node  SOFT_MAX ffn_moe_probs
+   CUDA0  n= 48.0    1.876 ms      39.1 us/node  DSV4_HC_POST l_last
+   CUDA0  n= 48.0    1.869 ms      38.9 us/node  DSV4_HC_POST hc_combine
+   CUDA0  n= 48.0    1.863 ms      38.8 us/node  DIV ffn_moe_weights_norm
+   CUDA0  n= 48.0    1.847 ms      38.5 us/node  CLAMP ffn_moe_weights_sum_clamped
+   CUDA0  n= 48.0    1.830 ms      38.1 us/node  ADD ffn_moe_out
+   CUDA0  n= 48.0    1.820 ms      37.9 us/node  MUL ffn_shexp_gated
+   CUDA0  n= 48.0    1.806 ms      37.6 us/node  SIGMOID shared_expert_gate_sigmoid
+   CUDA0  n= 48.0    1.780 ms      37.1 us/node  ADD ffn_out
+   CUDA0  n= 48.0    1.749 ms      36.4 us/node  SUM_ROWS ffn_moe_weights_sum
+   CUDA0  n= 48.0    1.700 ms      35.4 us/node  SWIGLU ffn_swiglu
+depth profile prof1 done

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# never touch a server that is already on 5000 (the daily one): this script starts and stops its own
+if curl -s -m 2 http://127.0.0.1:5000/health 2>/dev/null | grep -q "\"ok\""; then echo "port 5000 is busy (the daily server?): not starting a second launcher, not killing anything"; exit 1; fi
 # Problem 1 measurement on the 120k launcher (port 5000):
 #   a) agentic-shaped 30k prompt (82 short turns) alone
 #   b) a 1500-token generation in flight, then the agentic prompt (variant, uncached)
@@ -49,5 +51,5 @@ b0=$(grep -c "prompt processing, n_tokens" "$LOG")
 curl -s -m 3600 http://127.0.0.1:5000/v1/chat/completions -H "Content-Type: application/json" -d @customware/depth-request-22k-v3.json > customware/ab-conc-d.json
 timing customware/ab-conc-d.json "d"; batches $b0
 grep -c "hot_refill" "$LOG" | sed 's/^/  refills total: /'
-taskkill //F //IM llama-server.exe >/dev/null 2>&1
+bash customware/kill-port.sh 5000 > /dev/null 2>&1
 echo "conc test done"

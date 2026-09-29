@@ -1,0 +1,20 @@
+== run 1: alone in a 24576 pool, reserve uncapped, need > pool
+server up after 15 s
+A1: prompt_n=22225 (123.0 t/s) predicted_n=46 (9.76 t/s) finish=stop, 185 s wall
+deferrals in run 1: 0 (expected 0)
+kill-port: stopped llama-server pid 8656 on 5011
+== run 2: 32768 pool, default reserve; A generates, B (22k, max_tokens 100000) must start next to it
+server up after 10 s
+A2: prompt_n=12341 (126.7 t/s) predicted_n=400 (11.48 t/s) finish=length, 133 s wall
+B2: prompt_n=22225 (185.5 t/s) predicted_n=51 (10.70 t/s) finish=stop, 245 s wall
+deferrals in run 2: 1 (expected 0)
+srv  process_sing: task 2 needs 24273 cells (prompt 22225) but 12597 of 32768 are spoken for: waiting for cells
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =   2048, progress = 0.17, t =  25.72 s / 79.62 tokens per second
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =   4096, progress = 0.33, t =  41.31 s / 99.15 tokens per second
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =   6144, progress = 0.50, t =  55.55 s / 110.61 tokens per second
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =   8192, progress = 0.66, t =  69.07 s / 118.60 tokens per second
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =  10240, progress = 0.83, t =  82.46 s / 124.18 tokens per second
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =  10293, progress = 0.83, t =  84.05 s / 122.46 tokens per second
+slot print_timing: id  1 | task 0 | prompt processing, n_tokens =  12337, progress = 1.00, t =  97.14 s / 127.00 tokens per second
+kill-port: stopped llama-server pid 38984 on 5011
+admit test admit1 done

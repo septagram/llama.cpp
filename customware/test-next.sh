@@ -23,7 +23,7 @@ start() { # <phase> <ctx> <ub> <mib> <extra server args...>
   for i in $(seq 1 180); do
     sleep 5
     if curl -s -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"ok"'; then echo "health ok after $((i*5)) s"; break; fi
-    if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT\|error: " "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT|error: " "$log" | head -3; taskkill //F //IM llama-server.exe >/dev/null 2>&1; return 1; fi
+    if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT\|error: " "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT|error: " "$log" | head -3; bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; return 1; fi
   done
   grep -E "placement from|hot experts: [0-9]+ experts|hot_alias_place|compute buffer size|spec|draft" "$log" | grep -v "^.*srv.*params" | cut -c1-200 | head -8
   echo "vram: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader -i 1)"
@@ -40,7 +40,7 @@ print('$label $1: prompt_n=%d (%.1f t/s) predicted_n=%d (%.2f t/s)%s' % (t.get('
 " 2>&1 | head -2
   grep -E "hot experts: [0-9]+ tokens" "$log" | grep -E "over the last [0-9]{3} " | tail -1 | cut -c1-160
 }
-stop() { taskkill //F //IM llama-server.exe >/dev/null 2>&1; sleep 3; grep -E "draft acceptance|mean_acc_len|draft_ratio|n_draft" "$log" | tail -2 | cut -c1-200; }
+stop() { bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; sleep 3; grep -E "draft acceptance|mean_acc_len|draft_ratio|n_draft" "$log" | tail -2 | cut -c1-200; }
 
 for phase in $PHASES; do
   case $phase in

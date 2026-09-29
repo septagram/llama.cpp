@@ -19,7 +19,7 @@ run() { # <phase> <server args...>
   for i in $(seq 1 180); do
     sleep 5
     if curl -s -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"ok"'; then echo "health ok after $((i*5)) s"; break; fi
-    if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT\|error: " "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT|error: " "$log" | head -3; taskkill //F //IM llama-server.exe >/dev/null 2>&1; return 1; fi
+    if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT\|error: " "$log"; then echo "server failed"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT|error: " "$log" | head -3; bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; return 1; fi
   done
   for r in 1 2; do
     curl -s -m 3600 "http://127.0.0.1:$PORT/v1/chat/completions" -H "Content-Type: application/json" -d @customware/smoke-request-echo.json > "customware/ab-$label-$phase-echo$r.json"
@@ -33,7 +33,7 @@ print('$label $phase echo$r: prompt_n=%d (%.1f t/s) predicted_n=%d (%.2f t/s)%s 
 " 2>&1 | head -2
   done
   grep -E "draft acceptance|mean_acc_len|draft_ratio" "$log" | tail -2 | cut -c1-200
-  taskkill //F //IM llama-server.exe >/dev/null 2>&1; sleep 3
+  bash customware/kill-port.sh "$PORT" > /dev/null 2>&1; sleep 3
 }
 
 echo "== $label nospec"; run nospec

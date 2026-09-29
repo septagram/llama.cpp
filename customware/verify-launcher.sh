@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# never touch a server that is already on 5000 (the daily one): this script starts and stops its own
+if curl -s -m 2 http://127.0.0.1:5000/health 2>/dev/null | grep -q "\"ok\""; then echo "port 5000 is busy (the daily server?): not starting a second launcher, not killing anything"; exit 1; fi
 # Start the released launcher exactly as the user does (C:\dev\textgen, port 5000), check health, compare the greedy
 # log-probs of the fixed 48-token request with the earlier classic-hot and plain results, run the 22k code prompt once,
 # print the hot-expert log lines, stop the server.
@@ -12,7 +14,7 @@ LAUNCHER=${LAUNCHER:-Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh}
 for i in $(seq 1 180); do
   sleep 5
   if curl -s -m 2 http://127.0.0.1:5000/health 2>/dev/null | grep -q '"ok"'; then echo "health ok after $((i*5)) s"; break; fi
-  if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT" "$LOG"; then echo "LAUNCH FAILED"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT" "$LOG" | head -3; taskkill //F //IM llama-server.exe >/dev/null 2>&1; exit 1; fi
+  if grep -q "CUDA error\|error loading model\|failed to load\|GGML_ASSERT" "$LOG"; then echo "LAUNCH FAILED"; grep -E "CUDA error|error loading|failed to load|GGML_ASSERT" "$LOG" | head -3; bash customware/kill-port.sh 5000 > /dev/null 2>&1; exit 1; fi
 done
 grep -E "hot experts|hot_alias_place|compute buffer size|KV buffer size|placement from|no usable stats" "$LOG" | cut -c1-200
 echo "vram: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader -i 1)"
@@ -28,7 +30,7 @@ print('launcher code prompt: prompt_n=%d (%.1f t/s) predicted_n=%d (%.2f t/s)' %
 "
 echo "vram: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader -i 1)"
 grep -E "hot experts: [0-9]+ tokens|hot_refill|prefill mode" "$LOG" | cut -c1-200 | tail -8
-taskkill //F //IM llama-server.exe >/dev/null 2>&1
+bash customware/kill-port.sh 5000 > /dev/null 2>&1
 sleep 2
 ls -la /c/dev/llama.cpp-customware/hot-experts.stats 2>&1 | head -1
 echo "verify done"

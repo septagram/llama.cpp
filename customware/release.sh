@@ -35,6 +35,8 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 #   LLAMA_HOT_EXPERTS_MIB      the GPU slots while running and rewrites this stats file every 8192 tokens; at the
 #                              next start the placement is computed from it within the MiB budget (the placement
 #                              file above is only used until the stats exist). Delete the stats file to start over.
+#   --mmproj / -mmdev CUDA1    the vision projector (1 GB, F16) lives on the otherwise idle 2060 SUPER and only runs
+#                              when a request carries an image; measured: no effect on text prefill or generation
 # Fallbacks:
 #   GPU shared with other work (diffusion etc): a smaller placement (--budget-mib 3000), or drop both LLAMA_HOT_EXPERTS
 #   lines and use -ot "blk\.(2[8-9]|30)\..*_exps=CUDA0,.*_exps=CPU" with -ub 1024 instead of -ot ".*_exps=CPU"
@@ -53,6 +55,7 @@ export GGML_OP_OFFLOAD_MIN_BATCH=512
 	-fa on \
 	-ngl 99 \
 	-dev CUDA0 \
+	--mmproj "V:/Model/Qwen3.8-Flash-Next-GGUF-UD-Q4_K_XL/qwen-3.8-flash-next-mmproj-F16.gguf" -mmdev CUDA1 \
 	-ot ".*_exps=CPU" \
 	--cache-type-k q8_0 --cache-type-v q8_0 \
 	--load-mode mmap \
@@ -91,6 +94,7 @@ export GGML_OP_OFFLOAD_MIN_BATCH=512
 	-fa on \
 	-ngl 99 \
 	-dev CUDA0 \
+	--mmproj "V:/Model/Qwen3.8-Flash-Next-GGUF-UD-Q4_K_XL/qwen-3.8-flash-next-mmproj-F16.gguf" -mmdev CUDA1 \
 	-ot ".*_exps=CPU" \
 	--cache-type-k q8_0 --cache-type-v q8_0 \
 	--load-mode mmap \
