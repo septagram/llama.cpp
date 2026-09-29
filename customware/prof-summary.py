@@ -4,9 +4,13 @@
 usage: prof-summary.py <log> <label>:<first line>-<end line> ...
 Per range: the decode graphs (ubatches of one token) - mean graph time, per-backend copy/compute, mean set_inputs -
 and the node ranking of the dumped decode graphs, averaged per graph."""
+import os
 import re
 import sys
 from collections import defaultdict
+
+# NTOK=2 summarises the two-token graphs (two generators on one server) instead of the one-token ones
+NTOK = int(os.environ.get("NTOK", "1"))
 
 RE_INPUTS = re.compile(r"sched-prof: set_inputs ([0-9.]+) ms for (\d+) tokens")
 RE_NODE   = re.compile(r"sched-prof:\s+node (\S+)\s+n=\s*(\d+) total=\s*([0-9.]+) us mean=\s*([0-9.]+) us\s+(.*)$")
@@ -24,7 +28,7 @@ def summarise(lines, label):
         m = RE_INPUTS.search(line)
         if m:
             ntok = int(m.group(2))
-            if ntok == 1:
+            if ntok == NTOK:
                 t_inputs.append(float(m.group(1)))
             continue
         m = RE_NODE.search(line)
@@ -39,13 +43,13 @@ def summarise(lines, label):
             continue
         m = RE_GRAPH.search(line)
         if m:
-            if ntok == 1:
+            if ntok == NTOK:
                 backs = {b.group(1): (float(b.group(4)), float(b.group(5))) for b in RE_BACK.finditer(m.group(4))}
                 graphs.append((float(m.group(2)), backs))
                 if cur_nodes:
                     dumps.append(cur_nodes)
             cur_nodes = {}
-    print(f"== {label}: {len(graphs)} decode graphs, {len(dumps)} dumped node by node")
+    print(f"== {label}: {len(graphs)} graphs of {NTOK} token(s), {len(dumps)} dumped node by node")
     if not graphs:
         return
     # the node-by-node graphs are slower; report the mean of the others as the graph time

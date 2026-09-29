@@ -9101,6 +9101,10 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
     }
 
     test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 1, 8, 2, 1, 1, false));
+    // customware (entry 009): tall and narrow gathers (the qwen4exp score expansion: one float per cell at decode)
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 1, 4096, 90112, 1, 1, false));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 2, 4096, 20000, 2, 1, false));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F16, 1, 4096, 90112, 1, 1, false));
     for (ggml_type type : all_types) {
         for (int b : {1, 7}) {
             for (bool v : {false, true}) {

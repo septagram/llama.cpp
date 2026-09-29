@@ -3296,6 +3296,11 @@ static bool ggml_cuda_can_fuse(const struct ggml_cgraph *                cgraph,
         return false;
     }
 
+    // customware: get_rows + avg pool over groups of gathered rows (the qwen4exp indexer block mean)
+    if (ops.size() == 2 && ops.begin()[0] == GGML_OP_GET_ROWS && ops.begin()[1] == GGML_OP_POOL_2D) {
+        return ggml_cuda_can_fuse_get_rows_pool2d(cgraph->nodes[node_idx], cgraph->nodes[node_idx + 1]);
+    }
+
     if ((ops.size() == 2 || ops.size() == 3) && ops.begin()[0] == GGML_OP_RMS_NORM && ops.begin()[1] == GGML_OP_MUL) {
         const ggml_tensor *rms_norm = cgraph->nodes[node_idx];
         const ggml_tensor *mul      = cgraph->nodes[node_idx+1];
@@ -4157,6 +4162,11 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph 
 
     if (fused_mul_mat_vec) {
         return fused_node_count - 1;
+    }
+
+    if (ggml_cuda_can_fuse(cgraph, i, { GGML_OP_GET_ROWS, GGML_OP_POOL_2D }, {})) {
+        ggml_cuda_op_get_rows_pool2d(*cuda_ctx, node, cgraph->nodes[i + 1]);
+        return 1;
     }
 
     if (ggml_cuda_can_fuse(cgraph, i, { GGML_OP_RMS_NORM, GGML_OP_MUL, GGML_OP_ROPE, GGML_OP_VIEW, GGML_OP_SET_ROWS }, {})) {
