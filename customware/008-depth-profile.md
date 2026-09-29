@@ -55,3 +55,62 @@ comes from the 12 QSA attention layers. Find where, by measurement, and remove t
 
 Prefill at depth (the sort over `ub x n_kv` rows) unless the profile shows it; the two-GPU probe; the fused CPU
 expert op.
+
+## Profile (2026-09-29, `customware/prof1.out`, launcher-shaped config, decode graphs only)
+
+Per-split summaries (mean over ~44 decode graphs, a sync per split): CUDA0 compute 60.6 / 61.7 / 81.4 ms at
+22k / 44k / 88k, CPU experts 47.3 / 46.4 / 45.3 ms, `set_inputs` 0.74 / 1.41 / 2.78 ms. The node ranking of the
+dumped graphs (unnamed nodes merged per op) puts the depth cost where the plan did not expect it:
+
+| node                              | 22k     | 44k     | 88k      |
+|-----------------------------------|---------|---------|----------|
+| FLASH_ATTN_EXT (12 layers)        | < 1.9   | 4.4 ms  | 14.5 ms  |
+| CONT of the pooling slices (48)   | 2.0 ms  | 2.3 ms  | 5.3 ms   |
+| TOP_K (12)                        | < 1.7   | < 1.7   | < 1.7 ms |
+| set_inputs (CPU, per ubatch)      | 0.7 ms  | 1.4 ms  | 2.8 ms   |
+
+The flash attention grows linearly with the context although the op carries `n_kv_max` = 2051: with a q8_0 cache
+`ggml_cuda_get_best_fattn_kernel` picks the *vector* kernel for decode (`Q->ne[1] <= 2` on Ada), and the vector
+kernel has no index list: it reads every K and V row of the cache. The sparse path (mask compaction, O(n_kv_max))
+exists only in the f16 MMA kernel, and taking it with a quantized cache would first convert the whole cache to f16
+(`launch_fattn`, `need_f16_K/V`). The top-k is a non-issue at decode (one row); at prefill it is a real one
+(27 ms per layer per 2048-token ubatch at 88k: a full sort of `ub x n_kv` pairs), about 5% of a ubatch.
+
+## Implementation
+
+- `ggml/src/ggml-cuda/fattn.cu`: `BEST_FATTN_KERNEL_MMA_F16_GATHER`, chosen on NVIDIA Turing+ when K or V is
+  quantized, the op carries `n_kv_max`, the query batch is 1 or 2 (decode), head size 64/128/256, no ALiBi or
+  softcap, and the context holds at least 4 x n_kv_max x queries cells. It compacts the mask into one index list
+  per query (`ggml_cuda_flash_attn_ext_compact_mask`, the existing kernel), gathers and dequantizes those rows of K
+  and V into f16 pool scratch (`get_rows_cuda`, one list after the other, padded to a multiple of
+  `FATTN_KQ_STRIDE`), writes a compact mask (the original value at the gathered cell for the owning query, -inf
+  elsewhere), and runs the dense MMA kernel on shallow tensor copies pointing at the scratch. `get_alloc_size`
+  requests nothing for this path; the scratch is pool memory. test-backend-ops cases added for the qwen4exp shape
+  (256/256, gqa 12, budget 2048, one and two queries, q8_0 and q4_0).
+- `src/models/qwen4exp.cpp`: the block mean is `ggml_pool_2d(AVG, 1 x r)` over the gathered keys instead of four
+  slice copies and three adds (5 ms per token at 88k for 12 layers).
+- `customware/build-win.cmd` configures with tests on and builds `test-backend-ops` too.
+
+## Verification log
+
+- `test-backend-ops test -b CUDA0 -o FLASH_ATTN_EXT`: 3986/3986 pass, including the four gather cases (256/256
+  gqa 12 q8_0 at 8k with one query and at 16k with two, q4_0 at 8k, 128/128 gqa 8 q8_0 with two queries);
+  `-o POOL_2D`: 128/128.
+- Launcher verification of the admission-fix release (f6a59d2e8, projector on CUDA1): 120k launcher up, 22k code
+  prompt 222.9 t/s prefill / 11.55 t/s generation at 15.4-15.8 GB VRAM (the desktop holds 1.4 GB now, so the 6 GB
+  set sits in the paging regime; `LLAMA_HOT_EXPERTS_MIB=5000` is the advice).
+- **Depth A/B** (`customware/test-depth-ab.sh ab1`, `depth-ab1.out`): released binary vs the build, 120k pool,
+  ub 2048, the 4 GB alias set, 12.0 GB VRAM (no paging), 64 greedy tokens, decode ms/token:
+
+  | depth | old   | new   | change   |
+  |-------|-------|-------|----------|
+  | 22k   |  97.9 |  95.5 | -2.4 ms  |
+  | 44k   | 100.7 |  93.7 | -7.0 ms  |
+  | 88k   | 119.2 | 102.5 | -16.7 ms (-14%) |
+
+  Slope: 0.32 -> 0.11 ms per 1k tokens of context. Prefill unchanged (166-187 t/s both). Greedy outputs identical
+  at 44k and 88k; at 22k they share 171 characters and then diverge: the gathered K/V rows are f16 where the vector
+  kernel used the int8 dot products of the q8_0 cache, and the block mean is now r partial products instead of one
+  sum, so near-ties can flip. What remains of the slope: `set_inputs` (the QSA block tables, 0.7 -> 2.8 ms), the
+  indexer's `get_rows` over every cell (12 MB read, 46 MB written per layer at 88k), the mask fill/set_rows/add
+  over `n_kv`, and the per-token mask upload.

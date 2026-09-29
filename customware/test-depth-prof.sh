@@ -11,7 +11,10 @@ label=${1:?label}
 PORT=${PORT:-5011}
 LOG=customware/serve-$label.log
 : > "$LOG"
-(GGML_SCHED_PROFILE="${PROF:-16}" GGML_SCHED_PROFILE_NODES=1 GGML_CUDA_DISABLE_GRAPHS=1 \
+PROF=${PROF:-16}
+# PROF=0: no profiling at all, CUDA graphs on: the plain depth series for a before/after comparison
+if [ "$PROF" -gt 0 ]; then prof_env=(GGML_SCHED_PROFILE="$PROF" GGML_SCHED_PROFILE_NODES=1 GGML_CUDA_DISABLE_GRAPHS=1); else prof_env=(); fi
+(env "${prof_env[@]}" \
  OT='.*_exps=CPU' LLAMA_HOT_EXPERTS=customware/hot-experts-mixed-4000.txt LLAMA_HOT_EXPERTS_ALIAS=1 LLAMA_HOT_EXPERTS_SWAP=0 \
  GGML_OP_OFFLOAD_MIN_BATCH=512 CTX="${CTX:-120000}" UB="${UB:-2048}" bash customware/serve.sh "$PORT" -lv 4 > "$LOG" 2>&1 &)
 for i in $(seq 1 120); do sleep 5; curl -s -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"ok"' && { echo "server up after $((i*5)) s"; break; }; done

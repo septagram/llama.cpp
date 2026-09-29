@@ -1,0 +1,11 @@
+== old: /c/dev/llama.cpp-customware/llama-server.exe
+server up after 10 s
+22k: prompt_n=22220 (166.1 t/s) predicted_n=51 97.9 ms/token
+44k: prompt_n=44428 (185.7 t/s) predicted_n=45 100.7 ms/token
+88k: prompt_n=46450 (171.6 t/s) predicted_n=45 119.2 ms/token
+== new: build/bin/llama-server.exe
+server up after 15 s
+22k: prompt_n=22220 (167.3 t/s) predicted_n=46 95.5 ms/token
+44k: prompt_n=44428 (187.4 t/s) predicted_n=45 93.7 ms/token
+88k: prompt_n=46450 (171.5 t/s) predicted_n=45 102.5 ms/token
+depth A/B ab1 done

@@ -3,11 +3,14 @@
 Resume from here when the queueing/preemption work (entry 006) and the concurrent-prefill fix are done. Order is
 by expected value on the user's real workload (agent sessions at 40-120k depth on the 120k launcher).
 
-1. **H16: decode cost at depth.** Measured on the fresh launcher: 80.8 ms/token at 22k, 94.8 at 44k, 116.2 at 92k
-   (~0.5 ms per 1k tokens of context). Suspect: the QSA indexer scores and top-k selects over all n_kv positions per
-   token per layer (a full argsort per head). Profile per op at 90k depth (`GGML_SCHED_PROFILE` + a CUDA op-level
-   breakdown), then a radix/partial top-k kernel or a cached-score path. Biggest remaining decode lever for long
-   sessions.
+1. **H16: decode cost at depth** (entry 008, in progress). Measured on the fresh launcher: 80.8 ms/token at 22k,
+   94.8 at 44k, 116.2 at 92k (~0.5 ms per 1k tokens of context). The per-node profile (`GGML_SCHED_PROFILE_NODES=1`,
+   `test-depth-prof.sh`, `prof1.out`) says: the flash attention (0.15 -> 0.68 -> 1.31 ms per layer, 12 layers), then
+   the indexer pooling copies (2 -> 5 ms per token); `top_k` stays under 2 ms. Cause: with a q8_0 cache the CUDA
+   dispatcher takes the vector kernel for decode, which walks the whole context; the sparse index-list path only
+   exists in the f16 MMA kernel. Fix being built: gather the selected cells into f16 scratch and run the dense MMA
+   kernel (`BEST_FATTN_KERNEL_MMA_F16_GATHER`), `ggml_pool_2d` for the pooling. Left after that: `set_input_qsa`'s
+   CPU scan (0.7 -> 2.8 ms per token) and the prefill-side sort over `ub x n_kv` rows (~5% of a ubatch at 88k).
 2. **H17: prompt cache vs page cache.** Each idle-slot save carries 19-31 checkpoints of 112 MB; after a 30-minute
    agent session the cache held 10.6 GB of host RAM and free RAM fell to 6 GB. Measure `--cache-ram 4096` and
    `--ctx-checkpoints 8` against today's 16384 in an agent session; second-order on decode, first-order on RAM.

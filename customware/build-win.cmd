@@ -20,7 +20,8 @@ cmake -S . -B build -G Ninja ^
   -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75-real;89-real" ^
   -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON ^
   -DGGML_OPENMP=ON -DGGML_CCACHE=OFF ^
-  -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON ^
+  -DLLAMA_BUILD_TESTS=ON -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON ^
   -DBUILD_SHARED_LIBS=OFF ^
   || exit /b 1
-cmake --build build --config Release --target llama-server llama-bench llama-batched-bench llama-perplexity -j 14 %*
+rem tests are configured so test-backend-ops exists (entry 008 checks the CUDA flash-attention gather path with it)
+cmake --build build --config Release --target llama-server llama-bench llama-batched-bench llama-perplexity test-backend-ops -j 14 %*

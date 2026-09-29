@@ -7,7 +7,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 port=${1:-5001}; shift || true
 model="C:/dev/textgen/user_data/models/Qwen3.8-Flash-Next-GGUF-UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf"
-exec build/bin/llama-server.exe \
+# BIN: another binary for an A/B, e.g. the released one in C:/dev/llama.cpp-customware
+exec "${BIN:-build/bin/llama-server.exe}" \
   -m "$model" \
   --jinja -fa on -ngl 99 -dev CUDA0 \
   -ot "${OT:-blk\.(2[8-9]|3[0-1])\..*_exps=CUDA0,.*_exps=CPU}" \

@@ -3,8 +3,10 @@
 # capped (clients send max_tokens 32000 as a matter of course).
 #   run 1, pool 24576, LLAMA_KV_RESERVE=100000: a 22k prompt with max_tokens 3000 needs more than the pool on paper,
 #          nothing else is active -> must start at once (before: "waiting for cells" forever)
-#   run 2, pool 32768, default reserve 2048: A generates from a short prompt, B (22k prompt, max_tokens 100000)
-#          arrives -> B must start at once next to A (before: deferred until A finished)
+#   run 2, pool 40960, default reserve 2048: A generates from a 12k prompt, B (22k prompt, max_tokens 100000)
+#          arrives -> B must start at once next to A: 12597 + 22225 + 2048 fit, 12597 + 22225 + 100000 would not
+#          (the first run of this test used a 32k pool, where B genuinely did not fit next to A and waited: correct,
+#          but it tested nothing)
 #   usage: customware/test-admit.sh <label>
 set -uo pipefail
 cd "$(dirname "$0")/.."

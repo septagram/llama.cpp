@@ -1,0 +1,34 @@
+health ok after 190 s
+0.01.113.142 I load_tensors: hot experts: placement from ../llama.cpp-customware/hot-experts.stats: 2026 experts on 48 layers within 6000 MiB, predicted coverage 29.5% (placement file ignored)
+0.08.697.244 I load_tensors: hot experts: 2026 experts on 48 layers, 5998.63 MiB on CUDA0 (storage borrowed from the compute buffer, filled at context creation)
+0.08.717.553 I llama_kv_cache:      CUDA0 KV buffer size =  1494.94 MiB
+0.08.763.193 I llama_kv_cache:      CUDA0 KV buffer size =   186.87 MiB
+0.09.268.179 I sched_reserve:      CUDA0 compute buffer size =  7347.38 MiB
+0.09.268.188 I sched_reserve:  CUDA_Host compute buffer size =  1529.06 MiB
+0.09.268.246 I hot_alias_place: hot experts parked at [1348.7, 7347.4) MiB of the 7347.4 MiB CUDA0 compute buffer; decode mode for ubatches up to 2048 tokens, refined as graphs are allocated
+0.17.732.184 I hot_refill: hot experts restored: 5998.6 MiB in 3649 ms (refill #1)
+vram: 15400 MiB=== greedy log-probs vs classic hot (160k / ub 1024)
+Traceback (most recent call last):
+  File "C:\Users\septa\Documents\Code\llama.cpp\customware\equiv-compare.py", line 10, in <module>
+    a, b = load(sys.argv[1]), load(sys.argv[2])
+  File "C:\Users\septa\Documents\Code\llama.cpp\customware\equiv-compare.py", line 6, in load
+    r = json.load(open(p)); ch = r['choices'][0]
+  File "C:\Users\septa\anaconda3\lib\json\__init__.py", line 293, in load
+== greedy log-probs vs plain 3 layers
+Traceback (most recent call last):
+  File "C:\Users\septa\Documents\Code\llama.cpp\customware\equiv-compare.py", line 10, in <module>
+    a, b = load(sys.argv[1]), load(sys.argv[2])
+  File "C:\Users\septa\Documents\Code\llama.cpp\customware\equiv-compare.py", line 6, in load
+    r = json.load(open(p)); ch = r['choices'][0]
+launcher code prompt: prompt_n=22203 (222.9 t/s) predicted_n=300 (11.55 t/s)
+vram: 15771 MiB
+3.00.965.972 I hot experts: 8444 tokens, coverage 16.8% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+3.16.456.321 I hot experts: 12540 tokens, coverage 15.1% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+3.32.314.599 I hot experts: 16636 tokens, coverage 16.8% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+3.50.789.330 I hot experts: 20732 tokens, coverage 15.8% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+4.09.423.612 I hot experts: 24828 tokens, coverage 16.7% over the last 4096 (2026 resident), 0 swaps (0.0 MiB), 0 total
+4.09.442.639 I hot_alias_check: a 1723-token ubatch needs 2430.7 MiB of the compute buffer, past the hot experts at 1348.7 MiB: prefill mode for ubatches above 1722 tokens
+4.39.215.165 I hot experts: 30643 tokens, coverage 13.2% over the last 5815 (2026 resident), 0 swaps (0.0 MiB), 0 total
+4.40.292.877 I hot_refill: hot experts restored: 5998.6 MiB in 1028 ms (refill #2)
+-rw-r--r-- 1 septa 197609 124826 Sep 29 18:37 /c/dev/llama.cpp-customware/hot-experts.stats
+verify done

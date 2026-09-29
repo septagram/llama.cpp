@@ -4,6 +4,7 @@
 #include "fattn-tile.cuh"
 #include "fattn-vec.cuh"
 #include "fattn.cuh"
+#include "getrows.cuh"
 
 #if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
 // one list per group of ncols1 queries: a column is selected if any query of the group can see it
@@ -513,12 +514,167 @@ static void ggml_cuda_flash_attn_ext_vec(ggml_backend_cuda_context & ctx, ggml_t
     vec_case(ctx, dst);
 }
 
+// customware (entry 008): sparse decode on a quantized K/V cache. The vector kernel reads quantized K/V but walks the
+// whole context; the sparse MMA kernel walks only the selected cells but wants f16 K/V, which launch_fattn provides by
+// converting the entire cache on every call. Here the mask is compacted to the selected cells, only those rows are
+// gathered and dequantized into f16 scratch, the mask is compacted with them, and the dense MMA kernel runs on the
+// compact tensors: O(n_kv_max) per query instead of O(n_kv). One index list per query, laid out list after list.
+#if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
+// get_rows must never read row -1 (the list padding), so clamp; the padded columns are masked out below
+static __global__ void flash_attn_gather_rows(
+        const int32_t * __restrict__ indices, int32_t * __restrict__ rows, const int n_sel, const int n_kv_pad, const int n_head_kv) {
+    const int j = blockIdx.x*blockDim.x + threadIdx.x;
+    if (j >= n_kv_pad) {
+        return;
+    }
+    const int row = j < n_sel ? max(indices[j], 0) : 0;
+    for (int h = 0; h < n_head_kv; ++h) {
+        rows[h*n_kv_pad + j] = row;
+    }
+}
+
+// mask_c[q][j]: the original mask value at the gathered cell when column j belongs to query q's list, else -inf
+static __global__ void flash_attn_gather_mask(
+        const half * __restrict__ mask, const int32_t * __restrict__ indices, half * __restrict__ mask_c,
+        const int n_lists, const int n_kv_max, const int n_kv_pad, const int64_t s31) {
+    const int j = blockIdx.x*blockDim.x + threadIdx.x;
+    const int q = blockIdx.y;
+    if (j >= n_kv_pad) {
+        return;
+    }
+    half v = __float2half(-INFINITY);
+    if (j < n_lists*n_kv_max && j/n_kv_max == q) {
+        const int idx = indices[j];
+        if (idx >= 0) {
+            v = mask[q*s31 + idx];
+        }
+    }
+    mask_c[(int64_t) q*n_kv_pad + j] = v;
+}
+#endif // !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
+
+static bool ggml_cuda_flash_attn_ext_shall_use_gather(const int cc, const ggml_tensor * dst) {
+#if defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
+    GGML_UNUSED_VARS(cc, dst);
+    return false;
+#else
+    const ggml_tensor * Q    = dst->src[0];
+    const ggml_tensor * K    = dst->src[1];
+    const ggml_tensor * V    = dst->src[2];
+    const ggml_tensor * mask = dst->src[3];
+
+    float max_bias = 0.0f;
+    float logit_softcap = 0.0f;
+    memcpy(&max_bias,      (const float *) dst->op_params + 1, sizeof(float));
+    memcpy(&logit_softcap, (const float *) dst->op_params + 2, sizeof(float));
+
+    const int32_t n_kv_max = ggml_get_op_params_i32(dst, 4);
+
+    // the gather reads and writes n_kv_max rows per query for K and V and the kernel reads them again,
+    // the vector kernel reads every row of the cache once: worth it from a few times n_kv_max
+    return GGML_CUDA_CC_IS_NVIDIA(cc) && turing_mma_available(cc) &&
+        (ggml_is_quantized(K->type) || ggml_is_quantized(V->type)) &&
+        (K->ne[0] == 64 || K->ne[0] == 128 || K->ne[0] == 256) && V->ne[0] == K->ne[0] &&
+        mask != nullptr && n_kv_max > 0 && max_bias == 0.0f && logit_softcap == 0.0f &&
+        mask->ne[0] == K->ne[1] && mask->ne[1] >= Q->ne[1] && mask->ne[2] == 1 && mask->ne[3] == 1 &&
+        Q->ne[1] <= 2 && Q->ne[3] == 1 && K->ne[3] == 1 && V->ne[3] == 1 &&
+        K->ne[1] >= 4*int64_t(n_kv_max)*Q->ne[1];
+#endif // defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
+}
+
+static void ggml_cuda_flash_attn_ext_mma_f16_gather(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+#if defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
+    GGML_UNUSED_VARS(ctx, dst);
+    GGML_ABORT("sparse flash attention is only supported on NVIDIA CUDA");
+#else
+    const ggml_tensor * Q    = dst->src[0];
+    const ggml_tensor * K    = dst->src[1];
+    const ggml_tensor * V    = dst->src[2];
+    const ggml_tensor * mask = dst->src[3];
+
+    const int32_t n_kv_max  = ggml_get_op_params_i32(dst, 4);
+    const int     n_lists   = Q->ne[1];
+    const int     n_sel     = n_lists*n_kv_max;
+    const int     n_kv_pad  = GGML_PAD(n_sel, FATTN_KQ_STRIDE);
+    const int64_t D         = K->ne[0];
+    const int64_t n_head_kv = K->ne[2];
+
+    ggml_cuda_pool & pool = ctx.pool();
+    cudaStream_t stream = ctx.stream();
+
+    // the lists, then one count per list
+    ggml_cuda_pool_alloc<int32_t> indices(pool, size_t(n_sel) + n_lists);
+    ggml_cuda_flash_attn_ext_compact_mask(mask, indices.get(), indices.get() + n_sel, Q->ne[1], 1, n_kv_max, stream);
+
+    ggml_cuda_pool_alloc<int32_t> rows(pool, size_t(n_kv_pad)*n_head_kv);
+    {
+        const dim3 blocks((n_kv_pad + 255)/256, 1, 1);
+        flash_attn_gather_rows<<<blocks, 256, 0, stream>>>(indices.get(), rows.get(), n_sel, n_kv_pad, n_head_kv);
+        CUDA_CHECK(cudaGetLastError());
+    }
+
+    // K_c, V_c: [D, n_kv_pad, n_head_kv] f16
+    ggml_cuda_pool_alloc<half> K_c(pool, size_t(n_kv_pad)*D*n_head_kv);
+    ggml_cuda_pool_alloc<half> V_c(pool, size_t(n_kv_pad)*D*n_head_kv);
+    for (int t = 0; t < 2; ++t) {
+        const ggml_tensor * src = t == 0 ? K : V;
+        half * dst_c = t == 0 ? K_c.get() : V_c.get();
+        get_rows_cuda(src->data, src->type, rows.get(), dst_c, GGML_TYPE_F16,
+            D, src->nb[1], src->nb[2], src->nb[3],
+            n_kv_pad, n_head_kv, 1, sizeof(int32_t), size_t(n_kv_pad)*sizeof(int32_t), 0,
+            D*sizeof(half), size_t(n_kv_pad)*D*sizeof(half), 0, stream);
+    }
+
+    ggml_cuda_pool_alloc<half> mask_c(pool, size_t(n_kv_pad)*mask->ne[1]);
+    {
+        const dim3 blocks((n_kv_pad + 255)/256, mask->ne[1], 1);
+        flash_attn_gather_mask<<<blocks, 256, 0, stream>>>((const half *) mask->data, indices.get(), mask_c.get(),
+            n_lists, n_kv_max, n_kv_pad, mask->nb[1]/sizeof(half));
+        CUDA_CHECK(cudaGetLastError());
+    }
+
+    // the dense kernel on the compact tensors: shallow copies with the scratch as data
+    ggml_tensor K2 = *K;
+    K2.type  = GGML_TYPE_F16;
+    K2.data  = K_c.get();
+    K2.ne[1] = n_kv_pad;
+    K2.nb[0] = sizeof(half);
+    K2.nb[1] = D*sizeof(half);
+    K2.nb[2] = size_t(n_kv_pad)*K2.nb[1];
+    K2.nb[3] = size_t(n_head_kv)*K2.nb[2];
+    K2.view_src  = nullptr;
+    K2.view_offs = 0;
+
+    ggml_tensor V2 = K2;
+    V2.data = V_c.get();
+
+    ggml_tensor M2 = *mask;
+    M2.data  = mask_c.get();
+    M2.ne[0] = n_kv_pad;
+    M2.nb[0] = sizeof(half);
+    M2.nb[1] = size_t(n_kv_pad)*sizeof(half);
+    M2.nb[2] = size_t(mask->ne[1])*M2.nb[1];
+    M2.nb[3] = M2.nb[2];
+    M2.view_src  = nullptr;
+    M2.view_offs = 0;
+
+    ggml_tensor dst2 = *dst;
+    dst2.src[1] = &K2;
+    dst2.src[2] = &V2;
+    dst2.src[3] = &M2;
+    ggml_set_op_params_i32(&dst2, 4, 0); // dense over the compact cells
+
+    ggml_cuda_flash_attn_ext_mma_f16(ctx, &dst2);
+#endif // defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
+}
+
 // Best FlashAttention kernel for a specific GPU:
 enum best_fattn_kernel {
     BEST_FATTN_KERNEL_NONE    =   0,
     BEST_FATTN_KERNEL_TILE    = 200,
     BEST_FATTN_KERNEL_VEC     = 100,
     BEST_FATTN_KERNEL_MMA_F16 = 400,
+    BEST_FATTN_KERNEL_MMA_F16_GATHER = 450, // customware: quantized K/V, selected cells gathered to f16
 };
 
 // K/V types for which there is a vector kernel template instance, other kernels convert these to f16:
@@ -636,6 +792,10 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
 
     // If Turing tensor cores are available, use them:
     if (turing_mma_available(cc) && Q->ne[0] != 40 && Q->ne[0] != 72) {
+        // customware: sparse decode on a quantized cache: gather the selected cells into f16, dense MMA over them
+        if (gqa_opt_applies && ggml_cuda_flash_attn_ext_shall_use_gather(cc, dst)) {
+            return BEST_FATTN_KERNEL_MMA_F16_GATHER;
+        }
         if (can_use_vector_kernel) {
             if (!ggml_is_quantized(K->type) && !ggml_is_quantized(V->type)) {
                 // the sparse gather exists only in the MMA kernel: (DKQ, DV, 1, 8) with GQA > 4
@@ -737,6 +897,9 @@ size_t ggml_cuda_flash_attn_ext_get_alloc_size(int device, const ggml_tensor * d
             need_f16_K = true;
             need_f16_V = true;
             break;
+        case BEST_FATTN_KERNEL_MMA_F16_GATHER:
+            // the gathered f16 rows live in the pool, no scratch after dst
+            break;
         case BEST_FATTN_KERNEL_VEC: {
             const bool f16_fallback = ggml_cuda_get_fattn_vec_case(Q->ne[0], K->type, V->type) == nullptr;
             need_f16_K = K->type == GGML_TYPE_F32 || f16_fallback;
@@ -765,6 +928,9 @@ void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst
             break;
         case BEST_FATTN_KERNEL_MMA_F16:
             ggml_cuda_flash_attn_ext_mma_f16(ctx, dst);
+            break;
+        case BEST_FATTN_KERNEL_MMA_F16_GATHER:
+            ggml_cuda_flash_attn_ext_mma_f16_gather(ctx, dst);
             break;
     }
 }
