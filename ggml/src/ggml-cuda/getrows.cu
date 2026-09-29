@@ -278,8 +278,9 @@ static void get_rows_cuda_float(
     GGML_ASSERT(ne11 <= std::numeric_limits<uint32_t>::max() / ne12);
     const uint3 ne12_fdv = init_fastdiv_values(ne12);
 
-    // customware: tall and narrow gathers get one thread per element
-    if (ne00 <= 8 && ne10*ne11*ne12 >= 1024) {
+    // customware: tall and narrow gathers get one thread per element (GGML_CUDA_TALL_GET_ROWS=1 while it is bisected)
+    static const bool tall_enabled = getenv("GGML_CUDA_TALL_GET_ROWS") != nullptr && atoi(getenv("GGML_CUDA_TALL_GET_ROWS")) != 0;
+    if (tall_enabled && ne00 <= 8 && ne10*ne11*ne12 >= 1024) {
         const int64_t n = ne00*ne10*ne11*ne12;
         const dim3 block_nums((n + CUDA_GET_ROWS_BLOCK_SIZE - 1) / CUDA_GET_ROWS_BLOCK_SIZE, 1, 1);
         k_get_rows_float_tall<src0_t, dst_t><<<block_nums, block_dims, 0, stream>>>(
@@ -574,6 +575,13 @@ void ggml_cuda_op_get_rows_pool2d(ggml_backend_cuda_context & ctx, const ggml_te
     const int32_t * src1_d = (const int32_t *) src1->data;
     float         * dst_d  = (float *) dst->data;
 
+    static bool announced = false;
+    if (!announced) {
+        GGML_LOG_INFO("%s: fused get_rows + avg pool active (%s rows of %lld, groups of %d)\n",
+            __func__, ggml_type_name(src0->type), (long long) ne00, r);
+        announced = true;
+    }
+
     switch (src0->type) {
         case GGML_TYPE_F32:
         case GGML_TYPE_F16: {
@@ -622,6 +630,11 @@ void ggml_cuda_op_get_rows_pool2d(ggml_backend_cuda_context & ctx, const ggml_te
 
 // the fusion test for ggml_cuda_can_fuse: an average pool of whole groups of r gathered rows, nothing else
 bool ggml_cuda_can_fuse_get_rows_pool2d(const ggml_tensor * get_rows, const ggml_tensor * pool) {
+    // GGML_CUDA_NO_GET_ROWS_POOL=1 keeps every other fusion and disables this one: the A/B switch
+    static const bool disabled = getenv("GGML_CUDA_NO_GET_ROWS_POOL") != nullptr && atoi(getenv("GGML_CUDA_NO_GET_ROWS_POOL")) != 0;
+    if (disabled) {
+        return false;
+    }
     if (get_rows->op != GGML_OP_GET_ROWS || pool->op != GGML_OP_POOL_2D || pool->src[0] != get_rows) {
         return false;
     }

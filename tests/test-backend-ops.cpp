@@ -6684,6 +6684,63 @@ struct test_top_k : public test_case {
 };
 
 // qwen4exp QSA indexer top-k fusion: expand per-block scores to cells, add the f16 mask, top-k.
+// customware (entry 009): get_rows of a cache followed by an average pool over groups of r gathered rows (the qwen4exp
+// indexer block mean); the CUDA backend fuses the pair into one kernel, the reference runs them one by one
+struct test_get_rows_pool2d : public test_case {
+    const ggml_type type;
+    const int64_t   n_embd;
+    const int64_t   n_cells;
+    const int64_t   n_blocks;
+    const int64_t   n_stream;
+    const int       r;
+    ggml_tensor *   out {};
+
+    std::string op_desc(ggml_tensor * t) override {
+        GGML_UNUSED(t);
+        return "GET_ROWS_POOL2D";
+    }
+
+    std::string vars() override {
+        return VARS_TO_STR6(type, n_embd, n_cells, n_blocks, n_stream, r);
+    }
+
+    test_get_rows_pool2d(ggml_type type = GGML_TYPE_Q8_0, int64_t n_embd = 128, int64_t n_cells = 4096,
+            int64_t n_blocks = 1000, int64_t n_stream = 1, int r = 4)
+        : type(type), n_embd(n_embd), n_cells(n_cells), n_blocks(n_blocks), n_stream(n_stream), r(r) {}
+
+    double max_err() override { return 1e-6; }
+    bool run_whole_graph() override { return true; }
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * cache = ggml_new_tensor_3d(ctx, type, n_embd, n_cells, n_stream);
+        ggml_set_name(cache, "cache");
+        ggml_tensor * blk_cells = ggml_new_tensor_2d(ctx, GGML_TYPE_I32, r*n_blocks, n_stream);
+        ggml_set_name(blk_cells, "blk_cells");
+
+        ggml_tensor * members = ggml_get_rows(ctx, cache, blk_cells);
+        out = ggml_pool_2d(ctx, members, GGML_OP_POOL_AVG, 1, r, 1, r, 0, 0);
+        ggml_set_name(out, "out");
+        return out;
+    }
+
+    std::vector<ggml_tensor *> fusion_test_nodes() override { return { out }; }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
+            if (t->op != GGML_OP_NONE) {
+                continue;
+            }
+            if (t->type == GGML_TYPE_I32) {
+                std::vector<int32_t> data(ggml_nelements(t));
+                for (auto & v : data) { v = rand() % n_cells; }
+                ggml_backend_tensor_set(t, data.data(), 0, data.size() * sizeof(int32_t));
+            } else {
+                init_tensor_uniform(t);
+            }
+        }
+    }
+};
+
 struct test_topk_qsa : public test_case {
     const int64_t n_blocks;
     const int64_t n_kv;
@@ -10579,6 +10636,13 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
     test_cases.emplace_back(new test_top_k(GGML_TYPE_F32, { 33024, 4, 1, 1 }, 2051));
     test_cases.emplace_back(new test_top_k(GGML_TYPE_F32, { 8192,  2, 1, 1 }, 2051, true));
     test_cases.emplace_back(new test_top_k(GGML_TYPE_F32, { 33024, 4, 1, 1 }, 2051, true));
+
+    // customware (entry 009): qwen4exp indexer block mean, get_rows + avg pool fused on CUDA
+    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q8_0, 128,  4096,  1000, 1, 4));
+    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q8_0, 128, 90112, 22528, 1, 4));
+    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q8_0, 128,  4096,   500, 2, 4));
+    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_F16,  128,  4096,  1000, 1, 4));
+    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q4_0, 128,  4096,  1000, 1, 8));
 
     // qwen4exp QSA indexer top-k fusion (get_rows + f16 mask + top_k)
     test_cases.emplace_back(new test_topk_qsa(512,  2048,  1, 1, 1500));

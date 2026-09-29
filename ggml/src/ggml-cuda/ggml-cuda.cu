@@ -3292,13 +3292,17 @@ static bool ggml_cuda_can_fuse(const struct ggml_cgraph *                cgraph,
         }
     }
 
-    if (!ggml_can_fuse(cgraph, node_idx, ops)) {
-        return false;
+    // customware: get_rows + avg pool over groups of gathered rows (the qwen4exp indexer block mean). The pool's
+    // output is r times shorter than the gather's, so the generic same-shape check below cannot admit it.
+    std::initializer_list<enum ggml_op> get_rows_pool_ops = { GGML_OP_GET_ROWS, GGML_OP_POOL_2D };
+
+    if (is_equal(get_rows_pool_ops, ops)) {
+        return ggml_can_fuse_subgraph(cgraph, node_idx, ops, { node_idx + 1 }) &&
+            ggml_cuda_can_fuse_get_rows_pool2d(cgraph->nodes[node_idx], cgraph->nodes[node_idx + 1]);
     }
 
-    // customware: get_rows + avg pool over groups of gathered rows (the qwen4exp indexer block mean)
-    if (ops.size() == 2 && ops.begin()[0] == GGML_OP_GET_ROWS && ops.begin()[1] == GGML_OP_POOL_2D) {
-        return ggml_cuda_can_fuse_get_rows_pool2d(cgraph->nodes[node_idx], cgraph->nodes[node_idx + 1]);
+    if (!ggml_can_fuse(cgraph, node_idx, ops)) {
+        return false;
     }
 
     if ((ops.size() == 2 || ops.size() == 3) && ops.begin()[0] == GGML_OP_RMS_NORM && ops.begin()[1] == GGML_OP_MUL) {

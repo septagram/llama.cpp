@@ -1,0 +1,11 @@
+[on] server up after 10 s
+[on] prose 12k: prompt_n=12336 (21.0 t/s) predicted_n=64 1250.1 ms/token
+[on] fusion announced: 1
+[off] server up after 10 s
+[off] prose 12k: prompt_n=12336 (21.5 t/s) predicted_n=64 113.2 ms/token
+[off] fusion announced: 0
+== 48-token log-probs, off vs on
+tokens: 48 vs 48, identical prefix: 48 tokens
+mean |delta logprob| over identical prefix: 0.0000 (max 0.0000)
+prose greedy off vs on: IDENTICAL 299 299
+fusion A/B fab1 done

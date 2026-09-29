@@ -61,11 +61,55 @@ expansion of one score per block to every cell, an 88k-rows-of-one-float gather 
   single-use check) and its dispatch ahead of the rms_norm patterns.
 - `customware/test-np2-prof.sh` + `NTOK=2 prof-summary.py`: the two-token graph ranking for H12.
 
+## Verification log
+
+- test-backend-ops on CUDA0: GET_ROWS 219/219 (three tall cases: 90112 rows of one f32, 20000 rows of two with
+  two batches, 90112 rows of one f16), POOL_2D 128/128, FLASH_ATTN_EXT 3986/3986.
+- Depth A/B `ab2` (008 release vs this build, same config, hot set disabled on both, 12.0 GB VRAM), decode
+  ms/token at 22k / 44k / 88k: **old 125.2 / 124.4 / 139.4 -> new 113.3 / 116.1 / 126.3**. Greedy outputs
+  identical at all three depths (the fused mean is bit-for-bit the pool's). Caveat: both sides ran under the
+  background load below, which moved between the two runs; the gain shows at every depth (-12, -8, -13 ms)
+  while the 22k -> 88k slope is nearly unchanged (14.2 -> 13.0 ms), so part of the level shift is the load.
+  A reversed-order pair at 22k follows to separate the two.
+
+## The "hang" (01:20-02:10): page cache, not kernels
+
+The launcher verification of the 009 release stalled on its 22k code prompt for 30 minutes with no progress
+line, while the depth A/B on port 5011 had run the same prompts normally. Bisecting on 5011 with the launcher's
+shape (ub 4096, alias set active): fusion on and off, then the tall gather on and off, all four the same: the
+first 4096-token batch completes after 184-194 s, 21-22 t/s, GPU at 100%. That is the expert weights streaming
+from disk, not a kernel (the disk itself reads the 112 GB of shards sequentially in 79 s; the 340 MB/s effective
+during a squeezed prefill is page-fault churn: every ubatch faults the whole expert set through a cache window
+smaller than it). The box tonight has 70 GB of commit charge with no server
+running: the Ordis VM (16 GB assigned) and WSL NixOS are running (vmmem 11 GB private), rust-analyzer 3 GB,
+Telegram and Zed 2 GB each. The 94 GB of mmap'd model cannot stay resident next to that, and the launcher's
+16 GB prompt cache (H17) pushed the experts out entirely. Two more findings from the same bisect:
+
+- the `{GET_ROWS, POOL_2D}` fusion never fired: `ggml_can_fuse` demands consecutive nodes of the same shape,
+  and the pool's output is r times shorter than the gather's. The rope/set_rows patterns use
+  `ggml_can_fuse_subgraph` for the same reason; the pattern now does too, ahead of the generic gate, and the
+  op logs once when it first runs.
+- the tall gather is behind `GGML_CUDA_TALL_GET_ROWS=1` until it is A/B'd on its own; it is not the stall.
+
+The A/B numbers of `ab2` therefore compare the 008 binary with the tall gather only (fusion inert), under a
+page cache that was being squeezed. They are not the fusion's numbers.
+
+With the gate fixed the fusion fires (the log says so), and the first on/off comparison showed different
+outputs: the 48-token log-probs diverged at token 2 with a different distribution, the 12k greedy text after 30
+characters. That comparison was confounded: its "off" side used `GGML_CUDA_DISABLE_FUSION=1`, which switches
+off every CUDA fusion (rms_norm+mul, rope+set_rows, mul_mat+glu, ...) and changes the numerics of all 48 layers.
+`test_get_rows_pool2d` (a whole-graph case in test-backend-ops, CUDA fused vs the reference unfused) passes
+5/5 including 90112 cells, two streams and q4_0 with r = 8, so the kernel itself is exact. The clean A/B is
+`customware/test-fusion-ab.sh`: `GGML_CUDA_NO_GET_ROWS_POOL=1` disables only this fusion. The released binary
+(b4ba3b3fa) carries the inert gate, so nothing wrong is live; the fixed gate is released only when that A/B
+shows identical outputs.
+
 ## Environment tonight (2026-09-30, 00:30)
 
 Zed spins 1.35 cores continuously, llmsniff 0.5, vorpControl 0.25, sst-prototype 0.2: about 2.3 of 8 cores
 busy next to the server's six barrier-synchronized threads. The 22k profile point came out 25% slower than the
-same config yesterday (145 vs 120 ms/token under profiling). The user's processes are left alone; every number
+same config yesterday (145 vs 120 ms/token under profiling). At 01:10 sst-prototype was at 1.8 cores and Zed at
+1.2: the load moves by a core or two between runs, which is the size of the effects measured here. The user's processes are left alone; every number
 tonight is read as an A/B pair run back to back under the same load, never against yesterday's absolute values.
 
 ## Out of scope

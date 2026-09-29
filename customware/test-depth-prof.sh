@@ -21,7 +21,7 @@ for i in $(seq 1 120); do sleep 5; curl -s -m 2 "http://127.0.0.1:$PORT/health" 
 
 ranges=()
 start=$(wc -l < "$LOG")
-for d in 22k 44k 88k; do
+for d in ${DEPTHS:-22k 44k 88k}; do
   python -c "
 import json;d=json.load(open('customware/depth-request-$d.json'))
 d['max_tokens']=${NPRED:-64}; d['temperature']=0; d['top_k']=1; d['seed']=7

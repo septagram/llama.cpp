@@ -15,6 +15,12 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
 2. **H17: prompt cache vs page cache.** Each idle-slot save carries 19-31 checkpoints of 112 MB; after a 30-minute
    agent session the cache held 10.6 GB of host RAM and free RAM fell to 6 GB. Measure `--cache-ram 4096` and
    `--ctx-checkpoints 8` against today's 16384 in an agent session; second-order on decode, first-order on RAM.
+   **Evidence from 2026-09-30 night** (entry 009 note): with the Ordis VM (16 GB) and WSL running the commit
+   charge is 70 GB before the server starts, the 94 GB of mmap'd model cannot stay resident, and the launcher's
+   16 GB prompt cache pushed the experts out: prefill fell to 21 t/s (every ubatch faults the whole expert set
+   in from disk) and a 22k prompt looked hung for 30 minutes. The failure mode is a cliff, not a slope: as long
+   as the experts fit in what the page cache has left, nothing is lost; one more consumer and prefill collapses
+   tenfold. A launcher that watches free RAM and caps `--cache-ram` accordingly (or 4096 flat) is the cheap fix.
 3. **Adaptive placement tuning on real traces** (`LLAMA_HOT_EXPERTS_TRACE`, `customware/hot-sim.py`). On the first
    agentic trace a 1024-token half-life beat 4096 by ~1.5 points of coverage at 0.9 MB of copies per token; the band
    sits 2-4 points under the hindsight ceiling. Sweep half-life, hysteresis, per-layer budget and the prefill weight
