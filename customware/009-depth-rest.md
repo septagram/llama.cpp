@@ -104,6 +104,17 @@ off every CUDA fusion (rms_norm+mul, rope+set_rows, mul_mat+glu, ...) and change
 (b4ba3b3fa) carries the inert gate, so nothing wrong is live; the fixed gate is released only when that A/B
 shows identical outputs.
 
+`test-fusion-ab.sh fab1` (03:05): **identical** — 48-token log-probs delta 0.0000 over all 48, the 12k greedy
+text identical (299 chars). Decode on the small request 104.1 ms/token with the fusion vs 115.2 without; the
+12k request's decode (1250 vs 113 ms/token) is the page cache again: the "on" run went first, straight after a
+ten-minute disk-bound prefill. The fusion's real gain waits for a day with the VM off; the kernel ships.
+
+## What tonight could not measure
+
+The fusion's and the tall gather's speed effect, and H12 (`test-np2-prof.sh` is ready). Both need the expert
+set resident: stop the Ordis VM and WSL, or run with the daily config's `--cache-ram` at 4096, then
+`customware/test-depth-ab.sh` (with the released binary as "old") and `customware/test-np2-prof.sh`.
+
 ## Environment tonight (2026-09-30, 00:30)
 
 Zed spins 1.35 cores continuously, llmsniff 0.5, vorpControl 0.25, sst-prototype 0.2: about 2.3 of 8 cores
