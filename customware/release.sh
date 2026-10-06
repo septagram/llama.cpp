@@ -37,6 +37,11 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 #                              file above is only used until the stats exist). Delete the stats file to start over.
 #   --mmproj / -mmdev CUDA1    the vision projector (1 GB, F16) lives on the otherwise idle 2060 SUPER and only runs
 #                              when a request carries an image; measured: no effect on text prefill or generation
+#   LLAMA_CACHE_RAM_RESERVE_MIB (not set: off) makes the prompt cache (--cache-ram) yield to the model's page cache:
+#                              older cached prompts are evicted, and a save is refused, when it would leave less
+#                              than this much RAM available. Off in this launcher on purpose: a refused save of an
+#                              idle slot loses that conversation's state (a full re-prefill later), which is worse
+#                              than the page-cache squeeze it prevents. See customware/010-cache-reserve.md.
 # Fallbacks:
 #   GPU shared with other work (diffusion etc): a smaller placement (--budget-mib 3000), or drop both LLAMA_HOT_EXPERTS
 #   lines and use -ot "blk\.(2[8-9]|30)\..*_exps=CUDA0,.*_exps=CPU" with -ub 1024 instead of -ot ".*_exps=CPU"

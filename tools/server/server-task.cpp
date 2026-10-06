@@ -10,7 +10,23 @@
 #include "speculative.h"
 #include "server-common.h"
 
+#include <fstream>
+#include <limits>
 #include <sstream>
+
+#if defined(_WIN32)
+#   ifndef WIN32_LEAN_AND_MEAN
+#       define WIN32_LEAN_AND_MEAN
+#   endif
+#   ifndef NOMINMAX
+#       define NOMINMAX
+#   endif
+#   include <windows.h>
+#   ifndef PSAPI_VERSION
+#       define PSAPI_VERSION 2 // K32GetProcessMemoryInfo from kernel32, no psapi.lib
+#   endif
+#   include <psapi.h>
+#endif
 
 //
 // task_params
@@ -1756,6 +1772,12 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
         }
     }
 
+    // customware: the model's page cache comes first
+    if (!make_room(state_size_new)) {
+        SRV_WRN(" - not saving this prompt (%.3f MiB): RAM is below the page-cache reserve\n", state_size_new / (1024.0 * 1024.0));
+        return nullptr;
+    }
+
     std::vector<uint8_t> state_data_tgt;
     std::vector<uint8_t> state_data_dft;
 
@@ -1790,18 +1812,18 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
     return &states.back();
 }
 
-bool server_prompt_cache::load(server_prompt & prompt, const server_tokens & tokens_new, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot) {
+std::list<server_prompt_cache_state>::const_iterator server_prompt_cache::select(const server_prompt & prompt, const server_tokens & tokens_new, float & f_keep_best, float & f_sim_best) const {
     const int lcp_best = prompt.tokens.get_common_prefix(tokens_new);
 
-    float f_keep_best = prompt.tokens.size() > 0 ? float(lcp_best) / prompt.tokens.size() : -1.0f; // empty slot: any cache entry wins
-    float f_sim_best  = float(lcp_best) / tokens_new.size();
+    f_keep_best = prompt.tokens.size() > 0 ? float(lcp_best) / prompt.tokens.size() : -1.0f; // empty slot: any cache entry wins
+    f_sim_best  = float(lcp_best) / tokens_new.size();
 
     SRV_TRC(" - looking for better prompt, base f_keep = %.3f, f_sim = %.3f\n", f_keep_best, f_sim_best);
 
-    auto it_best = states.end();
+    auto it_best = states.cend();
 
     // find the most similar cached prompt, that would also preserve the most context
-    for (auto it = states.begin(); it != states.end(); ++it) {
+    for (auto it = states.cbegin(); it != states.cend(); ++it) {
         const int lcp_cur = it->prompt.tokens.get_common_prefix(tokens_new);
 
         const float f_keep_cur = float(lcp_cur) / it->prompt.tokens.size();
@@ -1819,6 +1841,33 @@ bool server_prompt_cache::load(server_prompt & prompt, const server_tokens & tok
             f_sim_best  = f_sim_cur;
 
             it_best = it;
+        }
+    }
+
+    return it_best;
+}
+
+int64_t server_prompt_cache::peek(const server_prompt & prompt, const server_tokens & tokens_new) const {
+    float f_keep_best = 0.0f;
+    float f_sim_best  = 0.0f;
+
+    const auto it = select(prompt, tokens_new, f_keep_best, f_sim_best);
+
+    return it == states.cend() ? -1 : (int64_t) it->prompt.tokens.size();
+}
+
+bool server_prompt_cache::load(server_prompt & prompt, const server_tokens & tokens_new, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot) {
+    float f_keep_best = 0.0f;
+    float f_sim_best  = 0.0f;
+
+    // the selection is const; the restore below consumes the entry
+    const auto it_sel = select(prompt, tokens_new, f_keep_best, f_sim_best);
+
+    auto it_best = states.end();
+    for (auto it = states.begin(); it != states.end(); ++it) {
+        if (it == it_sel) {
+            it_best = it;
+            break;
         }
     }
 
@@ -1894,6 +1943,9 @@ server_prompt_cache_state * server_prompt_cache::alloc_pinned(size_t state_size_
         }
     }
 
+    // customware: a suspended slot must be parked whatever the RAM picture; older prompts still go first
+    make_room(state_size_new);
+
     std::vector<uint8_t> state_data_tgt;
     std::vector<uint8_t> state_data_dft;
 
@@ -1965,6 +2017,86 @@ size_t server_prompt_cache::n_pinned() const {
     return n;
 }
 
+// customware: physical RAM the OS could hand out now: free pages plus the file cache, the model's pages included.
+// 0 when unknown, which switches the reserve off.
+static size_t server_available_ram_bytes() {
+#if defined(_WIN32)
+    MEMORYSTATUSEX st;
+    st.dwLength = sizeof(st);
+    if (!GlobalMemoryStatusEx(&st)) {
+        return 0;
+    }
+    size_t avail = (size_t) st.ullAvailPhys;
+
+    // the model's pages that this process has touched sit in its working set, which Windows counts as in use
+    // rather than as cache (Linux's MemAvailable counts them); they are file-backed and reclaimable all the
+    // same, so they are room for the page cache as much as the standby list is
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    pmc.cb = sizeof(pmc);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *) &pmc, sizeof(pmc))) {
+        const size_t ws      = (size_t) pmc.WorkingSetSize;
+        const size_t priv    = (size_t) pmc.PrivateUsage;
+        avail += ws > priv ? ws - priv : 0;
+    }
+
+    return avail;
+#elif defined(__linux__)
+    std::ifstream f("/proc/meminfo");
+    std::string key;
+    size_t kb = 0;
+    while (f >> key >> kb) {
+        if (key == "MemAvailable:") {
+            return kb*1024;
+        }
+        f.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+    return 0;
+#else
+    return 0;
+#endif
+}
+
+// The mmap'd experts live in the page cache, which the OS counts as available and reclaims first: a prompt
+// cache that grows to its byte limit evicts them silently, and prefill drops to disk speed. So a save may only
+// go ahead when it leaves reserve_bytes available, and older prompts go first. Freed vectors of this size are
+// returned to the OS at once (VirtualFree / munmap), so the number can be re-read after each eviction.
+bool server_prompt_cache::make_room(size_t bytes_new) {
+    if (reserve_bytes == 0) {
+        return true;
+    }
+
+    size_t avail = server_available_ram_bytes();
+    if (avail == 0) {
+        return true;
+    }
+
+    bool evicted = false;
+    while (avail < reserve_bytes + bytes_new && !states.empty()) {
+        if (!evict_oldest()) {
+            break;
+        }
+        evicted = true;
+        avail = server_available_ram_bytes();
+    }
+
+    const bool ok = avail >= reserve_bytes + bytes_new;
+
+    // a box that sits below the reserve (a VM, other agents) would otherwise say so at every update: once per
+    // episode for the update() probe, every time for a save that is refused
+    static bool short_reported = false;
+    const bool probe = bytes_new == 0;
+    if (evicted || (!ok && (!probe || !short_reported))) {
+        SRV_WRN(" - %.1f GiB of RAM available, %.1f GiB reserved for the model's page cache, %.3f MiB to save: %s\n",
+                avail / (1024.0*1024.0*1024.0), reserve_bytes / (1024.0*1024.0*1024.0), bytes_new / (1024.0*1024.0),
+                ok ? "older prompts evicted" : "not enough even with the cache empty");
+    }
+    if (probe) {
+        short_reported = !ok;
+    }
+
+    return ok;
+}
+
 void server_prompt_cache::update() {
     if (limit_size > 0) {
         while (!states.empty() && size() > limit_size) {
@@ -1973,6 +2105,9 @@ void server_prompt_cache::update() {
             }
         }
     }
+
+    // customware: external pressure (a VM, other agents) shrinks the cache too
+    make_room(0);
 
     // average size per token
     const float size_per_token = std::max<float>(1.0f, float(size()) / (std::max<size_t>(1, n_tokens())));

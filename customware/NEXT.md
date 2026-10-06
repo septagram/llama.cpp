@@ -20,7 +20,13 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
    16 GB prompt cache pushed the experts out: prefill fell to 21 t/s (every ubatch faults the whole expert set
    in from disk) and a 22k prompt looked hung for 30 minutes. The failure mode is a cliff, not a slope: as long
    as the experts fit in what the page cache has left, nothing is lost; one more consumer and prefill collapses
-   tenfold. A launcher that watches free RAM and caps `--cache-ram` accordingly (or 4096 flat) is the cheap fix.
+   tenfold. **Resolved by entry 010 (2026-09-30)**: `LLAMA_CACHE_RAM_RESERVE_MIB` makes the prompt cache evict
+   and skip saves whenever available RAM would drop below the reserve (76000 MiB in the launchers), so the
+   server never pushes its own experts out; the Ordis VM (permanent) is accommodated the same way. What is left
+   of H17 is only the measurement of `--ctx-checkpoints 8` vs 32 on an agent session (checkpoint count sets the
+   size of every save: 112 MiB each). Same entry: under `--kv-unified` the prompt-cache restore now runs after the
+   other idle slots are freed (and is not attempted when it cannot fit), so a cached prompt is never re-prefilled
+   because another slot still held its cells; the decode-time purge saves before it clears.
 3. **Adaptive placement tuning on real traces** (`LLAMA_HOT_EXPERTS_TRACE`, `customware/hot-sim.py`). On the first
    agentic trace a 1024-token half-life beat 4096 by ~1.5 points of coverage at 0.9 MB of copies per token; the band
    sits 2-4 points under the hindsight ceiling. Sweep half-life, hysteresis, per-layer budget and the prefill weight

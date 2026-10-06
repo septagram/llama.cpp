@@ -616,6 +616,10 @@ struct server_prompt_cache {
     server_prompt_cache(int32_t limit_size_mib, size_t limit_tokens) {
         this->limit_size   = 1024ull*1024ull*(limit_size_mib < 0 ? 0 : limit_size_mib);
         this->limit_tokens = limit_tokens;
+
+        // customware: the cache yields to the model's page cache (env LLAMA_CACHE_RAM_RESERVE_MIB, 0 = off)
+        const char * env = getenv("LLAMA_CACHE_RAM_RESERVE_MIB");
+        this->reserve_bytes = env && atoll(env) > 0 ? 1024ull*1024ull*(size_t) atoll(env) : 0;
     }
 
     std::list<server_prompt_cache_state> states;
@@ -626,6 +630,10 @@ struct server_prompt_cache {
     // in tokens, 0 = no limit
     size_t limit_tokens = 0;
 
+    // customware: physical RAM (free plus file cache) that must stay available after a save, so the cached
+    // prompts never push the mmap'd experts out of the page cache; 0 = off. In bytes.
+    size_t reserve_bytes = 0;
+
     size_t size() const;
 
     size_t n_tokens() const;
@@ -633,6 +641,10 @@ struct server_prompt_cache {
     server_prompt_cache_state * alloc(const server_prompt & prompt, size_t state_size_main, size_t state_size_drft);
 
     bool load(server_prompt & prompt, const server_tokens & tokens_new, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
+
+    // customware: the length in tokens of the entry load() would restore for tokens_new, -1 if none. Under a
+    // unified KV pool the caller needs that many free cells before it asks for the restore.
+    int64_t peek(const server_prompt & prompt, const server_tokens & tokens_new) const;
 
     void update();
 
@@ -648,8 +660,14 @@ struct server_prompt_cache {
     size_t n_pinned() const;
 
 private:
+    // the entry that best extends tokens_new while keeping most of its own context; states.end() if none
+    std::list<server_prompt_cache_state>::const_iterator select(const server_prompt & prompt, const server_tokens & tokens_new, float & f_keep_best, float & f_sim_best) const;
+
     // evict the oldest entry that is not pinned; false if there is none
     bool evict_oldest();
+
+    // customware: evict until a state of bytes_new leaves reserve_bytes of RAM available; false if it cannot
+    bool make_room(size_t bytes_new);
 };
 
 // used exclusively by router mode

@@ -1,0 +1,40 @@
+available at start: 84742 MiB
+== run 1: LLAMA_CACHE_RAM_RESERVE_MIB=200000
+  server up after 10 s
+  A: prompt_n=42 predicted_n=16
+  B: prompt_n=12341 predicted_n=16
+  C: prompt_n=42 predicted_n=16
+  -- guard lines
+srv    load_model: prompt cache keeps 195.3 GiB of RAM available for the model's page cache (LLAMA_CACHE_RAM_RESERVE_MIB): older prompts are evicted, and a save is skippe
+srv     make_room:  - 74.6 GiB of RAM available, 195.3 GiB reserved for the model's page cache, 0.000 MiB to save: not enough even with the cache empty
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 16384.000 MiB, 120064 tokens, 17179869184 est)
+srv     make_room:  - 54.0 GiB of RAM available, 195.3 GiB reserved for the model's page cache, 0.000 MiB to save: not enough even with the cache empty
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 16384.000 MiB, 120064 tokens, 17179869184 est)
+srv   prompt_save:  - saving prompt with length 57, total state size = 113.373 MiB (draft: 0.000 MiB)
+srv     make_room:  - 54.0 GiB of RAM available, 195.3 GiB reserved for the model's page cache, 225.944 MiB to save: not enough even with the cache empty
+srv         alloc:  - not saving this prompt (225.944 MiB): RAM is below the page-cache reserve
+srv   prompt_save:  - saving prompt with length 12356, total state size = 286.215 MiB (draft: 0.000 MiB)
+srv     make_room:  - 12.3 GiB of RAM available, 195.3 GiB reserved for the model's page cache, 511.357 MiB to save: not enough even with the cache empty
+srv         alloc:  - not saving this prompt (511.357 MiB): RAM is below the page-cache reserve
+srv     make_room:  - 12.3 GiB of RAM available, 195.3 GiB reserved for the model's page cache, 0.000 MiB to save: not enough even with the cache empty
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 16384.000 MiB, 120064 tokens, 17179869184 est)
+== run 2: LLAMA_CACHE_RAM_RESERVE_MIB=82742
+  server up after 5 s
+  A: prompt_n=42 predicted_n=16
+  B: prompt_n=12341 predicted_n=16
+  C: prompt_n=42 predicted_n=16
+  -- guard lines
+srv    load_model: prompt cache keeps 80.8 GiB of RAM available for the model's page cache (LLAMA_CACHE_RAM_RESERVE_MIB): older prompts are evicted, and a save is skipped
+srv     make_room:  - 79.9 GiB of RAM available, 80.8 GiB reserved for the model's page cache, 0.000 MiB to save: not enough even with the cache empty
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 16384.000 MiB, 120064 tokens, 17179869184 est)
+srv     make_room:  - 59.2 GiB of RAM available, 80.8 GiB reserved for the model's page cache, 0.000 MiB to save: not enough even with the cache empty
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 16384.000 MiB, 120064 tokens, 17179869184 est)
+srv   prompt_save:  - saving prompt with length 57, total state size = 113.373 MiB (draft: 0.000 MiB)
+srv     make_room:  - 59.2 GiB of RAM available, 80.8 GiB reserved for the model's page cache, 225.944 MiB to save: not enough even with the cache empty
+srv         alloc:  - not saving this prompt (225.944 MiB): RAM is below the page-cache reserve
+srv   prompt_save:  - saving prompt with length 12356, total state size = 286.215 MiB (draft: 0.000 MiB)
+srv     make_room:  - 12.3 GiB of RAM available, 80.8 GiB reserved for the model's page cache, 511.357 MiB to save: not enough even with the cache empty
+srv         alloc:  - not saving this prompt (511.357 MiB): RAM is below the page-cache reserve
+srv     make_room:  - 12.3 GiB of RAM available, 80.8 GiB reserved for the model's page cache, 0.000 MiB to save: not enough even with the cache empty
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 16384.000 MiB, 120064 tokens, 17179869184 est)
+cache reserve test cr1 done

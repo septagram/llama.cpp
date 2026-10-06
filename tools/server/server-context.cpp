@@ -1454,6 +1454,12 @@ private:
             SRV_TRC("%s", "use `--cache-ram 0` to disable the prompt cache\n");
 
             prompt_cache = std::make_unique<server_prompt_cache>(params_base.cache_ram_mib, n_ctx);
+
+            // customware: the cache yields to the model's page cache
+            if (prompt_cache->reserve_bytes > 0) {
+                SRV_INF("prompt cache keeps %.1f GiB of RAM available for the model's page cache (LLAMA_CACHE_RAM_RESERVE_MIB): older prompts are evicted, and a save is skipped, before the mmap'd experts would be pushed out\n",
+                        prompt_cache->reserve_bytes / (1024.0*1024.0*1024.0));
+            }
         } else {
             SRV_TRC("%s", "prompt cache is disabled - use `--cache-ram N` to enable it\n");
         }
@@ -1752,7 +1758,54 @@ private:
 
                 ret->prompt_save(*prompt_cache);
 
-                if (!ret->prompt_load(*prompt_cache, task.tokens)) {
+                // customware: under a unified pool the restore needs free cells, and the other idle slots keep
+                // theirs until the launch below clears them. Free them here first (saved, as the launch would),
+                // and do not ask for a restore that cannot fit: the entry stays for the retry after admission
+                // defers the task. Before this, a continuation of a cached 99k prompt behind a 70k prefill was
+                // re-prefilled from zero with its state sitting in RAM.
+                bool can_load = true;
+
+                if (params_base.kv_unified) {
+                    const int64_t need = prompt_cache->peek(ret->prompt, task.tokens);
+
+                    if (need > 0) {
+                        // the restore removes this slot's own sequence first, so its cells count as free
+                        const auto cells_free = [&]() {
+                            return (int64_t) kv_pool_size() - (int64_t) kv_cells_used() + (int64_t) ret->prompt.n_tokens();
+                        };
+
+                        while (cells_free() < need) {
+                            server_slot * idle = nullptr;
+                            for (auto & slot : slots) {
+                                if (&slot == ret || slot.is_processing() || slot.prompt.n_tokens() == 0) {
+                                    continue;
+                                }
+                                if (!idle || slot.t_last_used < idle->t_last_used) {
+                                    idle = &slot;
+                                }
+                            }
+                            if (!idle) {
+                                break;
+                            }
+
+                            SLT_INF(*idle, "freeing idle slot (%zu tokens) so the cached prompt of %lld tokens fits\n",
+                                    idle->prompt.tokens.size(), (long long) need);
+
+                            if (params_base.cache_idle_slots) {
+                                idle->prompt_save(*prompt_cache);
+                            }
+                            idle->prompt_clear();
+                        }
+
+                        if (cells_free() < need) {
+                            SLT_INF(*ret, "cached prompt of %lld tokens needs more cells than the %lld free: kept for later\n",
+                                    (long long) need, (long long) cells_free());
+                            can_load = false;
+                        }
+                    }
+                }
+
+                if (can_load && !ret->prompt_load(*prompt_cache, task.tokens)) {
                     ret->prompt_clear();
                 }
 
@@ -2014,6 +2067,12 @@ private:
 
             if (slot.prompt.n_tokens() > 0) {
                 SRV_WRN("purging slot %d with %zu tokens\n", slot.id, slot.prompt.tokens.size());
+
+                // customware: a purge is not a cache miss: the prompt goes to the cache first, as a launch would do
+                if (prompt_cache && params_base.cache_idle_slots) {
+                    slot.prompt_save(*prompt_cache);
+                    prompt_cache->update();
+                }
 
                 slot.prompt_clear();
 

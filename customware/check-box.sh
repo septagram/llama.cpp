@@ -7,7 +7,7 @@ $os = Get-CimInstance Win32_OperatingSystem
 $free = $os.FreePhysicalMemory/1MB; $commit = ($os.TotalVirtualMemorySize-$os.FreeVirtualMemory)/1MB
 "RAM: free {0:N1} GB, commit charge {1:N1} GB (the model needs ~70 GB of page cache for the experts to stay resident; the box has ~128 GB)" -f $free, $commit
 if ($free -lt 75) { "  WARNING: below ~75 GB free the experts fall out of the page cache and prefill drops to ~20 t/s" }
-try { Get-VM -ErrorAction Stop | Where-Object State -eq Running | ForEach-Object { "VM running: {0} ({1:N0} GB assigned): stop it before measuring" -f $_.Name, ($_.MemoryAssigned/1GB) } } catch {}
+try { Get-VM -ErrorAction Stop | Where-Object State -eq Running | ForEach-Object { "VM running: {0} ({1:N0} GB assigned; Ordis is a permanent resident: budget for it, do not stop it)" -f $_.Name, ($_.MemoryAssigned/1GB) } } catch {}
 $wsl = (wsl.exe --list --running 2>$null | Out-String) -replace "\x00",""
 if ($wsl -match "NixOS|Ubuntu|Debian") { "WSL running: " + (($wsl -split "`n" | Select-Object -Skip 1 | Where-Object { $_.Trim() }) -join ", ").Trim() }
 $a = Get-Process | Select-Object Name,Id,@{n="cpu";e={$_.CPU}}; Start-Sleep -Seconds 3
