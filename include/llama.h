@@ -815,6 +815,12 @@ extern "C" {
     // customware: cells in use in the attention cache behind this memory (the unified pool's occupancy); 0 if unknown
     LLAMA_API uint32_t llama_memory_n_cells_used(llama_memory_t mem);
 
+    // customware: cells of the attention cache that the given sequences own together: non-empty cells whose every
+    // label is one of seq_ids. With one id, the cells only that sequence holds (what removing it frees); with the ids
+    // of all idle sequences, what purging them all frees. In a unified pool sequences share cells, so this is not
+    // the sum of their token counts. 0 if unknown.
+    LLAMA_API uint32_t llama_memory_n_cells_owned(llama_memory_t mem, const llama_seq_id * seq_ids, size_t n_seq_ids);
+
     //
     // State / sessions
     //

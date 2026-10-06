@@ -16,6 +16,8 @@
 #include "llama-sampler.h"
 #include "llama.h"
 
+#include <algorithm>
+#include <bitset>
 #include <cinttypes>
 #include <cmath>
 #include <cstring>
@@ -4381,6 +4383,55 @@ uint32_t llama_memory_n_cells_used(llama_memory_t mem) {
     }
 
     return kv->get_cells(0).get_used();
+}
+
+uint32_t llama_memory_n_cells_owned(llama_memory_t mem, const llama_seq_id * seq_ids, size_t n_seq_ids) {
+    if (!mem || !seq_ids || n_seq_ids == 0) {
+        return 0;
+    }
+
+    const llama_kv_cache * kv = nullptr;
+    if (auto * hybrid = dynamic_cast<llama_memory_hybrid *>(mem)) {
+        kv = hybrid->get_mem_attn();
+    } else {
+        kv = dynamic_cast<llama_kv_cache *>(mem);
+    }
+    if (!kv) {
+        return 0;
+    }
+
+    std::bitset<LLAMA_MAX_SEQ> mask;
+    for (size_t i = 0; i < n_seq_ids; ++i) {
+        if (seq_ids[i] >= 0 && seq_ids[i] < LLAMA_MAX_SEQ) {
+            mask.set(seq_ids[i]);
+        }
+    }
+
+    // one pass per distinct stream: a unified pool has one, a partitioned cache one per sequence
+    std::vector<const llama_kv_cells *> streams;
+    for (size_t i = 0; i < n_seq_ids; ++i) {
+        if (seq_ids[i] < 0 || seq_ids[i] >= LLAMA_MAX_SEQ) {
+            continue;
+        }
+        const llama_kv_cells * cells = &kv->get_cells(seq_ids[i]);
+        if (std::find(streams.begin(), streams.end(), cells) == streams.end()) {
+            streams.push_back(cells);
+        }
+    }
+
+    uint32_t n = 0;
+    for (const llama_kv_cells * cells : streams) {
+        for (uint32_t i = 0; i < cells->size(); ++i) {
+            if (cells->is_empty(i)) {
+                continue;
+            }
+            if ((cells->seq_get_all(i) & ~mask).none()) {
+                n++;
+            }
+        }
+    }
+
+    return n;
 }
 
 // llama state API
