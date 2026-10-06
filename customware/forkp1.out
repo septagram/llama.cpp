@@ -1,0 +1,17 @@
+server up after 15 s
+srv    load_model: initializing, n_slots = 2, n_ctx_slot = 16384, kv_unified = 'true'
+srv    load_model: unified KV pool of 16384 cells: requests that do not fit next to the active ones wait, and a pool ove
+n=2 choices: 2 usage: {'completion_tokens': 48, 'prompt_tokens': 12340, 'total_tokens': 12388, 'prompt_tokens_details': {'cached_tokens': 0}} prompt_n=12340 predicted_n=48
+   [0] '**Run Your Own AI: A Beginner’s Guide to llama.cpp**\n\nEver dreamed of running a powerful Artificial Intelligence on your own laptop, without sending'
+   [1] '**Run Your Own AI: A Beginner’s Guide to llama.cpp**\n\nEver dreamed of running a powerful Artificial Intelligence on your own laptop, without sending'
+n=1 choices: 1 usage: {'completion_tokens': 48, 'prompt_tokens': 12340, 'total_tokens': 12388, 'prompt_tokens_details': {'cached_tokens': 12336}} prompt_n=4 predicted_n=48
+   [0] '**Run Your Own AI: A Beginner’s Guide to llama.cpp**\n\nEver wished you could run a powerful Artificial Intelligence on your own laptop, without sendi'
+   choice 0 vs the n=1 text: same for 61 of 235 chars
+   choice 1 vs the n=1 text: same for 61 of 235 chars
+-- server log
+slot launch_slot_: id  0 | task 1 | processing task, is_child = 1
+slot       decode: id  1 | task 0 |  - copying state to child 0
+slot      release: id  0 | task 1 | stop processing: n_tokens = 12387, truncated = 0
+slot      release: id  1 | task 0 | stop processing: n_tokens = 12387, truncated = 0
+slot      release: id  1 | task 57 | stop processing: n_tokens = 12387, truncated = 0
+fork probe forkp1 done
