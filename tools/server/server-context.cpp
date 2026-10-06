@@ -4833,33 +4833,56 @@ std::unique_ptr<server_res_generator> server_routes::handle_completions_impl(
         // in streaming mode, the first error must be treated as non-stream response
         // this is to match the OAI API behavior
         // ref: https://github.com/ggml-org/llama.cpp/pull/16486#discussion_r2419657309
-        auto first_result = rd.next(req.should_stop);
-        if (first_result == nullptr) {
+        //
+        // customware (entry 011): a request that has to wait (queued for KV cells or for a slot, its state being
+        // restored, a long prefill) has no first result for minutes, and until then nothing was sent, not even the
+        // headers: Node clients give up after 300 s without them. So the wait for the first result is bounded by
+        // the ping interval. In time: nothing changes, an early error is still an HTTP error. Not in time: commit
+        // to the stream with a ping as its first chunk; the loop below pings on silence and delivers whatever
+        // comes next, an error included (in-stream, as for any error after the first chunk).
+        bool first_timeout = false;
+        const int64_t t_first_wait = ggml_time_ms();
+        auto first_result = rd.next([&]() {
+            if (req.should_stop()) {
+                return true;
+            }
+            if (sse_ping_interval > 0 && ggml_time_ms() - t_first_wait > (int64_t) sse_ping_interval * 1000) {
+                first_timeout = true;
+                return true;
+            }
+            return false;
+        });
+        if (first_result == nullptr && !first_timeout) {
             GGML_ASSERT(req.should_stop());
             return res; // connection is closed
         }
 
-        if (first_result->is_error()) {
-            res->error(first_result->to_json());
-            return res;
-        }
-
-        GGML_ASSERT(
-            dynamic_cast<server_task_result_cmpl_partial*>(first_result.get()) != nullptr ||
-            dynamic_cast<server_task_result_cmpl_final*>  (first_result.get()) != nullptr
-        );
-
-        // next responses are streamed
-        // to be sent immediately
-        json first_result_json = first_result->to_json();
-        if (first_result_json == nullptr) {
-            res->data = ""; // simply send HTTP headers and status code
-        } else if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
-            res->data = format_anthropic_sse(first_result_json);
-        } else if (res_type == TASK_RESPONSE_TYPE_OAI_RESP) {
-            res->data = format_oai_resp_sse(first_result_json);
+        if (first_result == nullptr) {
+            SRV_INF("no result after %d s: the stream starts with a ping and the request keeps waiting\n", sse_ping_interval);
+            res->data = ":\n\n";
         } else {
-            res->data = format_oai_sse(first_result_json);
+            if (first_result->is_error()) {
+                res->error(first_result->to_json());
+                return res;
+            }
+
+            GGML_ASSERT(
+                dynamic_cast<server_task_result_cmpl_partial*>(first_result.get()) != nullptr ||
+                dynamic_cast<server_task_result_cmpl_final*>  (first_result.get()) != nullptr
+            );
+
+            // next responses are streamed
+            // to be sent immediately
+            json first_result_json = first_result->to_json();
+            if (first_result_json == nullptr) {
+                res->data = ""; // simply send HTTP headers and status code
+            } else if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
+                res->data = format_anthropic_sse(first_result_json);
+            } else if (res_type == TASK_RESPONSE_TYPE_OAI_RESP) {
+                res->data = format_oai_resp_sse(first_result_json);
+            } else {
+                res->data = format_oai_sse(first_result_json);
+            }
         }
         res->status = 200;
         res->content_type = "text/event-stream";

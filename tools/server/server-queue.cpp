@@ -90,22 +90,31 @@ int server_queue::get_new_id() {
 void server_queue::pop_deferred_task(int id_slot) {
     std::unique_lock<std::mutex> lock(mutex_tasks);
     if (!queue_tasks_deferred.empty()) {
-        // try to find a task that uses the specified slot
-        bool found = false;
-        for (auto it = queue_tasks_deferred.begin(); it != queue_tasks_deferred.end(); ++it) {
-            if (it->id_slot == id_slot) {
-                QUE_DBG("pop deferred task (use slot %d), id_task = %d\n", id_slot, it->id);
-                queue_tasks.emplace_front(std::move(*it));
-                queue_tasks_deferred.erase(it);
-                found = true;
-                break;
+        // customware (entry 011): every deferred task gets another look when a slot is released, not only one.
+        // Upstream moved back a single task (one pinned to the released slot, else the first); when that one still
+        // could not start (under --kv-unified: not enough cells yet) it went to the back and the others waited for
+        // the next release, although a slot was free and a smaller request would have fitted.
+        // Order: the tasks pinned to the released slot, then the others, each group as it was deferred. A task
+        // that cannot start is deferred again as it is processed, so the order of the queue survives the round.
+        std::vector<server_task> pinned;
+        std::vector<server_task> others;
+        for (auto & task : queue_tasks_deferred) {
+            if (task.id_slot == id_slot) {
+                pinned.push_back(std::move(task));
+            } else {
+                others.push_back(std::move(task));
             }
         }
-        // if not tasks found using the slot, just pop the first deferred task (default behavior)
-        if (!found) {
-            QUE_DBG("pop deferred task, id_task = %d\n", queue_tasks_deferred.front().id);
-            queue_tasks.emplace_front(std::move(queue_tasks_deferred.front()));
-            queue_tasks_deferred.pop_front();
+        queue_tasks_deferred.clear();
+
+        QUE_DBG("pop %zu deferred tasks (%zu use slot %d)\n", pinned.size() + others.size(), pinned.size(), id_slot);
+
+        // emplace_front reverses, so the last one goes in first
+        for (auto it = others.rbegin(); it != others.rend(); ++it) {
+            queue_tasks.emplace_front(std::move(*it));
+        }
+        for (auto it = pinned.rbegin(); it != pinned.rend(); ++it) {
+            queue_tasks.emplace_front(std::move(*it));
         }
     }
     time_last_task = ggml_time_ms();
