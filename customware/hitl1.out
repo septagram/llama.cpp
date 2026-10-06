@@ -1,0 +1,24 @@
+health ok after 20 s
+vram: 0, 959 MiB 1, 15219 MiB 
+== fill the cache: A1 then B1
+  A1: prompt_n=88834 cache_n=0 (248.7 t/s) predicted_n=16 (11.05 t/s), 359 s wall
+  B1: prompt_n=44432 cache_n=0 (305.2 t/s) predicted_n=16 (12.16 t/s), 147 s wall
+== A2 generating, B2 arrives behind it
+  A2: prompt_n=4 cache_n=88830 (15.2 t/s) predicted_n=400 (11.21 t/s), 37 s wall
+  B2: prompt_n=4 cache_n=44428 (15.6 t/s) predicted_n=16 (12.40 t/s), 24 s wall
+== verdict
+restore failures (failed to find / failed to load): 0
+restores skipped until they fit (kept for later):   1
+idle slots freed for a cached prompt:               2
+admission deferrals (waiting for cells):            1
+srv   prompt_save:  - saving prompt with length 88849, total state size = 1361.197 MiB (draft: 0.000 MiB)
+slot get_availabl: id  0 | task -1 | freeing idle slot (44447 tokens) so the cached prompt of 88849 tokens fits
+srv   prompt_save:  - saving prompt with length 44447, total state size = 737.201 MiB (draft: 0.000 MiB)
+srv          load:  - found better prompt with f_keep = 1.000, f_sim = 1.000
+slot get_availabl: id  0 | task -1 | cached prompt of 44447 tokens needs more cells than the 31070 free: kept for later
+srv  process_sing: task 229 needs 44448 cells (prompt 44432) but 89250 of 120064 are spoken for: waiting for cells
+slot get_availabl: id  1 | task -1 | freeing idle slot (89233 tokens) so the cached prompt of 44447 tokens fits
+srv   prompt_save:  - saving prompt with length 89233, total state size = 1366.594 MiB (draft: 0.000 MiB)
+srv          load:  - found better prompt with f_keep = 1.000, f_sim = 1.000
+vram: 0, 959 MiB 1, 15611 MiB 
+launcher cache hit test hitl1 done

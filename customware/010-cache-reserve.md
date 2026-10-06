@@ -117,6 +117,39 @@ restore needs cells for the whole entry. After a compaction (a 99k entry, a 35k 
 skipped and the 35k are prefilled from zero. Deferring the task until the entry fits would close it, at the
 price of waiting for the other slot.
 
+## What the user's logs showed (read on 2026-10-06), and the refinement
+
+The launcher log of 2026-10-05 21:25 (12.4 hours, OpenCode and OpenClaw at ~93k tokens each on the 120k pool)
+has three shapes of the same bug, not one:
+
+1. `failed to find N available cells` while the other slot is processing: the restore is attempted, fails, the
+   task is deferred (16 failures with shape 2).
+2. the same on the retry, with the other slot idle but its cells not cleared yet: prefill from zero.
+3. no error at all: the returning task arrives a few seconds into the other slot's prefill, the pool still has
+   room, the restore **succeeds** and the cache entry is consumed; the task is deferred (the other prompt is
+   committed); the other prefill reaches the point where both do not fit, `decode` fails to find cells, and
+   `try_clear_idle_slots` purges the restored slot without saving it. 30 purges of 80-94k tokens.
+
+Cost in that session: 890,532 tokens prefilled again (about 65 minutes), and of 70 queued requests 28 were
+cancelled by the client after 300 s (its timeout), most of them waiting behind a prefill that should have been a
+restore. Two ~93k conversations cannot be active together in 120k cells, so they alternate; each swap is a
+4 GiB save and a 4 GiB restore, seconds when it works.
+
+d8a68dfff handles 1 and 2 directly and rescues 3 through the purge's save. The refinement removes the round trip
+of 3: the picker restores only when the entry fits next to what the active sequences are *committed* to
+(`kv_committed`: their whole prompts plus margins, suspended slots included), not the cells free at that
+instant; otherwise "does not fit next to the N cells the active sequences need: kept for later" and the task
+queues with its state still in the cache.
+
+Verification of d8a68dfff on the deployed 120k launcher (`test-cache-hit-launcher.sh hitl1`): A (88,834 tokens)
+and B (44,432) fill the cache; A2 comes back with `cache_n` 88830 and generates 400 tokens in 37 s wall; B2
+arrives while A2 generates, is "kept for later" and deferred, then restored with `cache_n` 44428 after A2;
+zero restore failures. Prefill on the way: 248.7 and 305.2 t/s; decode at 89k depth 11.2 t/s.
+
+Not addressed: a queued request that waits longer than the client's timeout is still cancelled by the client
+(a turn of 3000 generated tokens is five minutes on its own). Raising the clients' request timeout is the
+immediate remedy; keep-alive bytes on a queued streaming response would be the server-side one.
+
 ## Out of scope
 
 Deriving the reserve from the model automatically (the table's touched rows are not knowable up front); a

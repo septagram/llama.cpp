@@ -1,0 +1,22 @@
+== E: a cached prompt returns early in another slot's prefill
+server up after 15 s
+  E-B1: prompt_n=12340 cache_n=0 predicted_n=16, 88 s wall
+  E-C: prompt_n=22224 cache_n=0 predicted_n=16, 112 s wall
+  E-B2: prompt_n=4 cache_n=12336 predicted_n=16, 100 s wall
+  restore failures: 0   kept for later: 1   purges: 0   deferrals: 1   idle slots freed for a restore: 1
+srv   prompt_save:  - saving prompt with length 12355, total state size = 286.201 MiB (draft: 0.000 MiB)
+slot get_availabl: id  1 | task -1 | cached prompt of 12355 tokens does not fit next to the 22480 cells the active sequences need: kept for later
+srv  process_sing: task 27 needs 12356 cells (prompt 12340) but 22480 of 24576 are spoken for: waiting for cells
+slot get_availabl: id  0 | task -1 | freeing idle slot (22239 tokens) so the cached prompt of 12355 tokens fits
+srv   prompt_save:  - saving prompt with length 22239, total state size = 425.104 MiB (draft: 0.000 MiB)
+== P: an idle slot purged by a pool overflow keeps its prompt
+server up after 15 s
+  P-A1: prompt_n=12340 cache_n=0 predicted_n=16, 191 s wall
+  P-B: prompt_n=22224 cache_n=0 predicted_n=400, 227 s wall
+  P-A2: prompt_n=4 cache_n=12336 predicted_n=16, 2 s wall
+  restore failures: 0   kept for later: 0   purges: 1   deferrals: 0   idle slots freed for a restore: 1
+srv  try_clear_id: purging slot 0 with 12355 tokens
+srv   prompt_save:  - saving prompt with length 12355, total state size = 286.201 MiB (draft: 0.000 MiB)
+slot get_availabl: id  1 | task -1 | freeing idle slot (22623 tokens) so the cached prompt of 12355 tokens fits
+srv   prompt_save:  - saving prompt with length 22623, total state size = 430.500 MiB (draft: 0.000 MiB)
+cache hit paths hitp1 done

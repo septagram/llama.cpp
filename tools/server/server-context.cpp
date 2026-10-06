@@ -1768,7 +1768,17 @@ private:
                 if (params_base.kv_unified) {
                     const int64_t need = prompt_cache->peek(ret->prompt, task.tokens);
 
-                    if (need > 0) {
+                    // what the active and suspended sequences will hold once their prompts are in. A restore that fits the
+                    // cells free at this instant but not next to those is purged again by the first decode that runs out
+                    // of room: seen in the field as a 94k state restored four seconds into another slot's 99k prefill,
+                    // purged at 25k, and prefilled from zero on its next turn.
+                    const int64_t committed = need > 0 ? (int64_t) kv_committed(true) : 0;
+
+                    if (need > 0 && committed + need > (int64_t) kv_pool_size()) {
+                        SLT_INF(*ret, "cached prompt of %lld tokens does not fit next to the %lld cells the active sequences need: kept for later\n",
+                                (long long) need, (long long) committed);
+                        can_load = false;
+                    } else if (need > 0) {
                         // the restore removes this slot's own sequence first, so its cells count as free
                         const auto cells_free = [&]() {
                             return (int64_t) kv_pool_size() - (int64_t) kv_cells_used() + (int64_t) ret->prompt.n_tokens();
