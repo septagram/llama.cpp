@@ -7,7 +7,7 @@ Items keep their numbers; the order of work is the list right below, not the num
 
 1. **Keep-alive for queued requests**, with the queue retry fix (item 9). Done: entry 011, released 2026-10-06.
 2. **Forking v1** (item 12, `notes-forking.md`). Done 2026-10-06: entry 012 (`012-forking.md`), released as `6f50e7617`, verified at 12k (fan-out, overflow) and at 88k on the launcher (the compaction fork generating next to the main agent).
-3. **One scheduler instead of five rules** (item 15, `notes-scheduler.md`).
+3. **One scheduler instead of five rules** (item 15, `notes-scheduler.md`). Implemented 2026-10-07 as entry 013 (`013-scheduler.md`); verification in progress.
 4. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
 5. **Checkpoint policy** (item 14, `notes-checkpoint-policy.md`): last, the least defined of them.
 

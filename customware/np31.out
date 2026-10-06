@@ -1,0 +1,17 @@
+server up after 10 s
+  P1: cache_n=0 predicted_n=8 at 11.88 t/s
+  P2: cache_n=0 predicted_n=8 at 11.97 t/s
+  P3: cache_n=0 predicted_n=8 at 11.93 t/s
+== one alone
+  G1a: cache_n=12338 predicted_n=300 at 12.82 t/s
+== two at once
+  G1b: cache_n=12338 predicted_n=300 at 8.77 t/s
+  G2b: cache_n=12338 predicted_n=300 at 8.82 t/s
+  together: 17.6 t/s
+== three at once
+  G1c: cache_n=12338 predicted_n=300 at 6.54 t/s
+  G3c: cache_n=12338 predicted_n=300 at 6.59 t/s
+  G2c: cache_n=12338 predicted_n=300 at 6.58 t/s
+  together: 19.7 t/s
+  waiting for cells: 0
+np3 test np31 done

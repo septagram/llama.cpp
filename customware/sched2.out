@@ -1,0 +1,33 @@
+server up after 10 s
+srv    load_model: initializing, n_slots = 3, n_ctx_slot = 24576, kv_unified = 'true'
+== P1: a higher priority request displaces the running one
+  A is generating at +87 s; H (priority 5) posted
+  H: posted +87 s, done +151 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.49 t/s
+  A: posted +0 s, done +190 s: prompt_n=12341 cache_n=0 predicted_n=600 at 5.39 t/s
+  displaced: 1   suspended: 1   resumed: 1   purges: 1   saves at launch: 0   restores: 0   waiting: 0   errors: 0
+srv      schedule: scheduler (task): keep 0, start 1, suspend 0, purge 0; 12941 of 24576 cells committed, 1 of 3 slots, 1 of 2 active
+srv      schedule: scheduler (task): keep 0, start 1, suspend 1, purge 0; 12389 of 24576 cells committed, 2 of 3 slots, 1 of 2 active
+slot     schedule: id  2 | task 0 | displaced by a higher priority request: suspending (12451 tokens)
+slot      suspend: id  2 | task 0 | suspended: 12451 tokens parked in RAM (287.5 MiB), cells freed
+srv      schedule: scheduler (release): keep 0, start 1, suspend 0, purge 1; 13475 of 24576 cells committed, 1 of 3 slots, 1 of 2 active
+srv      schedule: scheduler (tick): keep 0, start 1, suspend 0, purge 1; 13475 of 24576 cells committed, 1 of 3 slots, 1 of 2 active
+slot       resume: id  2 | task 0 | resumed after 66.1 s with 12451 tokens
+== P2: idle conversations stay in their slots across a launch
+  S: posted +190 s, done +193 s: prompt_n=42 cache_n=0 predicted_n=16 at 11.17 t/s
+  A2: posted +193 s, done +202 s: prompt_n=655 cache_n=12337 predicted_n=32 at 13.18 t/s
+  saves at launch during P2: 0   cache restores during P2: 1
+== P3: aging promotes a waiter after LLAMA_SCHED_AGE_S=20
+  B is generating at +271 s; W (priority 0) posted
+  W: posted +271 s, done +355 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.47 t/s
+  B: posted +202 s, done +374 s: prompt_n=12341 cache_n=0 predicted_n=600 at 5.40 t/s
+  displaced: 2   suspended: 2   resumed: 2   purges: 4   saves at launch: 0   restores: 1   waiting: 1   errors: 0
+== P4: overflow of a shared pair
+  P: posted +375 s, done +439 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.39 t/s
+  X: posted +439 s, done +724 s: prompt_n=79 cache_n=12337 predicted_n=2200 at 7.78 t/s
+  Y: posted +442 s, done +725 s: prompt_n=22 cache_n=12394 predicted_n=2200 at 7.79 t/s
+  displaced: 2   suspended: 2   resumed: 2   purges: 5   saves at launch: 0   restores: 1   waiting: 1   errors: 0
+== /slots
+  slot 0 processing False priority 0 fork_of -1
+  slot 1 processing False priority 0 fork_of -1
+  slot 2 processing False priority 0 fork_of 0
+sched test sched2 done

@@ -1,6 +1,6 @@
-# One scheduler instead of five rules: design note (parked 2026-10-06, after forking)
+# One scheduler instead of five rules: design note (discussed 2026-10-06; implemented 2026-10-07 as entry 013, see 013-scheduler.md)
 
-Idea from the user; discussed, judged worth doing, parked until forking v1 is in. Nothing here is implemented.
+Idea from the user; discussed, judged worth doing, implemented right after forking v1 (entry 013). What follows is the design as discussed; the implementation notes and results are in `013-scheduler.md`. One addition made during implementation: a cap on the requests running at once (`LLAMA_SCHED_MAX_ACTIVE`, default 2), because slots are request contexts, not parallelism.
 
 ## The model
 

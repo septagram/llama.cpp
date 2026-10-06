@@ -101,3 +101,42 @@ cases stand in for it: they are the logged shapes).
   prompt loop finds the processed prefix and continues (the begin marker is sent again: a ping after 011).
 - `priority` (request JSON, default 0), `t_arrival` set when the scheduler first sees a task,
   `LLAMA_SCHED_AGE_S` (300). The launchers go to `-np 3`.
+
+## Results
+
+`customware/test-sched.sh sched1` on `d39d22e07` (before the cap and the kept-cells fix), real model, pool
+24,576, three slots, `--sse-ping-interval 5`, `LLAMA_SCHED_AGE_S=20`:
+
+- **P1 priority preemption.** A (12.3k prompt, 600 tokens) generating; H (12.3k, other tag, priority 5)
+  arrives: "scheduler (task): keep 0, start 1, suspend 1", A is "displaced by a higher priority request:
+  suspending (12443 tokens)" (287 MiB parked), H prefills and generates alone at 13.2 t/s and answers at
+  +162 s; on H's release the decision purges H's idle conversation for A's resume ("resumed after 66.9 s"),
+  A finishes its 600 tokens at +202 s. No error.
+- **P2 idle conversations stay.** A 42-token request launches with zero "saving idle slot" lines (before:
+  every idle slot was saved and cleared at each launch). It took over A's conversation by a 10-token common
+  prefix, as the slot picker does, so A's continuation came back through one cache restore (`cache_n`
+  12337). The decision had charged the takeover with all 12,940 cells of A's conversation and purged H's for
+  nothing: fixed in `3511e93a0` (a takeover keeps the common prefix, the rest is freed).
+- **P3 aging.** B generating; W (priority 0) cannot fit: "waiting for cells" with the decision's numbers;
+  20 s later "scheduler (tick): ... suspend 1", B displaced, W answers at 12.6 t/s, B resumes and finishes.
+- **P4** ran the shared pair (2,200-token tails) to completion together at 7.8 t/s each, but with this
+  script's 24k pool the pair does not overflow; the overflow path under the scheduler is covered by
+  `test-fork.sh` F4 (16k pool) in the regression suite.
+
+`customware/test-sched.sh sched2` on `3511e93a0` (the cap and the kept-cells fix): the same four scenarios
+pass (H at 13.5 t/s alone while A is parked, A back and done at +190 s; zero saves at launch; the aged waiter at
+13.5 t/s; the shared pair at 7.8 t/s each).
+
+**Three generations at once** (`customware/test-np3.sh np31`, `LLAMA_SCHED_MAX_ACTIVE=3`, three 12.3k
+conversations, 300-token continuations from the cache):
+
+| generating at once | each | together |
+|---|---|---|
+| one | 12.8 t/s | 12.8 |
+| two | 8.8 t/s | 17.6 (x1.37) |
+| three | 6.6 t/s | 19.7 (x1.54) |
+
+A third concurrent generation adds 12% of total throughput and costs every slot 25%; the user does not want it
+by default, so `LLAMA_SCHED_MAX_ACTIVE` stays 2 and the third slot serves priority starts, suspended requests
+and idle conversations that keep their cells. The projection from the two-way cost model (5.6 each) was a
+little pessimistic: the third token adds ~43 ms to a 114 ms step here, not 46.

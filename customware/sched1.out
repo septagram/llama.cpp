@@ -1,0 +1,33 @@
+server up after 15 s
+srv    load_model: initializing, n_slots = 3, n_ctx_slot = 24576, kv_unified = 'true'
+== P1: a higher priority request displaces the running one
+  A is generating at +97 s; H (priority 5) posted
+  H: posted +97 s, done +162 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.15 t/s
+  A: posted +0 s, done +202 s: prompt_n=12341 cache_n=0 predicted_n=600 at 5.30 t/s
+  displaced: 1   suspended: 1   resumed: 1   purges: 1   saves at launch: 0   restores: 0   waiting: 0   errors: 0
+srv      schedule: scheduler (task): keep 0, start 1, suspend 0, purge 0; 12941 of 24576 cells committed, 1 of 3 slots
+srv      schedule: scheduler (task): keep 0, start 1, suspend 1, purge 0; 12389 of 24576 cells committed, 2 of 3 slots
+slot     schedule: id  2 | task 0 | displaced by a higher priority request: suspending (12443 tokens)
+slot      suspend: id  2 | task 0 | suspended: 12443 tokens parked in RAM (287.4 MiB), cells freed
+srv      schedule: scheduler (release): keep 0, start 1, suspend 0, purge 1; 13467 of 24576 cells committed, 1 of 3 slots
+srv      schedule: scheduler (tick): keep 0, start 1, suspend 0, purge 1; 13467 of 24576 cells committed, 1 of 3 slots
+slot       resume: id  2 | task 0 | resumed after 66.9 s with 12443 tokens
+== P2: idle conversations stay in their slots across a launch
+  S: posted +203 s, done +206 s: prompt_n=42 cache_n=0 predicted_n=16 at 10.23 t/s
+  A2: posted +206 s, done +215 s: prompt_n=655 cache_n=12337 predicted_n=32 at 12.75 t/s
+  saves at launch during P2: 0   cache restores during P2: 1
+== P3: aging promotes a waiter after LLAMA_SCHED_AGE_S=20
+  B is generating at +285 s; W (priority 0) posted
+  W: posted +285 s, done +373 s: prompt_n=12341 cache_n=0 predicted_n=48 at 12.62 t/s
+  B: posted +216 s, done +394 s: prompt_n=12341 cache_n=0 predicted_n=600 at 5.16 t/s
+  displaced: 2   suspended: 2   resumed: 2   purges: 4   saves at launch: 0   restores: 1   waiting: 1   errors: 0
+== P4: overflow of a shared pair
+  P: posted +394 s, done +462 s: prompt_n=12341 cache_n=0 predicted_n=48 at 12.61 t/s
+  X: posted +462 s, done +748 s: prompt_n=79 cache_n=12337 predicted_n=2200 at 7.77 t/s
+  Y: posted +465 s, done +748 s: prompt_n=22 cache_n=12394 predicted_n=2200 at 7.79 t/s
+  displaced: 2   suspended: 2   resumed: 2   purges: 5   saves at launch: 0   restores: 1   waiting: 1   errors: 0
+== /slots
+  slot 0 processing False priority 0 fork_of -1
+  slot 1 processing False priority 0 fork_of -1
+  slot 2 processing False priority 0 fork_of 0
+sched test sched1 done
