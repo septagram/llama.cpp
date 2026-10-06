@@ -109,3 +109,28 @@ Build `00ec137ff`. `customware/test-fork.sh fork1`, real model, pool 16,384 cell
   then read freed memory. Any suspension followed by a save had this; entry 010 made the sequence reachable
   (a purge saves first) and it was live on the launcher since this morning. Fix (`patch-012b.py`): `alloc` and
   `select` skip pinned entries.
+- **F4 pressure, third run, build `6f50e7617` (the pinned-entry fix).** Same sequence: overflow at ~14.4k
+  tokens each, the fork (slot 0, "0 in this batch") suspended, A2 finished its 2,200 tokens at 7.9 t/s, the
+  idle slot purged ("14617 cells of its own") and saved, the fork resumed after 20.7 s with its 14,376 tokens
+  and finished its 2,200 at 7.4 t/s. No error, no restore failure, the server alive at the end. F1 again:
+  fork, both generating together, zero deferrals.
+- **F2 precompaction on the deployed 120k launcher** (`test-fork-launcher.sh fkl1`, release `6f50e7617`).
+  M (88,834 tokens, cold at 282 t/s, 16 generated) ends with a turn-end checkpoint at 88,849. M2 (M + the
+  assistant turn + "continue", 400 tokens) takes M's slot; C (M + the assistant turn + "summarize", 200 tokens)
+  arrives 10 s later while M2 generates: "fork of slot 1 at 88852 tokens (common prefix 88855 of 88874), 22
+  tokens to process", `cache_n` 88852. Both generated at the same time (10 slot switches in the progress
+  lines): C at 7.45 t/s, M2 at 11.4 t/s before C arrived and ~7.5 t/s next to it (8.8 overall). Zero
+  "waiting for cells", zero restore failures, VRAM 15.1 -> 15.6 GB as for any two active slots. The fork point
+  88,852 was the checkpoint M2's launch made where it started adding (4 tokens past the turn-end one at
+  88,849, because the assistant turn tokenizes 3 tokens longer when echoed), so forks land on the lazy
+  checkpoint as well as the eager one.
+
+## Status
+
+Released 2026-10-06 as `6f50e7617` (both launchers). v1 as agreed: sharing lasts while both sequences stay in
+the pool; a fork pushed to the prompt cache comes back whole with private cells. What the user's harness can
+rely on: a request whose prefix is a busy conversation's state starts as a fork within seconds and runs next
+to it; several such requests take turns on the two slots; an idle source is still taken over in place.
+
+Left for later (notes-forking.md "Later"): parking, refcounted checkpoints, range-limited save/restore, forking
+from an idle source that diverges before its end, preferring a longer cache entry over a shorter busy prefix.

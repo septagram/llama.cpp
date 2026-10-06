@@ -6,7 +6,7 @@ Items keep their numbers; the order of work is the list right below, not the num
 ## Order of work (set by the user, 2026-10-06)
 
 1. **Keep-alive for queued requests**, with the queue retry fix (item 9). Done: entry 011, released 2026-10-06.
-2. **Forking v1** (item 12, `notes-forking.md`). Implemented 2026-10-06 as entry 012 (`012-forking.md`); verification in progress.
+2. **Forking v1** (item 12, `notes-forking.md`). Done 2026-10-06: entry 012 (`012-forking.md`), released as `6f50e7617`, verified at 12k (fan-out, overflow) and at 88k on the launcher (the compaction fork generating next to the main agent).
 3. **One scheduler instead of five rules** (item 15, `notes-scheduler.md`).
 4. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
 5. **Checkpoint policy** (item 14, `notes-checkpoint-policy.md`): last, the least defined of them.
@@ -81,12 +81,13 @@ of finishing a chunk under 120k).
    quarter the entry is not used at all (upstream rule), so a compacted conversation re-prefills its unchanged
    system prompt and tools.
 
-12. **Proper forking** (user, 2026-10-06: high priority, right after keep-alive). Two requests that branch from
-   the same state must both get a cache hit, and a fork must not cost gigabytes. The facts, the decisions taken so
-   far and the proposed v1 are in `customware/notes-forking.md`. In short: fork in the pool by sharing cells
-   (`llama_memory_seq_cp` adds a label, copies nothing) plus the fork-point checkpoint; a fork is then an
-   ordinary slot and parent and fork run together whenever prefix + two tails fit; sharing lasts while both stay
-   in the pool; parking, refcounted checkpoints and shared chunks in RAM come later.
+12. **Proper forking** (done 2026-10-06, entry 012; design in `customware/notes-forking.md`, results in
+   `012-forking.md`). v1: a request whose longest common prefix is a busy slot's conversation forks from it in
+   the pool (shared cells + the fork-point checkpoint) and runs next to it; share-aware cell accounting; a
+   checkpoint at every turn end. Later: parking (idle conversations keep their cells without a slot),
+   refcounted checkpoints, range-limited save/restore so a saved fork keeps its shared prefix, forking from an
+   idle source that diverges before its end (today taken over in place), preferring a longer cache entry over a
+   shorter busy prefix.
 13. **The prompt cache fills with dead pre-compaction states.** At a compaction the new prompt shares almost
    nothing with the old one (41 tokens in one harness, ~8.4k in another), so it goes to the other slot and the
    old 116k conversation is saved as a 5.2 GiB entry that nothing will ask for again. Three of them fill the

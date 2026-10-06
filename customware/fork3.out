@@ -1,0 +1,19 @@
+server up after 15 s
+== F1: fan-out
+  P: posted +0 s, done +79 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.42 t/s
+  A: posted +79 s, done +103 s: prompt_n=79 cache_n=12337 predicted_n=200 at 8.96 t/s
+  B: posted +82 s, done +104 s: prompt_n=22 cache_n=12394 predicted_n=200 at 9.28 t/s
+  forks: 1   waiting for cells: 0   restore failures: 0   turn-end checkpoints: 8   slot switches while generating: 7
+slot    fork_from: id  0 | task -1 | forked from slot 1 at 12394 tokens: the first 12394 cells are shared, the checkpoint there is the state
+srv  get_availabl: task 72: fork of slot 1 at 12394 tokens (common prefix 12397 of 12416), 22 tokens to process
+== F4: the pair outgrows the pool
+  A2: posted +105 s, done +383 s: prompt_n=24 cache_n=12394 predicted_n=2200 at 7.94 t/s
+  B2: posted +108 s, done +406 s: prompt_n=24 cache_n=12394 predicted_n=2200 at 7.40 t/s
+  suspended: 1   resumed: 1   collective errors: 0   purges: 1
+srv   try_preempt: KV pool overflow: suspended slot 0 (task 302, 14376 tokens, 0 in this batch); 14659 cells spoken for by the others
+srv  try_clear_id: purging slot 1 with 14617 tokens (14617 cells of its own)
+slot       resume: id  0 | task 302 | resumed after 20.7 s with 14376 tokens
+== /slots at the end
+  slot 0 fork_of 1 n_fork_shared 12394
+  slot 1 fork_of -1 n_fork_shared 0
+fork test fork3 done

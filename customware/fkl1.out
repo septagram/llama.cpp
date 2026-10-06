@@ -1,0 +1,21 @@
+health ok after 15 s
+vram: 0, 959 MiB 1, 15125 MiB 
+== M: the conversation, cold
+  M: posted +0 s, done +317 s: prompt_n=88834 (282.0 t/s) cache_n=0 predicted_n=16 at 11.25 t/s
+== M2 continues, C forks 10 s later
+  C: posted +327 s, done +355 s: prompt_n=22 (20.5 t/s) cache_n=88852 predicted_n=200 at 7.45 t/s
+  M2: posted +317 s, done +364 s: prompt_n=27 (23.6 t/s) cache_n=88849 predicted_n=400 at 8.80 t/s
+== verdict
+forks: 1   waiting for cells: 0   restore failures: 0   slot switches while generating: 10
+slot create_check: id  1 | task 0 | created context checkpoint 3 of 32 (pos_min = 88848, pos_max = 88848, n_tokens = 88849, size = 112.571 MiB)
+slot create_check: id  1 | task 39 | created context checkpoint 4 of 32 (pos_min = 88851, pos_max = 88851, n_tokens = 88852, size = 112.571 MiB)
+slot create_check: id  1 | task 39 | created context checkpoint 5 of 32 (pos_min = 88871, pos_max = 88871, n_tokens = 88872, size = 112.571 MiB)
+slot    fork_from: id  0 | task -1 | forked from slot 1 at 88852 tokens: the first 88852 cells are shared, the checkpoint there is the state
+srv  get_availabl: task 144: fork of slot 1 at 88852 tokens (common prefix 88855 of 88874), 22 tokens to process
+slot create_check: id  0 | task 144 | created context checkpoint 2 of 32 (pos_min = 88869, pos_max = 88869, n_tokens = 88870, size = 112.571 MiB)
+slot create_check: id  0 | task 144 | created context checkpoint 3 of 32 (pos_min = 89072, pos_max = 89072, n_tokens = 89073, size = 112.571 MiB)
+slot create_check: id  1 | task 39 | created context checkpoint 6 of 32 (pos_min = 89274, pos_max = 89274, n_tokens = 89275, size = 112.571 MiB)
+vram: 0, 959 MiB 1, 15629 MiB 
+  slot 0 fork_of 1 n_fork_shared 88852
+  slot 1 fork_of -1 n_fork_shared 0
+launcher fork test fkl1 done
