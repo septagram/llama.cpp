@@ -72,9 +72,7 @@ entry 007, which today holds only as long as the client's own timeout allows.
   silent window is only before the launch: queued for a slot or for cells, and the state restore. The four long
   prefills that ended with the client gone had headers and pings; that client's own five-minute limit ended them.
 - `handle_completions_impl`: the first wait is bounded by `sse_ping_interval`; on timeout the response commits
-  with `:
-
-` as its first chunk. The streaming loop turns a null-JSON result into a ping: after an early
+  with the SSE comment `:\n\n` as its first chunk. The streaming loop turns a null-JSON result into a ping: after an early
   commit the begin marker reaches the loop, and the first test run showed it going out as `data: null` (the test
   client crashed on it, as a strict client would).
 - `server_queue::pop_deferred_task` moves every deferred task back, pinned ones first, in deferral order.
