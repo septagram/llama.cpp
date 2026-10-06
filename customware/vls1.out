@@ -1,0 +1,8 @@
+health ok after 15 s
+vram: 0, 959 MiB 1, 15180 MiB 
+  A is generating at +332 s; B (44k, cannot fit next to it) posted as a stream
+  A: answered at +385 s (prompt_n=88834 at 275.6 t/s, predicted_n=700 at 11.21 t/s)
+  B: HTTP 200, headers after 30.2 s, 6 pings before the first data event (at 30, 53, 83, 113, ... s), first data at +197.8 s, 34 data events, longest silence 30.2 s, ended with [DONE], 200 s total, 154 chars
+streams started with a ping: 1   waiting for cells: 1   restore failures: 0
+vram: 0, 959 MiB 1, 15632 MiB 
+launcher stream check vls1 done

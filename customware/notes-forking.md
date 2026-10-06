@@ -132,3 +132,40 @@ a queued request never interrupts a running generation, only a real overflow sus
 
 `-np` is the number of conversations active at once; each has a live recurrent state (112.57 MiB of VRAM). It
 stays 2. The number of forks alive is a different thing and, with parking, not bounded by it.
+
+## Handoff (2026-10-06): for whoever plans and implements v1
+
+The user will plan and implement forking with Fable. State at handoff: nothing of forking is implemented; the
+design above was agreed in discussion; entries 010 and 011 are released (`17138311b`).
+
+Verified by running:
+- two sequences sharing a prefix decode correctly on this build and model (`test-fork-probe.sh`, upstream's
+  `n = 2` path): shared cells, identical greedy texts, no assert.
+- the queue and cache behaviour that forks will ride on: `test-cache-hit-real.sh`, `test-cache-hit-paths.sh`,
+  `test-cache-hit-launcher.sh`, `test-third-request.sh`, `test-keepalive.sh`.
+
+Read in the code, not run:
+- forking from a parent that has moved past the fork point: `llama_memory_seq_cp(src, dst, 0, N)` followed by a
+  PARTIAL_ONLY restore of the checkpoint at N into `dst`. The recurrent `seq_cp` ignores the range and shares the
+  parent's current state; the restore first detaches `dst` from it (`state_read_meta` calls `seq_rm(dst)`), so the
+  order copy-then-restore is the safe one. With two slots the recurrent memory has exactly two cells.
+- the indexer block boundary when the fork point is not a multiple of 4 (`set_input_qsa`, incomplete groups go
+  to the always-visible block).
+- more sequence ids than slots (needed for parking, not for v1).
+
+Where the server decides things today (all in `tools/server/server-context.cpp`): `get_available_slot` (slot
+choice, cache save/restore, the entry 010 fit check), the admission block in the `SERVER_TASK_TYPE_COMPLETION`
+case, the idle-slot save-and-clear right after a launch ([TAG_IDLE_SLOT_CLEAR]), the decode failure block
+(`try_clear_idle_slots`, `try_preempt`), `try_resume_suspended`, and the checkpoint logic in the prompt loop.
+Upstream's fork mechanics to reuse: `copy_state_to`, `launch_slots_with_parent_task`, `SLOT_STATE_WAIT_OTHER`.
+Cell accounting helpers: `kv_cells_used` (real, counts a shared cell once), `kv_resident` and
+`kv_idle_retained` (per-slot token sums: these double count shared cells), `kv_committed`.
+
+Suggested first steps: (1) a probe for the unverified fork-past-the-fork-point path, before any server logic;
+(2) the eager turn-end checkpoint; (3) the fork step in `get_available_slot` with a test at 20k (fan-out) and at
+~100k in the 120k launcher (parent and fork generating together); (4) the accounting.
+
+Working rules that cost time this week (also in the memory notes): prove a build by its log, the exe timestamp
+and a new string in the exe; never `taskkill /IM llama-server.exe`, use `customware/kill-port.sh`; check port
+5000 before using the GPU; in commands sent through the shell tool a doubled backslash arrives single, so write
+C escapes into patches with `chr(92)` or the edit tool.

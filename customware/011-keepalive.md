@@ -92,3 +92,9 @@ Known and left alone: a deferred request that is retried and still cannot start 
 the least recently used idle slot to the prompt cache without launching anything (once per distinct state);
 with the whole queue retried on each release this happens earlier, not more often. The scheduler rewrite
 (notes-scheduler.md) removes the side effect.
+
+Release check on the deployed 120k launcher with its default 30 s interval
+(`customware/verify-launcher-stream.sh vls1`, binary `17138311b`): A (88,834 tokens) prefills at 275.6 t/s and
+generates 700 tokens at 11.21 t/s; B (44k, cannot fit next to A) is posted as a stream while A generates: headers
+after 30.2 s, 6 pings before its first data event at 197.8 s (the wait for A, then its own cold prefill), longest
+silence 30.2 s, 34 data events, `[DONE]`. No restore failure.

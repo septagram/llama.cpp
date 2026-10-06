@@ -5,7 +5,7 @@ Items keep their numbers; the order of work is the list right below, not the num
 
 ## Order of work (set by the user, 2026-10-06)
 
-1. **Keep-alive for queued requests**, with the queue retry fix (item 9). Next entry.
+1. **Keep-alive for queued requests**, with the queue retry fix (item 9). Done: entry 011, released 2026-10-06.
 2. **Forking v1** (item 12, `notes-forking.md`). High priority.
 3. **One scheduler instead of five rules** (item 15, `notes-scheduler.md`).
 4. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
@@ -67,9 +67,11 @@ of finishing a chunk under 120k).
    by the client after 300 s. With entry 010 a swap between two large conversations is a restore of seconds, so
    the wait is the other agent's turn; a 3000-token turn is still five minutes. Raise the clients' request
    timeout; server side, keep-alive bytes on a queued streaming response would make the queue invisible.
-   **Next entry (user, 2026-10-06).** Same entry: retry the whole deferred queue when a slot is released; today
-   one request is retried per release, so a small request queued behind a large one that still does not fit
-   waits for the next release although it would fit (notes-forking.md, "How the queue behaves today").
+   **Done in entry 011 (2026-10-06)**, `customware/011-keepalive.md`: a stream that has no result after one ping
+   interval (30 s) starts with a ping and is pinged until its first result; a slot release retries the whole
+   deferred queue in order. What is left: non-streaming requests cannot be kept alive (nothing may precede the
+   JSON body), and a client's own limit on the time to the first token is not affected by pings (four long
+   prefills in the logs ended that way although headers and pings were being sent).
 10. **RAM guard for the prompt cache** (`LLAMA_CACHE_RAM_RESERVE_MIB`, built, off): before it is switched on it
    must never refuse the save of a live slot's prompt (evict older entries only), or the slot must keep its cells
    when the save is refused. See 010-cache-reserve.md.
