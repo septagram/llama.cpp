@@ -209,6 +209,17 @@ int main() {
         CHECK(!has(out2.start, 3));
     }
 
+    // 14. the pool within one reserve of full: the walk displaces the running request holding the fewest cells
+    //     (the cheapest to park), not the younger one
+    {
+        auto in = base(20000, 2);
+        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 6000, 900, 0, 10));  // older, smaller
+        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 13500, 900, 0, 20)); // younger, larger
+        auto out = sched_decide(in);
+        CHECK(has(out.keep, 2));
+        CHECK(has(out.suspend, 1));
+    }
+
     if (n_fail == 0) {
         printf("test-server-sched: all cases passed\n");
         return 0;

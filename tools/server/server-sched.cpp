@@ -32,6 +32,11 @@ bool sched_before(const sched_req & a, const sched_req & b, const sched_input & 
     if (ra != rb) {
         return ra < rb;
     }
+    // among running requests of one class the one holding more cells ranks first: when one of them has to
+    // leave, it is the cheapest to park and to bring back, as the overflow victim rule chooses
+    if (a.state == SCHED_REQ_RUNNING && b.state == SCHED_REQ_RUNNING && a.held != b.held) {
+        return a.held > b.held;
+    }
     if (a.t_arrival != b.t_arrival) {
         return a.t_arrival < b.t_arrival;
     }

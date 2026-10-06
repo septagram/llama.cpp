@@ -42,7 +42,7 @@ t=d.get('timings',{}); print('  $1: posted +%d s, done +%d s: prompt_n=%d cache_
 }
 clean() { sed -E 's/\x1b\[[0-9;]*m//g' "$LOG"; }
 wait_gen() { local base; base=$(clean | grep -c "n_gen = "); for i in $(seq 1 600); do sleep 1; [ "$(clean | grep -c "n_gen = ")" -gt "$base" ] && return 0; done; }
-counts() { echo "  displaced: $(clean | grep -c 'displaced by a higher priority')   suspended: $(clean | grep -c 'suspended:')   resumed: $(clean | grep -c 'resumed after')   purges: $(clean | grep -c 'purging slot')   saves at launch: $(clean | grep -c 'saving idle slot')   restores: $(clean | grep -c 'found better prompt')   waiting: $(clean | grep -c 'waiting for cells')   errors: $(clean | grep -c 'Context size has been exceeded\|GGML_ASSERT\|error loading state')"; }
+counts() { echo "  displaced: $(clean | grep -c 'displaced')   suspended: $(clean | grep -c 'suspended:')   resumed: $(clean | grep -c 'resumed after')   purges: $(clean | grep -c 'purging slot')   saves at launch: $(clean | grep -c 'saving idle slot')   restores: $(clean | grep -c 'found better prompt')   waiting: $(clean | grep -c 'waiting for cells')   errors: $(clean | grep -c 'Context size has been exceeded\|GGML_ASSERT\|error loading state')"; }
 
 if [[ $ONLY == *1* ]]; then
   echo "== P1: a higher priority request displaces the running one"

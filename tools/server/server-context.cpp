@@ -3110,7 +3110,7 @@ private:
                         slot->task->is_child() || slot->task->is_parent() || !prompt_cache) {
                     continue;
                 }
-                SLT_WRN(*slot, "displaced by a higher priority request: suspending (%d tokens)\n", slot->prompt.n_tokens());
+                SLT_WRN(*slot, "displaced: higher-ranked requests need its cells or its place among the active ones; suspending (%d tokens)\n", slot->prompt.n_tokens());
                 slot->spec_i_batch.clear();
                 slot->i_batch = -1;
                 if (slot->suspend()) {

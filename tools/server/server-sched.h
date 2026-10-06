@@ -58,7 +58,10 @@ struct sched_output {
 };
 
 // the ordering key: effective priority (explicit, plus one class after t_age of waiting) descending, then
-// running before suspended before waiting, then earlier arrival, then lower id
+// running before suspended before waiting, then (running only) more held cells first, then earlier arrival,
+// then lower id. A running request can be displaced by the walk a little before the pool overflows: the
+// reserve of the higher-ranked ones is charged first, so the lowest-ranked one no longer fits when the pool
+// is within one reserve of full. Among equals that is the one holding the fewest cells.
 int  sched_eff_prio(const sched_req & r, const sched_input & in);
 bool sched_before(const sched_req & a, const sched_req & b, const sched_input & in);
 
