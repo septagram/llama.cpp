@@ -4972,7 +4972,11 @@ std::unique_ptr<server_res_generator> server_routes::handle_completions_impl(
                         || dynamic_cast<server_task_result_cmpl_final*>(result.get()) != nullptr
                     );
                     json res_json = result->to_json();
-                    if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
+                    if (res_json == nullptr) {
+                        // customware (entry 011): the begin marker of a task (it only asks for the headers, which a
+                        // stream that started with a ping has already sent). It must not go out as "data: null".
+                        output = ":\n\n";
+                    } else if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
                         output = format_anthropic_sse(res_json);
                     } else if (res_type == TASK_RESPONSE_TYPE_OAI_RESP) {
                         output = format_oai_resp_sse(res_json);

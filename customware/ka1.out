@@ -1,0 +1,24 @@
+server up after 15 s
+== F: a request that answers at once
+  F: HTTP 200, headers after 0.0 s, 0 pings before the first data event, first data at +4.8 s, 34 data events, longest silence 4.8 s, ended with [DONE], 8 s total, 93 chars
+== E: a prompt larger than the pool
+  E: HTTP 400 after 0.1 s, application/json; charset=utf-8, not a stream: exceed_context_size_error: request (44432 tokens) exceeds the available context size (24576 tokens), try in
+== Q: a streaming request queued behind a generating one, then a cold prefill
+  A is generating at +86 s; B posted now
+  A: answered at +108 s (prompt_n=12341 cache_n=0 predicted_n=400)
+Traceback (most recent call last):
+  File "C:\Users\septa\Documents\Code\llama.cpp\customware\sse-client.py", line 71, in <module>
+    if 'error' in obj:
+TypeError: argument of type 'NoneType' is not iterable
+    +   5.1 s  ping
+    +  10.1 s  ping
+    +  15.1 s  ping
+    +  20.2 s  ping
+== R: both slots busy, Z (large) and D (small) queued in that order
+  Y: answered at +38 s (prompt_n=42 cache_n=0 predicted_n=150)
+  D: answered at +46 s (prompt_n=42 cache_n=0 predicted_n=48)
+  X: answered at +76 s (prompt_n=4 cache_n=12337 predicted_n=700)
+  Z: answered at +131 s (prompt_n=10293 cache_n=2048 predicted_n=32)
+== server log
+streams started with a ping: 1   waiting for cells: 4   failures: 0
+keepalive test ka1 done

@@ -41,6 +41,7 @@ error = None
 last = t_headers
 max_gap = 0.0
 text_out = ''
+bad_events = []   # data events that are not a JSON object (a client may choke on them)
 while True:
     line = resp.readline()
     if not line:
@@ -68,6 +69,9 @@ while True:
             obj = json.loads(data)
         except Exception:
             continue
+        if not isinstance(obj, dict):
+            bad_events.append(data[:40])
+            continue
         if 'error' in obj:
             error = obj['error']
             continue
@@ -80,8 +84,9 @@ while True:
             text_out += (ch.get('delta', {}).get('content') or '')
 t_end = time.time() - t0
 print('  %s: HTTP %d, headers after %.1f s, %d pings before the first data event%s, first data at %s, %d data events, '
-      'longest silence %.1f s, %s, %.0f s total, %d chars'
+      'longest silence %.1f s, %s, %.0f s total, %d chars%s'
       % (name, resp.status, t_headers, len(pings),
          (' (at ' + ', '.join('%.0f' % p for p in pings[:4]) + (', ...' if len(pings) > 4 else '') + ' s)') if pings else '',
          ('+%.1f s' % t_first_data) if t_first_data is not None else 'never',
-         n_data, max_gap, 'ended with [DONE]' if done else ('in-stream error %s' % error if error else 'no [DONE]'), t_end, len(text_out)))
+         n_data, max_gap, 'ended with [DONE]' if done else ('in-stream error %s' % error if error else 'no [DONE]'), t_end, len(text_out),
+         (', %d NON-OBJECT data events %s' % (len(bad_events), bad_events[:2])) if bad_events else ''))

@@ -63,3 +63,34 @@ entry 007, which today holds only as long as the client's own timeout allows.
 - An error after the early commit arrives as an in-stream error event with status 200. Only requests that
   waited longer than the interval are affected; before this entry those requests got no answer at all once the
   client timed out.
+
+## Implementation notes and results (2026-10-06)
+
+- Correction to "What happens today": a stream does not start with the first token but with a begin marker that
+  the server emits as soon as a task starts processing (`is_begin`, a result whose JSON is null; upstream uses it
+  to send the headers). So a launched request already had its headers and its pings during a long prefill. The
+  silent window is only before the launch: queued for a slot or for cells, and the state restore. The four long
+  prefills that ended with the client gone had headers and pings; that client's own five-minute limit ended them.
+- `handle_completions_impl`: the first wait is bounded by `sse_ping_interval`; on timeout the response commits
+  with `:
+
+` as its first chunk. The streaming loop turns a null-JSON result into a ping: after an early
+  commit the begin marker reaches the loop, and the first test run showed it going out as `data: null` (the test
+  client crashed on it, as a strict client would).
+- `server_queue::pop_deferred_task` moves every deferred task back, pinned ones first, in deferral order.
+- No launcher change: the default interval is 30 s, so a queued request gets its headers after 30 s and a ping
+  every 30 s.
+
+`customware/test-keepalive.sh ka2` (pool 24576, `--sse-ping-interval 5`, `sse-client.py`):
+
+| case | result |
+|------|--------|
+| F, answers at once | headers at 0.0 s, no ping before the first data event, `[DONE]` |
+| E, prompt larger than the pool | HTTP 400, JSON `exceed_context_size_error`, not a stream |
+| Q, queued behind a generating request, then a cold 12.3k prefill | headers after 5.1 s, 17 pings before the first data event (82.2 s), longest silence 5.0 s, 50 data events, `[DONE]`, no malformed event |
+| R, both slots busy, large Z and small D queued in that order | D answered at +36 s, before the active large X (+67 s); Z at +70 s from the cache (`cache_n` 12337) |
+
+Known and left alone: a deferred request that is retried and still cannot start may make the slot picker save
+the least recently used idle slot to the prompt cache without launching anything (once per distinct state);
+with the whole queue retried on each release this happens earlier, not more often. The scheduler rewrite
+(notes-scheduler.md) removes the side effect.

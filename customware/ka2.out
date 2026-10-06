@@ -1,0 +1,20 @@
+server up after 15 s
+== F: a request that answers at once
+  F: HTTP 200, headers after 0.0 s, 0 pings before the first data event, first data at +3.9 s, 34 data events, longest silence 3.9 s, ended with [DONE], 8 s total, 93 chars
+== E: a prompt larger than the pool
+  E: HTTP 400 after 0.1 s, application/json; charset=utf-8, not a stream: exceed_context_size_error: request (44432 tokens) exceeds the available context size (24576 tokens), try in
+== Q: a streaming request queued behind a generating one, then a cold prefill
+  A is generating at +89 s; B posted now
+  A: answered at +110 s (prompt_n=12341 cache_n=0 predicted_n=400)
+    +  76.7 s  ping
+    +  81.7 s  ping
+    +  82.2 s  first data event
+  B: HTTP 200, headers after 5.1 s, 17 pings before the first data event (at 5, 10, 15, 20, ... s), first data at +82.2 s, 50 data events, longest silence 5.0 s, ended with [DONE], 86 s total, 230 chars
+== R: both slots busy, Z (large) and D (small) queued in that order
+  Y: answered at +29 s (prompt_n=42 cache_n=0 predicted_n=150)
+  D: answered at +36 s (prompt_n=42 cache_n=0 predicted_n=48)
+  X: answered at +67 s (prompt_n=4 cache_n=12337 predicted_n=700)
+  Z: answered at +70 s (prompt_n=4 cache_n=12337 predicted_n=32)
+== server log
+streams started with a ping: 1   waiting for cells: 3   failures: 0
+keepalive test ka2 done
