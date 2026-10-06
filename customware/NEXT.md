@@ -63,6 +63,45 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
    quarter the entry is not used at all (upstream rule), so a compacted conversation re-prefills its unchanged
    system prompt and tools.
 
+12. **Proper forking** (user, 2026-10-06: high priority, right after keep-alive). Two requests that branch from
+   the same state must both get a cache hit, and a fork must not cost gigabytes. Facts gathered so far:
+   - *Today*: only the first fork hits. A busy slot is invisible to the slot picker, cache entries are consumed by
+     the load, a saved descendant deletes its cached prefix as "obsolete", and an idle sibling's slot is taken
+     over in place (unsaved when the new prompt keeps half of it). Three scenarios traced in the session of
+     2026-10-06: short fork (second fork prefills everything), long fork at ~100k (strictly serialized: the main
+     agent stalls while the compaction fork generates), cold fork (works only when the divergence sits at a
+     checkpoint of the first request).
+   - *State anatomy* (120k pool, measured): attention K/V 13,056 B per token (12 layers, q8_0) + indexer keys
+     1,632 B per token, append-only, in VRAM in one pool for all sequences (1,494.94 + 186.87 MiB, one tensor per
+     layer, allocated once); recurrent state 112.57 MiB per sequence (f32, 225 MiB for two slots), rewritten
+     every token. A checkpoint is a host copy of the recurrent state: 112.57 MiB each, up to 32 per conversation.
+     A saved 116k conversation is 1,743 MiB of state + 31 checkpoints = 5,233 MiB: checkpoints are two thirds.
+   - *The pool already shares*: every cell has a bitset of sequence ids (256). `seq_cp` in a unified pool tags
+     the parent's cells with the child's id: no copy, no new cells, no parent pointer; removing a sequence clears
+     its bit and a cell is free when no bit is left. Upstream uses it only for `n > 1` (parent/child slots).
+   - *Where a fork would cost RAM*: checkpoints are private `std::vector`s, deep-copied by `prompt.clone()` and
+     by every cache save; a cache entry is one flat blob per sequence; a restore wipes the sequence and
+     allocates private cells for all of it, so a save/restore round trip un-shares a fork and doubles its prefix
+     in the pool.
+   - *Checkpoint positions* (89k single-agent session, 51 requests): each request leaves one where it starts
+     adding to the slot (the end of the previous generation; 148 of 162 warm turns) and one 4 tokens before its
+     prompt ends; a long prefill adds the start of the last user-role message and ~4100 before the end. When the
+     list is full the old ones are thinned to at least 8192 apart: 7115, 14512, 17333, 29095, 37613, 47611,
+     55868, 64723, 73384, 79955, then 22 between 80.9k and 89.4k.
+   - *Direction* (proposed, not agreed): fork in the pool by `seq_cp` + the fork-point checkpoint restored into
+     the new sequence (force a checkpoint at the fork point); immutable refcounted chunks in host RAM
+     (checkpoints first, then KV cut at checkpoint positions) instead of a parent pointer with an heir; range-
+     limited KV save/restore so a saved fork re-attaches to prefix cells that are still live; share-aware cell
+     accounting for admission, preemption and the purge; idle forks stay in the pool (only their tail is
+     private) instead of being saved and cleared at every launch.
+13. **The prompt cache fills with dead pre-compaction states.** At a compaction the new prompt shares almost
+   nothing with the old one (41 tokens in one harness, ~8.4k in another), so it goes to the other slot and the
+   old 116k conversation is saved as a 5.2 GiB entry that nothing will ask for again. Three of them fill the
+   16 GiB limit; the next save evicts two entries at once, possibly a live agent's. In the session of
+   2026-09-30: 28 saves, 11 evictions, cache at 12-15 GiB throughout. This is also most of the RAM pressure of
+   H17. Options: an age or count limit for entries nobody extended, saving such entries without checkpoints, or
+   a harness hint.
+
 Tooling that exists: `test-next.sh`, `test-spec.sh`, `test-depth.sh`, `test-adapt.sh`, `test-concurrent.sh`,
 `verify-launcher.sh`, `run-pi-task.ps1` (pi needs `SHELL` pointed at Git Bash), `hot-sim.py`, `stats-seed.py`,
 `expert-place.py`, `equiv-compare.py`, `prof-summary.py`.
