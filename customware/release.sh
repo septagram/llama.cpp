@@ -35,6 +35,10 @@ cat > /c/dev/textgen/Qwen3.8-Flash-Next-UD-Q4_K_XL.customware.sh <<'LAUNCH'
 #   LLAMA_HOT_EXPERTS_MIB      the GPU slots while running and rewrites this stats file every 8192 tokens; at the
 #                              next start the placement is computed from it within the MiB budget (the placement
 #                              file above is only used until the stats exist). Delete the stats file to start over.
+#   -np 3                      three slots (entry 013): one more than the two agents, so a request of a higher
+#                              priority can start while two run, and an idle conversation can stay in its slot
+#                              (its cells kept) while two others are active. A slot costs one recurrent-state
+#                              cell of 112 MiB on the 4060 Ti and nothing else of note.
 #   --mmproj / -mmdev CUDA1    the vision projector (1 GB, F16) lives on the otherwise idle 2060 SUPER and only runs
 #                              when a request carries an image; measured: no effect on text prefill or generation
 #   LLAMA_CACHE_RAM_RESERVE_MIB (not set: off) makes the prompt cache (--cache-ram) yield to the model's page cache:
@@ -64,7 +68,7 @@ export GGML_OP_OFFLOAD_MIN_BATCH=512
 	-ot ".*_exps=CPU" \
 	--cache-type-k q8_0 --cache-type-v q8_0 \
 	--load-mode mmap \
-	-np 2 \
+	-np 3 \
 	--kv-unified \
 	-c 160000 \
 	-ub 2048 -b 2048 \
@@ -103,7 +107,7 @@ export GGML_OP_OFFLOAD_MIN_BATCH=512
 	-ot ".*_exps=CPU" \
 	--cache-type-k q8_0 --cache-type-v q8_0 \
 	--load-mode mmap \
-	-np 2 \
+	-np 3 \
 	--kv-unified \
 	-c 120000 \
 	-ub 4096 -b 4096 \

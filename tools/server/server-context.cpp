@@ -2932,9 +2932,18 @@ private:
         return age;
     }
 
+    // requests running at once (LLAMA_SCHED_MAX_ACTIVE, default 2): a third generation costs every slot a third of
+    // its speed for little in total, so the other slots serve priority starts, suspended requests and idle
+    // conversations that keep their cells
+    static int sched_active_max() {
+        static const int n = getenv("LLAMA_SCHED_MAX_ACTIVE") ? atoi(getenv("LLAMA_SCHED_MAX_ACTIVE")) : 2;
+        return n;
+    }
+
     struct sched_placement {
         int32_t need  = 0;  // cells the request needs that are not in the pool yet
         int     reuse = -1; // the idle slot whose conversation it would continue
+        int32_t keep  = 0;  // cells of that conversation it keeps (the common prefix)
     };
 
     // what starting the task would cost, without starting it: the same choice get_available_slot makes
@@ -2971,6 +2980,7 @@ private:
         if (idle != nullptr && lcp_idle >= lcp_busy) {
             pl.need  = kv_need(n - (int32_t) lcp_idle, task.params.n_predict);
             pl.reuse = idle->id;
+            pl.keep  = (int32_t) lcp_idle;
             return pl;
         }
 
@@ -3002,10 +3012,11 @@ private:
 
     sched_input build_sched_input(const server_task * new_task) const {
         sched_input in;
-        in.pool    = kv_pool_size();
-        in.n_slots = (int) slots.size();
-        in.now     = ggml_time_us();
-        in.t_age   = sched_age_us();
+        in.pool         = kv_pool_size();
+        in.n_slots      = (int) slots.size();
+        in.n_active_max = sched_active_max();
+        in.now          = ggml_time_us();
+        in.t_age        = sched_age_us();
 
         for (const auto & slot : slots) {
             if (slot.state == SLOT_STATE_SUSPENDED) {
@@ -3053,8 +3064,9 @@ private:
             r.prio      = task.params.priority;
             r.t_arrival = task.t_arrival;
             r.state     = SCHED_REQ_WAITING;
-            r.need      = pl.need;
-            r.reuse     = pl.reuse;
+            r.need       = pl.need;
+            r.reuse      = pl.reuse;
+            r.reuse_keep = pl.keep;
             in.reqs.push_back(r);
         };
 

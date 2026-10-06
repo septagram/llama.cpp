@@ -27,7 +27,8 @@ struct sched_req {
     sched_req_state state = SCHED_REQ_WAITING;
     int32_t held      = 0;     // RUNNING: cells its sequence owns alone (what a suspension frees)
     int32_t need      = 0;     // cells it still needs beyond `held` and beyond what `reuse` provides
-    int     reuse     = -1;    // idle conversation (slot id) it would continue; those cells become its own
+    int     reuse     = -1;    // idle conversation (slot id) it would continue
+    int32_t reuse_keep = 0;    // cells of that conversation it keeps (the common prefix); the rest is freed by the takeover
     bool    has_slot  = false; // RUNNING and SUSPENDED hold a slot
 };
 
@@ -40,6 +41,7 @@ struct sched_conv {
 struct sched_input {
     int32_t pool    = 0;       // cells
     int     n_slots = 0;
+    int     n_active_max = 0;  // requests running at once (generating or prefilling); 0 = n_slots. Slots are contexts, not parallelism
     int64_t now     = 0;       // us
     int64_t t_age   = 0;       // a request waiting longer than this (us) is promoted one class; 0 = off
     std::vector<sched_req>  reqs;

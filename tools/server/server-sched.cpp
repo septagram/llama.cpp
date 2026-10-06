@@ -74,6 +74,10 @@ sched_output sched_decide(const sched_input & in) {
         }
     }
 
+    // how many may run at once: a third generation costs every slot a third of its speed for little in total
+    const int active_max = in.n_active_max > 0 ? std::min(in.n_active_max, in.n_slots) : in.n_slots;
+    int active = 0;
+
     // the walk: idle cells count as free (they can be purged); the purge list is settled afterwards
     int32_t cells_used = 0;
     const sched_req * victim = nullptr;
@@ -82,32 +86,35 @@ sched_output sched_decide(const sched_input & in) {
         const bool continues = r->reuse >= 0 && idle_by_id.count(r->reuse) > 0 &&
             std::find(taken_over.begin(), taken_over.end(), r->reuse) == taken_over.end();
 
-        // what the request costs the pool: its own cells, what it still needs, and the conversation it continues
-        const int32_t cost = r->held + r->need + (continues ? idle_by_id[r->reuse]->owned : 0);
+        // what the request costs the pool: its own cells, what it still needs, and what it keeps of the
+        // conversation it continues (the rest of that conversation is freed by the takeover)
+        const int32_t cost = r->held + r->need + (continues ? std::min(r->reuse_keep, idle_by_id[r->reuse]->owned) : 0);
 
         bool fits_cells = false;
         bool fits_slot  = false;
 
         switch (r->state) {
             case SCHED_REQ_RUNNING:
-                // it stays unless the cells it actually holds do not fit next to the higher-ranked ones; its
-                // growth reserve is charged either way, so nothing lower-ranked starts into it
+                // it stays unless the cells it actually holds do not fit next to the higher-ranked ones, or a
+                // higher-ranked request took its place among the active ones; its growth reserve is charged
+                // either way, so nothing lower-ranked starts into it
                 fits_cells = cells_used + r->held <= in.pool;
-                fits_slot  = true;
+                fits_slot  = active + 1 <= active_max;
                 break;
             case SCHED_REQ_SUSPENDED:
                 fits_cells = cells_used + cost <= in.pool;
-                fits_slot  = true; // it kept its slot
+                fits_slot  = active + 1 <= active_max; // it kept its slot
                 break;
             case SCHED_REQ_WAITING:
                 fits_cells = cells_used + cost <= in.pool;
                 // an idle conversation's slot can be purged or taken over, so only slots of requests count
-                fits_slot  = slots_used + 1 <= in.n_slots;
+                fits_slot  = slots_used + 1 <= in.n_slots && active + 1 <= active_max;
                 break;
         }
 
         if (fits_cells && fits_slot) {
             cells_used += cost;
+            active++;
             switch (r->state) {
                 case SCHED_REQ_RUNNING:
                     out.keep.push_back(r->id);
@@ -131,7 +138,7 @@ sched_output sched_decide(const sched_input & in) {
                 taken_over.push_back(r->reuse);
             }
         } else if (r->state == SCHED_REQ_RUNNING) {
-            // displaced: a higher class took the cells it holds
+            // displaced: a higher class took the cells it holds, or its place among the active ones
             out.suspend.push_back(r->id);
             slots_used++; // it keeps its slot while suspended
         }
@@ -165,9 +172,9 @@ sched_output sched_decide(const sched_input & in) {
     }
 
     char buf[256];
-    snprintf(buf, sizeof(buf), "keep %zu, start %zu, suspend %zu, purge %zu; %d of %d cells committed, %d of %d slots",
+    snprintf(buf, sizeof(buf), "keep %zu, start %zu, suspend %zu, purge %zu; %d of %d cells committed, %d of %d slots, %d of %d active",
              out.keep.size(), out.start.size(), out.suspend.size(), out.purge.size(),
-             cells_used, in.pool, slots_used, in.n_slots);
+             cells_used, in.pool, slots_used, in.n_slots, active, active_max);
     out.why = buf;
 
     return out;

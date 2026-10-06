@@ -15,9 +15,9 @@ static bool has(const std::vector<int> & v, int id) {
     return std::find(v.begin(), v.end(), id) != v.end();
 }
 
-static sched_req req(int id, sched_req_state st, int32_t held, int32_t need, int prio = 0, int64_t t = 0, int reuse = -1) {
+static sched_req req(int id, sched_req_state st, int32_t held, int32_t need, int prio = 0, int64_t t = 0, int reuse = -1, int32_t reuse_keep = 0) {
     sched_req r;
-    r.id = id; r.state = st; r.held = held; r.need = need; r.prio = prio; r.t_arrival = t; r.reuse = reuse;
+    r.id = id; r.state = st; r.held = held; r.need = need; r.prio = prio; r.t_arrival = t; r.reuse = reuse; r.reuse_keep = reuse_keep;
     r.has_slot = st != SCHED_REQ_WAITING;
     return r;
 }
@@ -102,10 +102,10 @@ int main() {
         in.idle.push_back(conv(0, 12000, 100)); // oldest
         in.idle.push_back(conv(1, 10000, 200));
         in.idle.push_back(conv(2, 5000, 300));  // the one being continued
-        in.reqs.push_back(req(1, SCHED_REQ_WAITING, 0, 20000, 0, 10, /*reuse*/ 2));
+        in.reqs.push_back(req(1, SCHED_REQ_WAITING, 0, 20000, 0, 10, /*reuse*/ 2, /*keeps*/ 5000));
         auto out = sched_decide(in);
         CHECK(has(out.start, 1));
-        // cost = 20000 + 5000 (taken over) = 25000; idle left: 12000 + 10000 = 22000 -> 47000 > 30000: purge 0 (-> 35000), then 1 (-> 25000)
+        // cost = 20000 + 5000 (kept of the taken-over one) = 25000; idle left: 12000 + 10000 = 22000 -> 47000 > 30000: purge 0 (-> 35000), then 1 (-> 25000)
         CHECK(out.purge.size() == 2);
         CHECK(out.purge[0] == 0 && out.purge[1] == 1);
         CHECK(!has(out.purge, 2));
@@ -174,6 +174,39 @@ int main() {
         auto out = sched_decide(in);
         CHECK(has(out.keep, 1));
         CHECK(!has(out.start, 2));
+    }
+
+    // 12. a takeover keeps only the common prefix: a 42-token request continuing a 13k conversation by a 10-token
+    //     prefix costs 10 + its need, not 13k, so the other idle conversation is not purged
+    {
+        auto in = base(24576, 3);
+        in.idle.push_back(conv(0, 13000, 100));
+        in.idle.push_back(conv(2, 12940, 200));
+        in.reqs.push_back(req(1, SCHED_REQ_WAITING, 0, 42 - 10 + 16, 0, 10, /*reuse*/ 2, /*keeps*/ 10));
+        auto out = sched_decide(in);
+        CHECK(has(out.start, 1));
+        CHECK(out.purge.empty());
+    }
+
+    // 13. at most n_active_max run at once: three slots, two generating, a third waiter waits although cells and a
+    //     slot are free; a higher class still gets in by displacing the lowest-ranked running one
+    {
+        auto in = base(200000, 3);
+        in.n_active_max = 2;
+        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 1000, 256, 0, 10));
+        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1000, 256, 0, 20));
+        in.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 1000, 0, 30));
+        auto out = sched_decide(in);
+        CHECK(out.keep.size() == 2);
+        CHECK(!has(out.start, 3));
+        CHECK(out.suspend.empty());
+
+        in.reqs.push_back(req(4, SCHED_REQ_WAITING, 0, 1000, 3, 40));
+        auto out2 = sched_decide(in);
+        CHECK(has(out2.start, 4));
+        CHECK(has(out2.suspend, 2));
+        CHECK(has(out2.keep, 1));
+        CHECK(!has(out2.start, 3));
     }
 
     if (n_fail == 0) {
