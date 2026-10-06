@@ -1,0 +1,21 @@
+health ok after 15 s
+vram: 0, 959 MiB 1, 15219 MiB 
+== fill the cache: B1
+  B1: prompt_n=44432 cache_n=0 (265.7 t/s) predicted_n=16 (11.76 t/s), 168 s wall
+== C prefilling from zero, B2 arrives 25 s in
+  C: prompt_n=88834 cache_n=0 (285.0 t/s) predicted_n=16 (11.09 t/s), 313 s wall
+  B2: prompt_n=4 cache_n=44428 (15.5 t/s) predicted_n=16 (11.61 t/s), 290 s wall
+== verdict
+restore failures (failed to find / failed to load): 0
+restores skipped until they fit (kept for later):   1
+idle slots freed for a cached prompt:               1
+idle slots purged by a pool overflow:               0
+admission deferrals (waiting for cells):            1
+srv   prompt_save:  - saving prompt with length 44447, total state size = 737.201 MiB (draft: 0.000 MiB)
+slot get_availabl: id  1 | task -1 | cached prompt of 44447 tokens does not fit next to the 89090 cells the active sequences need: kept for later
+srv  process_sing: task 31 needs 44448 cells (prompt 44432) but 89090 of 120064 are spoken for: waiting for cells
+slot get_availabl: id  0 | task -1 | freeing idle slot (88849 tokens) so the cached prompt of 44447 tokens fits
+srv   prompt_save:  - saving prompt with length 88849, total state size = 1361.197 MiB (draft: 0.000 MiB)
+srv          load:  - found better prompt with f_keep = 1.000, f_sim = 1.000
+vram: 0, 959 MiB 1, 15607 MiB 
+launcher cache hit test hitl2 done

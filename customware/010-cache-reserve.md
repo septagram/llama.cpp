@@ -146,6 +146,13 @@ and B (44,432) fill the cache; A2 comes back with `cache_n` 88830 and generates 
 arrives while A2 generates, is "kept for later" and deferred, then restored with `cache_n` 44428 after A2;
 zero restore failures. Prefill on the way: 248.7 and 305.2 t/s; decode at 89k depth 11.2 t/s.
 
+Verification of dfa8b58dc (the refinement) on the deployed 120k launcher (`SCEN=early
+test-cache-hit-launcher.sh hitl2`): B (44,432 tokens) cached; C (88,834, new) prefills from zero at 285 t/s; B2
+arrives 25 s in: "cached prompt of 44447 tokens does not fit next to the 89090 cells the active sequences need:
+kept for later", deferred, no purge; after C the idle slot is saved and freed and B2 comes back with `cache_n`
+44428. Zero restore failures, zero purges. Small scale (`test-cache-hit-paths.sh hitp1`): E kept for later, no
+purge, `cache_n` 12336; P purge preceded by a save, `cache_n` 12336 in 2 s.
+
 Not addressed: a queued request that waits longer than the client's timeout is still cancelled by the client
 (a turn of 3000 generated tokens is five minutes on its own). Raising the clients' request timeout is the
 immediate remedy; keep-alive bytes on a queued streaming response would be the server-side one.

@@ -35,6 +35,12 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
    barriers per layer and keeping the intermediate in cache. Kernel work; expected 5-8% of decode.
 5. **Small-batch CPU expert kernel (H12)**: batch 2-31 runs at 10-15 GB/s effective vs 29-34 at batch 1. Unlocks
    speculation (measured +7-18% on echo-heavy output today, capped by the verify batch) and `-np 2`.
+   **Field data, 2026-10-05/06 launcher logs (1,646 samples with two generators)**: one generator 11.5-11.8 t/s
+   median, two generators 7.5-7.7 t/s each, 15.0-15.4 t/s together (x1.27-1.34). A step goes from 86 ms to
+   132 ms: the second token costs 46 ms, which is the CPU expert time of one token (47 ms in the entry 008
+   profile) and nothing else. So at batch 2 the cost is the memory traffic of ten more experts per layer, not a
+   kernel deficiency; a small-batch kernel has nothing to win there. What is left of H12 is the larger verify
+   batches of speculation, unmeasured.
 6. **Overlap the GPU hot half with the CPU cold half** of each layer's experts in the scheduler (launch the GPU split
    before computing the CPU split when they are independent). Bounded by the GPU hot time: 2-4 ms per token, 3-5%.
 7. **Second-GPU probe**: hot tensors of half the layers on the 2060 SUPER as a pessimistic stand-in for a second
@@ -43,6 +49,19 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
    ~10 lines to apply at the single-stream layer output, a matching capture point for the generator, and a per-token
    strength schedule that ramps with the length of the thinking block. The hard part is the ruler (deliberation
    tokens before the first tool call, task outcomes).
+
+9. **Queued requests vs client timeouts** (from the logs of 2026-10-05): 28 of 70 queued requests were cancelled
+   by the client after 300 s. With entry 010 a swap between two large conversations is a restore of seconds, so
+   the wait is the other agent's turn; a 3000-token turn is still five minutes. Raise the clients' request
+   timeout; server side, keep-alive bytes on a queued streaming response would make the queue invisible.
+10. **RAM guard for the prompt cache** (`LLAMA_CACHE_RAM_RESERVE_MIB`, built, off): before it is switched on it
+   must never refuse the save of a live slot's prompt (evict older entries only), or the slot must keep its cells
+   when the save is refused. See 010-cache-reserve.md.
+11. **A cached entry much longer than the new prompt** (after a compaction): the cache picks an entry when a
+   quarter of it is a prefix of the new prompt and the restore needs cells for all of it; next to a busy slot the
+   restore is skipped and the prompt prefilled from zero. Deferring until it fits would close the gap. Below a
+   quarter the entry is not used at all (upstream rule), so a compacted conversation re-prefills its unchanged
+   system prompt and tools.
 
 Tooling that exists: `test-next.sh`, `test-spec.sh`, `test-depth.sh`, `test-adapt.sh`, `test-concurrent.sh`,
 `verify-launcher.sh`, `run-pi-task.ps1` (pi needs `SHELL` pointed at Git Bash), `hot-sim.py`, `stats-seed.py`,
