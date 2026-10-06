@@ -1,7 +1,20 @@
-# Next optimizations (parked 2026-09-29 while the server correctness work runs)
+# What is next
 
-Resume from here when the queueing/preemption work (entry 006) and the concurrent-prefill fix are done. Order is
-by expected value on the user's real workload (agent sessions at 40-120k depth on the 120k launcher).
+The work queue of the customware fork: the order the user set, then every open item with what is known about it.
+Items keep their numbers; the order of work is the list right below, not the numbering.
+
+## Order of work (set by the user, 2026-10-06)
+
+1. **Keep-alive for queued requests**, with the queue retry fix (item 9). Next entry.
+2. **Forking v1** (item 12, `notes-forking.md`). High priority.
+3. **One scheduler instead of five rules** (item 15, `notes-scheduler.md`).
+4. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
+5. **Checkpoint policy** (item 14, `notes-checkpoint-policy.md`): last, the least defined of them.
+
+The 160k launcher: "not yet" (the user may switch, mainly because the model often ends one or two messages short
+of finishing a chunk under 120k).
+
+## Items
 
 1. **H16: decode cost at depth** (entry 008, done 2026-09-29). The per-node profile (`GGML_SCHED_PROFILE_NODES=1`,
    `test-depth-prof.sh`, `prof1.out`) put the slope in the flash attention (with a q8_0 cache the CUDA dispatcher
@@ -85,6 +98,11 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
    rollbacks in the launcher logs; retention by recency and a lower cap are the candidates). Needs an
    architectural discussion before anything is changed; not part of the fork work except the eager turn-end
    checkpoint.
+
+15. **One scheduler instead of five rules** (user's idea, 2026-10-06; after forking): one ordered list of
+   everything that wants to run, a single function that walks it and decides the active set, then a reconcile
+   step. Brings priorities and preemption, makes the small-request-next-to-a-large-one case true by definition,
+   and puts the shared-cell arithmetic in one place. `customware/notes-scheduler.md`.
 
 Tooling that exists: `test-next.sh`, `test-spec.sh`, `test-depth.sh`, `test-adapt.sh`, `test-concurrent.sh`,
 `verify-launcher.sh`, `run-pi-task.ps1` (pi needs `SHELL` pointed at Git Bash), `hot-sim.py`, `stats-seed.py`,
