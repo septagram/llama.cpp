@@ -65,6 +65,17 @@ public:
     // prioritize tasks that use the specified slot (otherwise, pop the first deferred task)
     void pop_deferred_task(int id_slot);
 
+    // customware (entry 013): the scheduler reads the deferred tasks and pulls the ones it starts, in its order
+    template <class F>
+    void for_each_deferred(F && f) {
+        std::unique_lock<std::mutex> lock(mutex_tasks);
+        for (const auto & task : queue_tasks_deferred) {
+            f(task);
+        }
+    }
+
+    void pop_deferred_tasks(const std::vector<int> & ids);
+
     // if sleeping, request exiting sleep state and wait until it is done
     // returns immediately if not sleeping
     void wait_until_no_sleep();

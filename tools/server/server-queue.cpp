@@ -81,6 +81,29 @@ void server_queue::defer(server_task && task) {
     condition_tasks.notify_one();
 }
 
+void server_queue::pop_deferred_tasks(const std::vector<int> & ids) {
+    std::unique_lock<std::mutex> lock(mutex_tasks);
+
+    // the named tasks go to the front of the queue in the given order; the others stay deferred in their order
+    std::vector<server_task> picked;
+    for (int id : ids) {
+        for (auto it = queue_tasks_deferred.begin(); it != queue_tasks_deferred.end(); ++it) {
+            if (it->id == id) {
+                QUE_DBG("pop deferred task (scheduler), id_task = %d\n", id);
+                picked.push_back(std::move(*it));
+                queue_tasks_deferred.erase(it);
+                break;
+            }
+        }
+    }
+    for (auto it = picked.rbegin(); it != picked.rend(); ++it) {
+        queue_tasks.emplace_front(std::move(*it));
+    }
+
+    time_last_task = ggml_time_ms();
+    condition_tasks.notify_one();
+}
+
 int server_queue::get_new_id() {
     std::unique_lock<std::mutex> lock(mutex_tasks);
     int new_id = id++;

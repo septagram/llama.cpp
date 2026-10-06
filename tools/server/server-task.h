@@ -56,6 +56,8 @@ struct task_params {
 
     int32_t sse_ping_interval = 30; // seconds between SSE comment pings while the stream stays silent, -1 disables
 
+    int32_t priority = 0; // customware (entry 013): scheduling class, higher first; a higher class may suspend a running lower one
+
     int32_t n_keep    =  0; // number of tokens to keep from initial prompt
     int32_t n_discard =  0; // number of tokens after n_keep that may be discarded when shifting context, 0 defaults to half
     int32_t n_predict = -1; // new tokens to predict
@@ -142,6 +144,8 @@ struct server_task {
     // used by SERVER_TASK_TYPE_CANCEL
     int id_target = -1;
     int id_slot   = -1;
+
+    int64_t t_arrival = 0; // customware (entry 013): when the scheduler first saw it (us); order within a class, aging
 
     // used by parallel sampling (multiple completions from same prompt)
     int id_parent  = -1;

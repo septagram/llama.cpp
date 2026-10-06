@@ -116,6 +116,9 @@ function(llama_build_and_test source)
     set_property(TEST ${TEST_TARGET} PROPERTY LABELS ${LLAMA_TEST_LABEL})
 endfunction()
 
+# customware (entry 013): the server scheduler decision, no model needed
+llama_build_and_test(test-server-sched.cpp ${PROJECT_SOURCE_DIR}/tools/server/server-sched.cpp)
+
 # build test-tokenizer-0 target once and add many tests
 llama_build(test-tokenizer-0.cpp)
 
