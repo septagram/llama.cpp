@@ -54,6 +54,9 @@ by expected value on the user's real workload (agent sessions at 40-120k depth o
    by the client after 300 s. With entry 010 a swap between two large conversations is a restore of seconds, so
    the wait is the other agent's turn; a 3000-token turn is still five minutes. Raise the clients' request
    timeout; server side, keep-alive bytes on a queued streaming response would make the queue invisible.
+   **Next entry (user, 2026-10-06).** Same entry: retry the whole deferred queue when a slot is released; today
+   one request is retried per release, so a small request queued behind a large one that still does not fit
+   waits for the next release although it would fit (notes-forking.md, "How the queue behaves today").
 10. **RAM guard for the prompt cache** (`LLAMA_CACHE_RAM_RESERVE_MIB`, built, off): before it is switched on it
    must never refuse the save of a live slot's prompt (evict older entries only), or the slot must keep its cells
    when the save is refused. See 010-cache-reserve.md.

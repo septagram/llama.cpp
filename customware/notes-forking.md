@@ -81,6 +81,36 @@ private cells for all of it, so it waits until the other leaves. The harness sho
 
 The child starts with one checkpoint, at the fork point.
 
+## Under pressure (read in the code, 2026-10-06; v1 accepted by the user)
+
+The shared prefix is reclaimed only when every sequence labelled on it is gone. Two cases:
+
+- The pair overflows the pool by itself (both generating, no idle slot): entry 007 suspends the smallest
+  generating sequence. That frees its tail only; the survivor is now alone on the prefix and continues until its
+  own context limit. No cascade. The suspended one comes back with private cells, so after the survivor's turn.
+  A suspended sequence keeps its slot.
+- An outsider needs more cells than a tail: both members of the pair must leave. Today every idle slot is saved
+  and cleared at each launch, so this happens by itself for idle ones; what has to change is the arithmetic
+  (evicting one of a pair frees its tail, not its token count) and the victim choice, which compares token
+  counts and should compare what a suspension would free.
+
+## How the queue behaves today (relevant to forks taking turns)
+
+Admission asks two things: is a slot free, and does the request fit next to what the active and suspended
+sequences are committed to. It does not look at who else is waiting. A new request is handled at once; the
+deferred queue is only retried when a slot is released, one request per release (one that asked for that slot,
+else the first in the queue), and a request that still does not fit goes to the back.
+
+So a small request slips in next to a large active one while another large one waits. Measured
+(customware/test-third-request.sh, pool 24576): B (12.3k) queued behind A (12.3k, generating) at +84 s; C
+(42 tokens) posted at +86 s started at once and answered at +96 s at 7.7 t/s; B was retried when C finished
+(still waiting), started when A finished at +111 s and answered at +177 s.
+
+Weak spot: one retry per release. A small request that was itself queued (both slots busy when it arrived) sits
+behind a large one that still does not fit until the next release. Retrying the whole queue on each release
+fixes it; planned with the keep-alive entry, which touches the same code. There is no preemption for fairness:
+a queued request never interrupts a running generation, only a real overflow suspends one.
+
 ## Work items for the entry
 
 - The fork step in slot selection: when the best prefix of a new prompt is in another slot (busy or idle), take a

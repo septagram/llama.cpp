@@ -1,0 +1,15 @@
+server up after 15 s
+A is generating at +84 s; posting B (must queue), then C
+  C: posted at +86 s, answered at +96 s (prompt_n=42 cache_n=0 predicted_n=64 at 7.7 t/s)
+  A: posted at +0 s, answered at +111 s (prompt_n=12341 cache_n=0 predicted_n=400 at 11.5 t/s)
+  B: posted at +84 s, answered at +177 s (prompt_n=12341 cache_n=0 predicted_n=64 at 13.5 t/s)
+== order of events
+0.15 slot launch_slot_: id  1 | task 0 | processing task, is_child = 0
+1.39 srv  process_sing: task 116 needs 12405 cells (prompt 12341) but 12704 of 24576 are spoken for: waiting for cells
+1.41 slot launch_slot_: id  0 | task 144 | processing task, is_child = 0
+1.50 slot      release: id  0 | task 144 | stop processing: n_tokens = 105, truncated = 0
+1.50 srv  process_sing: task 116 needs 12405 cells (prompt 12341) but 12796 of 24576 are spoken for: waiting for cells
+2.05 slot      release: id  1 | task 0 | stop processing: n_tokens = 12740, truncated = 0
+2.05 slot launch_slot_: id  0 | task 116 | processing task, is_child = 0
+3.11 slot      release: id  0 | task 116 | stop processing: n_tokens = 12404, truncated = 0
+third request test third1 done
