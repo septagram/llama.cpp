@@ -1727,6 +1727,11 @@ size_t server_prompt_cache::n_tokens() const {
 server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & prompt, size_t state_size_tgt, size_t state_size_dft) {
     // first check if the current state is contained fully in the cache
     for (auto it = states.begin(); it != states.end(); ++it) {
+        // customware (entry 012): a suspended slot's parked state has no token list and takes no part in matching
+        if (it->pinned) {
+            continue;
+        }
+
         const int cur_lcp_len = it->prompt.tokens.get_common_prefix(prompt.tokens);
 
         if (cur_lcp_len == (int) prompt.tokens.size()) {
@@ -1752,6 +1757,13 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
 
     // remove any cached prompts that are fully contained in the current prompt
     for (auto it = states.begin(); it != states.end();) {
+        // customware (entry 012): never a pinned entry: its empty token list is "contained" in every prompt, and a
+        // suspended slot holds a pointer to it (found by a fork that was suspended, then a purge that saved first)
+        if (it->pinned) {
+            ++it;
+            continue;
+        }
+
         const int len = it->prompt.tokens.get_common_prefix(prompt.tokens);
 
         if (len == (int) it->prompt.tokens.size()) {
@@ -1824,6 +1836,11 @@ std::list<server_prompt_cache_state>::const_iterator server_prompt_cache::select
 
     // find the most similar cached prompt, that would also preserve the most context
     for (auto it = states.cbegin(); it != states.cend(); ++it) {
+        // customware (entry 012): pinned entries belong to suspended slots and are not prompts to load
+        if (it->pinned) {
+            continue;
+        }
+
         const int lcp_cur = it->prompt.tokens.get_common_prefix(tokens_new);
 
         const float f_keep_cur = float(lcp_cur) / it->prompt.tokens.size();

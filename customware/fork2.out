@@ -1,0 +1,38 @@
+server up after 15 s
+== F1: fan-out
+  P: posted +0 s, done +79 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.27 t/s
+  A: posted +79 s, done +104 s: prompt_n=79 cache_n=12337 predicted_n=200 at 8.87 t/s
+  B: posted +82 s, done +105 s: prompt_n=22 cache_n=12394 predicted_n=200 at 9.21 t/s
+  forks: 1   waiting for cells: 0   restore failures: 0   turn-end checkpoints: 8   slot switches while generating: 7
+slot    fork_from: id  0 | task -1 | forked from slot 1 at 12394 tokens: the first 12394 cells are shared, the checkpoint there is the state
+srv  get_availabl: task 71: fork of slot 1 at 12394 tokens (common prefix 12397 of 12416), 22 tokens to process
+== F4: the pair outgrows the pool
+  A2: posted +105 s, done +382 s: prompt_n=24 cache_n=12394 predicted_n=2200 at 8.00 t/s
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "C:\Users\septa\anaconda3\lib\json\__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "C:\Users\septa\anaconda3\lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "C:\Users\septa\anaconda3\lib\json\decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "C:\Users\septa\anaconda3\lib\json\decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+  suspended: 1   resumed: 1   collective errors: 0   purges: 1
+srv   try_preempt: KV pool overflow: suspended slot 0 (task 300, 14377 tokens, 1 in this batch); 14659 cells spoken for by the others
+srv  try_clear_id: purging slot 1 with 14617 tokens (14617 cells of its own)
+slot       resume: id  0 | task 300 | resumed after 20.5 s with 14376 tokens
+== /slots at the end
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\Users\septa\anaconda3\lib\json\__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "C:\Users\septa\anaconda3\lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "C:\Users\septa\anaconda3\lib\json\decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "C:\Users\septa\anaconda3\lib\json\decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+fork test fork2 done

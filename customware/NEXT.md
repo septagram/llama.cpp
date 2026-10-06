@@ -6,7 +6,7 @@ Items keep their numbers; the order of work is the list right below, not the num
 ## Order of work (set by the user, 2026-10-06)
 
 1. **Keep-alive for queued requests**, with the queue retry fix (item 9). Done: entry 011, released 2026-10-06.
-2. **Forking v1** (item 12, `notes-forking.md`). High priority.
+2. **Forking v1** (item 12, `notes-forking.md`). Implemented 2026-10-06 as entry 012 (`012-forking.md`); verification in progress.
 3. **One scheduler instead of five rules** (item 15, `notes-scheduler.md`).
 4. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
 5. **Checkpoint policy** (item 14, `notes-checkpoint-policy.md`): last, the least defined of them.

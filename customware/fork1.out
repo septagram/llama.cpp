@@ -1,0 +1,19 @@
+server up after 15 s
+== F1: fan-out
+  P: posted +1 s, done +80 s: prompt_n=12341 cache_n=0 predicted_n=48 at 13.17 t/s
+  A: posted +80 s, done +105 s: prompt_n=79 cache_n=12337 predicted_n=200 at 8.64 t/s
+  B: posted +83 s, done +107 s: prompt_n=22 cache_n=12394 predicted_n=200 at 8.96 t/s
+  forks: 1   waiting for cells: 0   restore failures: 0   turn-end checkpoints: 8   slot switches while generating: 7
+slot    fork_from: id  0 | task -1 | forked from slot 1 at 12394 tokens: the first 12394 cells are shared, the checkpoint there is the state
+srv  get_availabl: task 71: fork of slot 1 at 12394 tokens (common prefix 12397 of 12416), 22 tokens to process
+== F3: the forked text against the same request served alone
+  C: posted +107 s, done +122 s: prompt_n=4 cache_n=12412 predicted_n=200 at 13.66 t/s
+  B (fork, next to A) vs C (alone): same for the first 130 chars (1068 and 1020 chars)
+== F4: the pair outgrows the pool
+  A2: posted +122 s, done +315 s: prompt_n=24 cache_n=12394 predicted_n=1500 at 7.80 t/s
+  B2: posted +125 s, done +318 s: prompt_n=24 cache_n=12394 predicted_n=1500 at 7.82 t/s
+  suspended: 0   resumed: 0   collective errors: 0   purges: 0
+== /slots at the end
+  slot 0 fork_of 1 n_fork_shared 12394
+  slot 1 fork_of 0 n_fork_shared 12394
+fork test fork1 done

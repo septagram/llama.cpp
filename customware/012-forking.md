@@ -78,3 +78,34 @@ is not preferred over the fork; pinned requests (`id_slot`) do not fork; non-uni
 - A restore that cannot find a recurrent cell aborts the server (`load_tgt` aborts on size mismatch): the fork
   frees `dst`'s own recurrent cell first and the restore takes it; with `-np` slots there are `-np` cells.
 - The 112 MiB checkpoint copy per fork and per turn end (host memcpy / device read, tens of ms).
+
+## Results (2026-10-06)
+
+Build `00ec137ff`. `customware/test-fork.sh fork1`, real model, pool 16,384 cells, `-np 2`:
+
+- **F1 fan-out.** P (12,341 tokens, 48 generated) ends; A and B, both P + the assistant turn + a different
+  follow-up, posted 3 s apart. A continued in P's slot (`cache_n` 12337, 79 tokens processed); B became a fork
+  of A's busy slot at the turn-end checkpoint (12,394 tokens; common prefix 12,397 of 12,416; 22 tokens to
+  process; `cache_n` 12394). Both generated at the same time (8.6 and 9.0 t/s, 7 slot switches in the progress
+  lines), zero "waiting for cells" in a pool that could not hold two private copies (2 x 12.4k > 16,384), zero
+  restore failures, 8 checkpoints created including the turn-end ones. `/slots` shows `fork_of` and
+  `n_fork_shared` 12394 on both slots (the second fork happened in F4, from the other direction).
+- **F3 exactness.** The same request as B, served alone afterwards from the slot (`cache_n` 12412): the texts
+  agree for the first 130 characters, then diverge (1068 vs 1020 characters). The near-tie flip of a different
+  batch composition (entry 007's caveat), not a defect of the fork. B's fork point (12,394) is not a multiple of 4, so the straddling indexer
+  block (treated as always visible) was in play, and the text stayed coherent.
+- **F4 pressure, first attempt.** 1,500 tokens per tail fitted next to the 12.4k prefix (15.4k < 16,384):
+  no overflow, both finished at 7.8 t/s. Re-run with 2,200 per tail below.
+- **F4 pressure, second attempt (2,200 tokens per tail), build `00ec137ff`.** The pair overflowed at ~14.4k
+  tokens each: the fork (slot 0, owning only its tail) was suspended ("14376 tokens parked in RAM (314.6 MiB)":
+  a fork is saved whole, as designed), A2 finished (2,200 tokens at 8.0 t/s), the idle slot was purged to make
+  room ("14617 cells of its own"), and the resume **crashed the server**: `state_seq_set_data: error loading
+  state: unexpectedly reached end of buffer`, then the indexer assert on the next decode.
+
+  Cause, not in the fork code: `server_prompt_cache::alloc` removes "any cached prompt fully contained in the
+  new one"; a pinned entry (a suspended slot's parked state, entry 007) has an empty token list, which is
+  contained in every prompt, so the purge's save (added in entry 010) erased it: the log line "removing obsolete
+  cached prompt with length 0" is the parked state going away while the slot still pointed at it. The resume
+  then read freed memory. Any suspension followed by a save had this; entry 010 made the sequence reachable
+  (a purge saves first) and it was live on the launcher since this morning. Fix (`patch-012b.py`): `alloc` and
+  `select` skip pinned entries.

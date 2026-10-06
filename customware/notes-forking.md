@@ -1,4 +1,4 @@
-# Forking: architecture notes (discussion in progress, 2026-10-06)
+# Forking: architecture notes (discussed 2026-10-06; v1 implemented the same day as entry 012, see 012-forking.md)
 
 Goal (user): two requests that branch from the same state both get a cache hit, cheaply; subagent fan-out and a
 "precompaction" flow (fork at ~100k, the fork writes the summary while the main agent continues). High priority,
@@ -133,7 +133,7 @@ a queued request never interrupts a running generation, only a real overflow sus
 `-np` is the number of conversations active at once; each has a live recurrent state (112.57 MiB of VRAM). It
 stays 2. The number of forks alive is a different thing and, with parking, not bounded by it.
 
-## Handoff (2026-10-06): for whoever plans and implements v1
+## Handoff (2026-10-06): for whoever plans and implements v1 (done: entry 012, same day; kept as the record of what was known before)
 
 The user will plan and implement forking with Fable. State at handoff: nothing of forking is implemented; the
 design above was agreed in discussion; entries 010 and 011 are released (`17138311b`).

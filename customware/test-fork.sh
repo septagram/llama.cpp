@@ -6,7 +6,8 @@
 #      same time, no "waiting for cells" although two private copies would not fit the pool.
 #   F3 exactness: C = the same request as B, served alone after A and B finished (from the cache or the slot).
 #      Reports the common prefix of B's and C's texts (a near-tie flip is expected at some point, as in 007).
-#   F4 pressure, pool 16384: A2 and B2 (same prefix, 1500 tokens each, ignore_eos) overflow the pool together.
+#   F4 pressure, pool 16384: A2 and B2 (same prefix, N4 = 2200 tokens each, ignore_eos) overflow the pool together
+#      (12.4k shared + 2 x 2200 > 16384; 1500 each fitted).
 #      Pass: one is suspended and resumed, both finish, no "Context size has been exceeded".
 #   usage: [ONLY=134] customware/test-fork.sh <label>
 set -uo pipefail
@@ -14,6 +15,7 @@ cd "$(dirname "$0")/.."
 label=${1:?label}
 PORT=${PORT:-5011}
 ONLY=${ONLY:-134}
+N4=${N4:-2200}
 LOG=customware/serve-$label.log
 : > "$LOG"
 (env OT='.*_exps=CPU' LLAMA_HOT_EXPERTS=customware/hot-experts-mixed-4000.txt LLAMA_HOT_EXPERTS_ALIAS=0 LLAMA_HOT_EXPERTS_SWAP=0 GGML_OP_OFFLOAD_MIN_BATCH=512 CTX=16384 UB=2048 CACHE_RAM=8192 bash customware/serve.sh "$PORT" -lv 4 --sse-ping-interval 5 > "$LOG" 2>&1 &)
@@ -64,7 +66,7 @@ EOF
 fi
 if [[ $ONLY == *4* ]]; then
   echo "== F4: the pair outgrows the pool"
-  python customware/fork-requests.py customware/fk-P.json customware/ab-$label-P.json customware/fk 1500 A2 B2 > /dev/null
+  python customware/fork-requests.py customware/fk-P.json customware/ab-$label-P.json customware/fk $N4 A2 B2 > /dev/null
   post A2 customware/fk-A2.json & sleep 3
   post B2 customware/fk-B2.json
   wait
