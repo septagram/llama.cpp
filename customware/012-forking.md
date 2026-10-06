@@ -121,9 +121,12 @@ Build `00ec137ff`. `customware/test-fork.sh fork1`, real model, pool 16,384 cell
   tokens to process", `cache_n` 88852. Both generated at the same time (10 slot switches in the progress
   lines): C at 7.45 t/s, M2 at 11.4 t/s before C arrived and ~7.5 t/s next to it (8.8 overall). Zero
   "waiting for cells", zero restore failures, VRAM 15.1 -> 15.6 GB as for any two active slots. The fork point
-  88,852 was the checkpoint M2's launch made where it started adding (4 tokens past the turn-end one at
-  88,849, because the assistant turn tokenizes 3 tokens longer when echoed), so forks land on the lazy
-  checkpoint as well as the eager one.
+  88,852 was M2's last-user-message checkpoint, 3 tokens past the eager turn-end one at 88,849: a generation
+  stops when the end-of-turn token is sampled and that token is not pushed into the slot, while the echoed
+  turn is rendered with `<|im_end|>
+<|im_start|>user
+` after it. The echo is faithful; the fork takes the
+  latest checkpoint at or before the divergence, so it lands on whichever is later.
 
 ## Status
 
