@@ -153,3 +153,56 @@ recurrent state, so it is never restored for a new conversation by itself); the 
   note and the release; each with the `Plan:` trailer. Never pushed.
 - Review: this entry is part of the review cadence over entries 010-014 that follows tonight (Opus
   reviewer and tribunal, until the second full review converges), per the user's instructions.
+
+## Implementation notes (2026-10-07)
+
+- Engine: commit `88de1d50e`. `llama_kv_cache::set_state_range`, the window in `state_write` (cells outside
+  `[state_p0, state_p1)` skipped) and `state_read_meta` (`seq_rm(dest, state_p0, -1)` instead of all),
+  `LLAMA_STATE_SEQ_FLAGS_ATTN_ONLY` (`1u << 8`) gating the recurrent part in both hybrid memories,
+  `llama_memory_set_state_range` (plain `llama_kv_cache` only, by `typeid`; sets the indexer cache as well).
+- Server: commits `de2360b44`, `56b24a07b`. As planned, with these details found on the way:
+  - `prefix_holders()` must not test `llama_memory_seq_pos_min`: for a hybrid memory it is the larger of the
+    attention and recurrent minima, and the recurrent cell sits at the last position, so it is never 0. The first
+    run of F5 showed no tail at all. A slot's tokens start at 0 and are all in the pool; the count comes from
+    `seq_pos_max + 1` capped at the token list.
+  - A pinned (suspended) tail keeps a clone of the slot's tokens in its entry, so the segment-coverage check in
+    `evict_oldest` can see it; `save()` holds the segment it is about to reference (`seg_hold`) across the
+    eviction `alloc`/`alloc_pinned` may run, since the new tail is not in the list yet.
+  - The segment is written from the saved sequence's own cells (window `[0, c)`, `ATTN_ONLY`), never from the
+    holder: nothing of another slot is touched by a save.
+  - `restore()` clears the destination first, re-attaches or restores the prefix, then reads the tail with the
+    window `[p0, -1)`; the entry's buffers are freed on success and kept on failure (a retry needs them).
+  - `get_available_slot`: when an idle slot holds a prefix of the request but the cache holds the request's own
+    tail behind that prefix and a live holder exists, the tail is restored into another idle slot next to it
+    ("restoring the tail here, next to it") instead of the takeover cutting the sibling's tail. Without another
+    idle slot the takeover stands.
+- Patches as applied: `patch-014a.py`, `patch-014a2.py` (its hybrid anchor needed the blank line), `patch-014b.py`
+  (one raw newline in a log string broke the first build; fixed in place).
+
+## Results (2026-10-07, real model, `test-fork.sh r3-fork`, pool 16384, `-np 2`)
+
+- F1 fan-out as in entry 012: one fork, no waiting for cells, both generating together (8.8 / 9.1 t/s).
+- **F5**: U (unrelated 12.3k) purges the idle pair: `wrote a 12397-token prefix segment (174.2 MiB) from slot 1`,
+  `saved slot 1 as a tail: 218 of 12615 tokens behind the prefix held by slot 0 (115.6 MiB)`, then
+  `saved slot 0 as a tail: 218 of 12615 tokens behind a 12397-token segment in RAM (115.6 MiB)`. B's request
+  again: `restored a tail of 218 tokens behind 12397 cells restored from a prefix segment; pool 12615 of 16384`.
+  A's request again: `the cache holds 12615 tokens of this conversation behind the 12397 that slot 0 has:
+  restoring the tail here, next to it`, `restored a tail of 218 tokens behind the 12397 shared with slot 0; pool
+  12833 of 16384 cells` (two private copies would need 25230). Neither re-prefilled: `prompt_n=4` each, both
+  at 13.5 t/s. Texts agree with the F1 answers for the first 367 / 221 characters (the batch-composition flip
+  of entry 007, as in F3). Counts: 1 segment, 2 tail saves, 1 segment restore, 1 re-attached restore, 0 failures.
+- F3: B (fork, next to A) vs C (alone): same for the first 221 chars, as before.
+- F4 (A2/B2 with 2200-token tails outgrow the pool): `suspended slot 0 (14373 tokens)` after
+  `saved slot 0 as a tail: 1976 of 14373 tokens behind the prefix held by slot 1 (140.3 MiB)` (a whole save was
+  ~450 MiB); when B2 finished, the decision purged it (`saved slot 1 as a tail: 2220 of 14617 tokens behind a
+  12397-token segment`: the pair's tails plus the prefix, 16593, exceed the pool) and A2 `resumed after 20.8 s`
+  from the segment (`restored a parked tail of 1976 tokens behind 12397 cells restored from a prefix segment`).
+  Both finish, no collective error.
+- A refinement left for later: the decision costs a parked tail as "behind a live holder" and may purge that
+  holder in the same pass (F4 above); the resume then needs the whole sequence, and if that does not fit, the
+  resume-retry rule covers it (next pass, lower occupancy). A cost that knows a purged holder raises its tails'
+  need would predict it.
+
+Regression on the same build (`r3`/`r4`): kvu 2 and 5 (suspend, resume after 95 s, both complete), kvu 4 and
+keep-alive E (a prompt larger than the pool refused at once: HTTP 400 after 0.1 s, server idle after), keep-alive
+F/Q/R (pings every 5 s, headers after 5.1 s, order kept); scheduler P1, cache-hit and the third request: below.
