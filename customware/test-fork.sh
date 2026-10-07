@@ -9,12 +9,18 @@
 #   F4 pressure, pool 16384: A2 and B2 (same prefix, N4 = 2200 tokens each, ignore_eos) overflow the pool together
 #      (12.4k shared + 2 x 2200 > 16384; 1500 each fitted).
 #      Pass: one is suspended and resumed, both finish, no "Context size has been exceeded".
-#   usage: [ONLY=134] customware/test-fork.sh <label>
+#   F5 (entry 014) the pair leaves the pool and comes back shared: after F1 (A continues P in one slot, B is a fork in
+#      the other, both idle) an unrelated 12.3k request U needs their cells: the scheduler purges them (one prefix
+#      segment written, two tail saves); U answers. B's request again (B3): no live holder, so its prefix comes back
+#      from the segment; A's request again (A3): B is live, so A's tail is restored next to it and re-attached.
+#      Pass: 1 segment, 2 tail saves, 1 segment restore, 1 re-attached restore, no restore failure, the pool after
+#      A3's restore well under 2 x 12.4k cells (the restore line prints it), A3/B3 texts match A/B (modulo a near-tie).
+#   usage: [ONLY=1534] customware/test-fork.sh <label>
 set -uo pipefail
 cd "$(dirname "$0")/.."
 label=${1:?label}
 PORT=${PORT:-5011}
-ONLY=${ONLY:-134}
+ONLY=${ONLY:-1534}
 N4=${N4:-2200}
 LOG=customware/serve-$label.log
 : > "$LOG"
@@ -51,6 +57,24 @@ if [[ $ONLY == *1* ]]; then
   wait
   echo "  forks: $(clean | grep -c 'fork of slot')   waiting for cells: $(clean | grep -c 'waiting for cells')   restore failures: $(clean | grep -c 'failed to find [0-9]* available')   turn-end checkpoints: $(clean | grep -c 'created context checkpoint')   slot switches while generating: $(overlap)"
   clean | grep -E "fork of slot|forked from slot|not forking|waiting for cells|no slot is free" | sed -E 's/^[0-9.]+ [IWE] //' | cut -c1-150
+fi
+if [[ $ONLY == *5* ]]; then
+  echo "== F5: the pair leaves the pool and comes back shared"
+  mk customware/fk-U.json customware/smoke-request-prose.json 20 forkU
+  post U customware/fk-U.json
+  post B3 customware/fk-B.json
+  post A3 customware/fk-A.json
+  echo "  segments written: $(clean | grep -c 'wrote a .*prefix segment')   tail saves: $(clean | grep -c 'saved slot .* as a tail')   segment restores: $(clean | grep -c 'restored from a prefix segment')   re-attached restores: $(clean | grep -c 'restored a tail .* shared with slot')   restore failures: $(clean | grep -c 'failed to load prompt from cache')"
+  clean | grep -E "prefix segment|as a tail|restored a tail|purging slot|restoring the tail here" | sed -E 's/^[0-9.]+ [IWE] //' | cut -c1-170
+  python - <<EOF2
+import json
+for x in ('A', 'B'):
+    a = json.load(open('customware/ab-$label-%s.json' % x))['choices'][0]['message'].get('content') or ''
+    b = json.load(open('customware/ab-$label-%s3.json' % x))['choices'][0]['message'].get('content') or ''
+    n = 0
+    while n < min(len(a), len(b)) and a[n] == b[n]: n += 1
+    print('  %s3 vs %s: %s (%d and %d chars)' % (x, x, 'IDENTICAL' if a == b else 'same for the first %d chars' % n, len(a), len(b)))
+EOF2
 fi
 if [[ $ONLY == *3* ]]; then
   echo "== F3: the forked text against the same request served alone"

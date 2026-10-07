@@ -17,6 +17,6 @@ run() { # <name> <command...>
 run kvu          env SCEN="1 2 3 4 5" bash customware/test-kvu.sh "$label-kvu"
 run cachehit     bash customware/test-cache-hit-real.sh "$label-hit"
 run keepalive    bash customware/test-keepalive.sh "$label-ka"
-run fork         env ONLY=14 bash customware/test-fork.sh "$label-fork"
+run fork         env ONLY=154 bash customware/test-fork.sh "$label-fork"
 run third        bash customware/test-third-request.sh "$label-third"
 echo "regression suite $label done"
