@@ -2196,6 +2196,23 @@ private:
             victim->prompt.tokens.keep_first(victim->prompt.tokens.size() - removed.size());
         }
 
+        // customware (entry 013, follow-up): a victim that could never come back (the cells it holds alone plus the
+        // resume margin exceed the pool) is not parked: it fails alone with the context error, its conversation goes
+        // to the cache like any purged one, and the others go on with its cells. Parked, nothing could have brought
+        // it back and its client would have waited forever.
+        {
+            const int32_t owned = kv_cells_owned({ victim->id });
+            if (owned + kv_resume_margin() > kv_pool_size()) {
+                SRV_WRN("KV pool overflow: slot %d (task %d, %d tokens, %d cells of its own) outgrew the pool of %d cells and could not come back: failing it, the others continue\n",
+                        victim->id, victim->task->id, n_before, owned, kv_pool_size());
+                send_error(*victim, string_format("context size exceeded: the request (%d tokens) outgrew the KV pool (%d cells)", n_before, kv_pool_size()),
+                        ERROR_TYPE_EXCEED_CONTEXT_SIZE);
+                victim->release();
+                purge_idle(*victim, owned);
+                return true;
+            }
+        }
+
         if (!victim->suspend()) {
             return false;
         }
@@ -3162,7 +3179,9 @@ private:
             r.prio      = task.params.priority;
             r.t_arrival = task.t_arrival;
             r.state     = SCHED_REQ_WAITING;
-            r.need       = pl.need;
+            // a request whose growth reserve exceeds the pool is charged the pool: it runs alone, as entry 007's
+            // admission let it (the prompt fits; a generation that outgrows the pool fails as before)
+            r.need       = std::min(pl.need, in.pool);
             r.reuse      = pl.reuse;
             r.reuse_keep = pl.keep;
             in.reqs.push_back(r);
@@ -3322,6 +3341,14 @@ private:
                     if (params_base.kv_unified && task.type == SERVER_TASK_TYPE_COMPLETION) {
                         if (task.t_arrival == 0) {
                             task.t_arrival = ggml_time_us();
+                        }
+                        // a prompt the pool cannot hold even alone is refused here, as the launch refuses it; waiting
+                        // for cells that never come is not an answer (a 44k prompt on a 32k pool waited until the
+                        // client gave up)
+                        if (task.n_tokens() >= kv_pool_size()) {
+                            send_error(task, string_format("request (%d tokens) exceeds the available context size (%d tokens), try increasing it",
+                                    task.n_tokens(), kv_pool_size()), ERROR_TYPE_EXCEED_CONTEXT_SIZE);
+                            break;
                         }
                         const sched_output out = schedule("task", &task, SCHED_FULL);
                         if (std::find(out.start.begin(), out.start.end(), task.id) == out.start.end()) {
