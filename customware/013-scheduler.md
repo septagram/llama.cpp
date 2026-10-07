@@ -140,3 +140,23 @@ A third concurrent generation adds 12% of total throughput and costs every slot 
 by default, so `LLAMA_SCHED_MAX_ACTIVE` stays 2 and the third slot serves priority starts, suspended requests
 and idle conversations that keep their cells. The projection from the two-way cost model (5.6 each) was a
 little pessimistic: the third token adds ~43 ms to a 114 ms step here, not 46.
+
+## Follow-ups from the regression suite (2026-10-07, commit `e49f3c06a`)
+
+The night's `test-regress.sh r1` (build of `3511e93a0`): kvu scenarios 1, 2, 3, 5 passed (scenario 2: the
+displaced sequence suspended, resumed after 104.6 s, both complete; the "identical prefix" check stays weak, as
+in entry 007: logits depend on the batch composition), cache-hit passed, keep-alive F passed. Three gaps:
+
+- **A prompt the pool cannot hold even alone waited forever** (kvu scenario 4, keep-alive E: a 44k prompt on a
+  32k / 24k pool). The decision never starts it, the deferral never ends, the client gives up. Now refused at
+  once in `process_single_task` with the context-exceeded error, as the launch would refuse it
+  (`task.n_tokens() >= kv_pool_size()`).
+- **A request whose growth reserve exceeds the pool never fit** although its prompt does. Its need is charged
+  at most the pool in `build_sched_input`, so it runs alone, as entry 007's admission let it.
+- **An overflow victim that could never come back was parked forever**: `try_preempt` suspended whatever the
+  scheduler named, and a sequence whose own cells plus the resume margin exceed the pool never resumes. Such a
+  victim now fails alone with the context error, its conversation goes to the cache like any purged one, and the
+  others go on with its cells.
+
+The suite itself was stopped by the harness at its 2-hour limit while the keep-alive stage hung on scenario E;
+its child script kept running into the next morning (see `check-box.sh`'s leftover-process check).

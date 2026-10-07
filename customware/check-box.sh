@@ -17,3 +17,9 @@ if ($hogs) { "CPU hogs (cores busy): " + (($hogs | ForEach-Object { "{0} {1}" -f
 '
 echo "VRAM: $(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader | tr '\n' ' ') (the 120k launcher wants <= 1 GB of desktop use on the 4060 Ti, else LLAMA_HOT_EXPERTS_MIB=5000)"
 if curl -s -m 2 http://127.0.0.1:5000/health 2>/dev/null | grep -q '"ok"'; then echo "port 5000: a server is running"; else echo "port 5000: free"; fi
+# leftover test processes (a background test chain that hit its time limit leaves its children running: on 2026-10-07
+# last night's suite shared a port 5011 server with the morning's; both runs were lost)
+powershell -NoProfile -Command '
+$p = Get-CimInstance Win32_Process | Where-Object { ($_.CommandLine -match "customware/(test-[a-z0-9-]+|serve)\.sh") -or ($_.Name -eq "llama-server.exe" -and $_.CommandLine -notmatch "--port 5000") }
+if ($p) { "LEFTOVER test processes (kill them before any GPU test; never the port-5000 server):"; $p | ForEach-Object { "  {0} {1}" -f $_.ProcessId, ($_.CommandLine -replace "^.*bash\.exe.? ", "").Substring(0, [Math]::Min(90, ($_.CommandLine -replace "^.*bash\.exe.? ", "").Length)) } } else { "test processes: none" }
+'
