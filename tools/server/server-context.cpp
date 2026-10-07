@@ -2259,8 +2259,6 @@ private:
         return std::max(n, 0);
     }
 
-    // cells the given sequences own together (every label in the set): what removing all of them frees. In a
-    // unified pool a fork shares its prefix with its source, so this is not the sum of token counts.
     // customware (entry 014): the sequences in the pool a tail can re-attach its prefix to: every slot with cells
     // (not suspended, not waiting on a parent), `exclude` left out; n_tokens = how many of its tokens are in the pool
     server_prefix_holders prefix_holders(const server_slot * exclude) const {
@@ -2286,6 +2284,8 @@ private:
         return res;
     }
 
+    // cells the given sequences own together (every label in the set): what removing all of them frees. In a
+    // unified pool a fork shares its prefix with its source, so this is not the sum of token counts.
     int32_t kv_cells_owned(const std::vector<llama_seq_id> & ids) const {
         if (ids.empty()) {
             return 0;
@@ -3178,11 +3178,16 @@ private:
                 c.owned  = kv_cells_owned({ slot.id });
                 c.t_last = slot.t_last_used;
                 in.idle.push_back(c);
+                idle_ids.push_back(slot.id);
             }
         }
 
+        in.shared = std::max(0, kv_cells_used() - (idle_ids.empty() ? 0 : kv_cells_owned(idle_ids)) - held_running);
+
         auto add_waiting = [&](const server_task & task) {
-            if (task.type != SERVER_TASK_TYPE_COMPLETION) {
+            // review fix: an infill is a completion for the pool (priced as a cold start by plan_placement); the
+            // other types cannot reach the queue on the shipped launchers
+            if (task.type != SERVER_TASK_TYPE_COMPLETION && task.type != SERVER_TASK_TYPE_INFILL) {
                 return;
             }
             const sched_placement pl = plan_placement(task);
@@ -3350,7 +3355,8 @@ private:
                     const int id_task = task.id;
 
                     // customware (entry 013): under --kv-unified the scheduler decides whether this request starts now
-                    if (params_base.kv_unified && task.type == SERVER_TASK_TYPE_COMPLETION) {
+                    // (review fix: an infill too)
+                    if (params_base.kv_unified && (task.type == SERVER_TASK_TYPE_COMPLETION || task.type == SERVER_TASK_TYPE_INFILL)) {
                         if (task.t_arrival == 0) {
                             task.t_arrival = ggml_time_us();
                         }

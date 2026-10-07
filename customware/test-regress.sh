@@ -2,7 +2,8 @@
 # The regression suite of the server-side entries, run one after the other on port 5011 (the GPU must be free):
 #   entry 007 queueing/preemption/resume (test-kvu.sh, scenarios 1 2 3 4 5, exactness included),
 #   entry 010 cache hits (test-cache-hit-real.sh), entry 011 keep-alive (test-keepalive.sh),
-#   entry 012 forking (test-fork.sh F1+F4), the small request next to a large one (test-third-request.sh).
+#   entries 012 and 014 forking and shared tails (test-fork.sh F1, F5 and F4: ONLY=154), the small request next
+#   to a large one (test-third-request.sh).
 # Prints each script's verdict lines; the pass criteria are in the scripts' headers.
 #   usage: customware/test-regress.sh <label>
 set -uo pipefail

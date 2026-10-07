@@ -2114,6 +2114,14 @@ int32_t server_prompt_cache::split_point(const server_tokens & tokens, const ser
         return 0;
     }
 
+    // review fix: the windows and the re-attach are in positions, and a media chunk before the split takes fewer
+    // positions than tokens under M-RoPE: such a conversation is saved whole
+    if (tokens.pos_next(best) != best) {
+        *holder  = nullptr;
+        *segment = nullptr;
+        return 0;
+    }
+
     if (*segment == nullptr) {
         *segment = find_segment(tokens, best);
     }
