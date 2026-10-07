@@ -48,6 +48,11 @@ struct sched_input {
     // would not free: a prefix shared between a running request and anything else (a fork and its source, a tail
     // re-attached to its holder). Nobody's `held` or `owned`, so the walk is seeded with them
     int32_t shared  = 0;
+    // cells labelled only by idle conversations and by more than one of them (a finished fork next to its source):
+    // purgeable, so nobody's `owned`, but a takeover that keeps such a prefix keeps these too, so they are charged
+    // to it. With three or more idle conversations this lumps all idle-only sharing together and can over-charge a
+    // takeover; that errs toward waiting, and the `min` with the kept prefix and the pool cap bound it
+    int32_t idle_shared = 0;
     std::vector<sched_req>  reqs;
     std::vector<sched_conv> idle;
 };

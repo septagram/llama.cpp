@@ -3182,7 +3182,15 @@ private:
             }
         }
 
-        in.shared = std::max(0, kv_cells_used() - (idle_ids.empty() ? 0 : kv_cells_owned(idle_ids)) - held_running);
+        // what purging every idle conversation frees, minus what purging each alone frees: the cells shared only
+        // between idle conversations. A takeover that keeps such a prefix is charged it (review iteration 2)
+        const int32_t idle_owned_all = idle_ids.empty() ? 0 : kv_cells_owned(idle_ids);
+        int32_t idle_owned_each = 0;
+        for (const auto & c : in.idle) {
+            idle_owned_each += c.owned;
+        }
+        in.shared      = std::max(0, kv_cells_used() - idle_owned_all - held_running);
+        in.idle_shared = std::max(0, idle_owned_all - idle_owned_each);
 
         auto add_waiting = [&](const server_task & task) {
             // review fix: an infill is a completion for the pool (priced as a cold start by plan_placement); the

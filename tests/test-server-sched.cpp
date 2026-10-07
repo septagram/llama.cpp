@@ -76,6 +76,22 @@ int main() {
         CHECK(out.suspend.empty());
     }
 
+    // 2d. two idle siblings share a 70000-cell prefix (nobody's `owned`, purgeable); a turn continuing one of them
+    //     keeps that prefix and is charged it: with 45000 running it does not start (45256 + 8048 + 71000 > 120064),
+    //     and nothing is suspended for it (running is sticky among equals)
+    {
+        auto in = base(120064, 3);
+        in.idle_shared = 70000;
+        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 45000, 256, 0, 10));
+        in.idle.push_back(conv(10, 1000, 100));
+        in.idle.push_back(conv(11, 1000, 200));
+        in.reqs.push_back(req(2, SCHED_REQ_WAITING, 0, 8048, 0, 20, /*reuse*/ 10, /*keeps*/ 71000));
+        auto out = sched_decide(in);
+        CHECK(has(out.keep, 1));
+        CHECK(!has(out.start, 2));
+        CHECK(out.suspend.empty());
+    }
+
     // 2c. the whole cost is capped at the pool: a conversation of 118000 idle in a 120064 pool, its next turn
     //     (2548 more with the reserve, keeping the 118000) starts with nothing running; before, 120548 never fit
     {

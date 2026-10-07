@@ -96,7 +96,9 @@ sched_output sched_decide(const sched_input & in) {
         // conversation it continues (the rest of that conversation is freed by the takeover). Capped at the pool:
         // a request alone in the pool always fits, whatever its growth reserve (a continuation of a conversation
         // within one reserve of the pool size would otherwise never start, with nothing to wait for)
-        const int32_t cost = std::min<int32_t>(r->held + r->need + (continues ? std::min(r->reuse_keep, idle_by_id[r->reuse]->owned) : 0), in.pool);
+        // the kept part of a takeover: the conversation's own cells plus what it shares only with other idle ones
+        // (the purge loop keeps using `owned`: purging the sibling still frees only its tail)
+        const int32_t cost = std::min<int32_t>(r->held + r->need + (continues ? std::min(r->reuse_keep, idle_by_id[r->reuse]->owned + in.idle_shared) : 0), in.pool);
 
         bool fits_cells = false;
         bool fits_slot  = false;
