@@ -83,8 +83,9 @@ sched_output sched_decide(const sched_input & in) {
     const int active_max = in.n_active_max > 0 ? std::min(in.n_active_max, in.n_slots) : in.n_slots;
     int active = 0;
 
-    // the walk: idle cells count as free (they can be purged); the purge list is settled afterwards
-    int32_t cells_used = 0;
+    // the walk: idle cells count as free (they can be purged); the purge list is settled afterwards. Cells shared
+    // with a running request are taken whatever is purged, so they are charged up front
+    int32_t cells_used = in.shared;
     const sched_req * victim = nullptr;
 
     for (const auto * r : order) {
@@ -92,8 +93,10 @@ sched_output sched_decide(const sched_input & in) {
             std::find(taken_over.begin(), taken_over.end(), r->reuse) == taken_over.end();
 
         // what the request costs the pool: its own cells, what it still needs, and what it keeps of the
-        // conversation it continues (the rest of that conversation is freed by the takeover)
-        const int32_t cost = r->held + r->need + (continues ? std::min(r->reuse_keep, idle_by_id[r->reuse]->owned) : 0);
+        // conversation it continues (the rest of that conversation is freed by the takeover). Capped at the pool:
+        // a request alone in the pool always fits, whatever its growth reserve (a continuation of a conversation
+        // within one reserve of the pool size would otherwise never start, with nothing to wait for)
+        const int32_t cost = std::min<int32_t>(r->held + r->need + (continues ? std::min(r->reuse_keep, idle_by_id[r->reuse]->owned) : 0), in.pool);
 
         bool fits_cells = false;
         bool fits_slot  = false;

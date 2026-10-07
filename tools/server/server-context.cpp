@@ -1902,7 +1902,9 @@ private:
                             task.id, lcp_src, src->id);
                 } else {
                     const int32_t need      = kv_need((int32_t) task.tokens.size() - (int32_t) ckpt->n_tokens, task.params.n_predict);
-                    const int32_t committed = kv_committed(true);
+                    // review fix: not the suspended slots (kv_committed(true)): resumes belong to the decision, which
+                    // admitted this task; a refusal here falls through to a cold start
+                    const int32_t committed = kv_committed(false);
                     const int32_t pool      = kv_pool_size();
 
                     if (committed + need > pool) {
@@ -1994,11 +1996,12 @@ private:
                     const auto    pk   = prompt_cache->peek(ret->prompt, task.tokens, prefix_holders(ret));
                     const int64_t need = pk.n_tokens > 0 ? pk.n_cells : -1;
 
-                    // what the active and suspended sequences will hold once their prompts are in. A restore that fits the
-                    // cells free at this instant but not next to those is purged again by the first decode that runs out
-                    // of room: seen in the field as a 94k state restored four seconds into another slot's 99k prefill,
-                    // purged at 25k, and prefilled from zero on its next turn.
-                    const int64_t committed = need > 0 ? (int64_t) kv_committed(true) : 0;
+                    // what the active sequences will hold once their prompts are in. A restore that fits the cells free
+                    // at this instant but not next to those is purged again by the first decode that runs out of room:
+                    // seen in the field as a 94k state restored four seconds into another slot's 99k prefill, purged
+                    // at 25k, and prefilled from zero on its next turn. Review fix: not the suspended slots: resumes
+                    // belong to the decision, which admitted this task, and a refusal here is a cold start
+                    const int64_t committed = need > 0 ? (int64_t) kv_committed(false) : 0;
 
                     if (need > 0 && committed + need > (int64_t) kv_pool_size()) {
                         SLT_INF(*ret, "cached prompt of %lld tokens does not fit next to the %lld cells the active sequences need: kept for later\n",
@@ -3128,6 +3131,12 @@ private:
 
         const server_prefix_holders holders = prefix_holders(nullptr);
 
+        // review fix: the cells shared between a running request and anything else are nobody's `held` or `owned`;
+        // they are charged up front. The idle ids are subtracted together, so a prefix shared only between idle
+        // conversations stays purgeable
+        int32_t held_running = 0;
+        std::vector<llama_seq_id> idle_ids;
+
         for (const auto & slot : slots) {
             if (slot.state == SLOT_STATE_SUSPENDED) {
                 sched_req r;
@@ -3135,7 +3144,9 @@ private:
                 r.prio      = slot.task->params.priority;
                 r.t_arrival = slot.task->t_arrival;
                 r.state     = SCHED_REQ_SUSPENDED;
-                r.need      = slot.prompt.n_tokens() + kv_resume_margin();
+                // review fix: a request parked during its prefill comes back to finish it, so the whole prompt is
+                // charged, as for a running one (the walk caps the cost at the pool)
+                r.need      = std::max(slot.prompt.n_tokens(), slot.task->n_tokens()) + kv_resume_margin();
                 // customware (entry 014): a parked tail behind a live holder comes back with its own cells only
                 if (slot.suspended_state != nullptr && slot.suspended_state->p0 > 0 &&
                         server_prompt_cache::find_holder(slot.prompt.tokens, slot.suspended_state->p0, holders, slot.id) != nullptr) {
@@ -3158,6 +3169,7 @@ private:
                 r.need      = std::max(0, slot.task->n_tokens() - (int32_t) slot.prompt.n_tokens()) + kv_margin();
                 r.has_slot  = true;
                 in.reqs.push_back(r);
+                held_running += r.held;
                 continue;
             }
             if (slot.prompt.n_tokens() > 0) {

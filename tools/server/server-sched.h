@@ -44,6 +44,10 @@ struct sched_input {
     int     n_active_max = 0;  // requests running at once (generating or prefilling); 0 = n_slots. Slots are contexts, not parallelism
     int64_t now     = 0;       // us
     int64_t t_age   = 0;       // a request waiting longer than this (us) is promoted one class; 0 = off
+    // cells in the pool that no single running request holds alone and that purging every idle conversation
+    // would not free: a prefix shared between a running request and anything else (a fork and its source, a tail
+    // re-attached to its holder). Nobody's `held` or `owned`, so the walk is seeded with them
+    int32_t shared  = 0;
     std::vector<sched_req>  reqs;
     std::vector<sched_conv> idle;
 };

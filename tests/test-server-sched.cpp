@@ -50,14 +50,41 @@ int main() {
         CHECK(out.suspend.empty());
     }
 
-    // 2. a fork pair: each holds only its tail; both fit although their token counts would not
+    // 2. a fork pair: each holds only its tail, the prefix is shared (nobody's alone); both fit although their
+    //    token counts would not
     {
         auto in = base(16384, 2);
-        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 12400 + 1500, 256, 0, 10)); // the parent owns the prefix and its tail
-        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1500, 256, 0, 20));         // the fork owns its tail
+        in.shared = 12400;
+        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 1500, 256, 0, 10)); // the parent's tail
+        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1500, 256, 0, 20)); // the fork's tail
         auto out = sched_decide(in);
         CHECK(out.keep.size() == 2);
         CHECK(out.suspend.empty());
+    }
+
+    // 2b. the shared prefix is charged: a running fork (tail 1000) next to its idle sibling (owned 1000) share
+    //     88000 of a 120064 pool; a cold 50000-token waiter must wait, and purging the sibling frees only its tail
+    {
+        auto in = base(120064, 3);
+        in.shared = 88000;
+        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 1000, 256, 0, 10));
+        in.idle.push_back(conv(1, 1000, 100));
+        in.reqs.push_back(req(2, SCHED_REQ_WAITING, 0, 50000 + 256, 0, 20));
+        auto out = sched_decide(in);
+        CHECK(has(out.keep, 1));
+        CHECK(!has(out.start, 2));
+        CHECK(out.suspend.empty());
+    }
+
+    // 2c. the whole cost is capped at the pool: a conversation of 118000 idle in a 120064 pool, its next turn
+    //     (2548 more with the reserve, keeping the 118000) starts with nothing running; before, 120548 never fit
+    {
+        auto in = base(120064, 2);
+        in.idle.push_back(conv(0, 118000, 100));
+        in.reqs.push_back(req(1, SCHED_REQ_WAITING, 0, 2548, 0, 10, /*reuse*/ 0, /*keeps*/ 118000));
+        auto out = sched_decide(in);
+        CHECK(has(out.start, 1));
+        CHECK(out.purge.empty());
     }
 
     // 3. priority: a higher class arrives with no room; the lowest-ranked running request is displaced
