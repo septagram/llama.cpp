@@ -11,7 +11,8 @@ Items keep their numbers; the order of work is the list right below, not the num
    with three follow-ups from the regression suite (a prompt the pool cannot hold is refused at once; a reserve larger
    than the pool is charged the pool; an overflow victim that could never return fails alone).
 4. **A fork pushed to RAM stays shared** (entry 014, `014-shared-tails.md`): tail saves behind live holders or RAM
-   prefix segments, re-attached on restore. Implemented 2026-10-07; verification in progress.
+   prefix segments, re-attached on restore. Done 2026-10-07, released as `b3fe31f24` after the review cadence
+   (iterations 1-3 fixed and converged; the second full review's findings are with the user).
 5. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
 6. **Checkpoint policy** (item 14, `notes-checkpoint-policy.md`): last, the least defined of them.
 

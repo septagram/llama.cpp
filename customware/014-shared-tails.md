@@ -205,4 +205,15 @@ recurrent state, so it is never restored for a new conversation by itself); the 
 
 Regression on the same build (`r3`/`r4`): kvu 2 and 5 (suspend, resume after 95 s, both complete), kvu 4 and
 keep-alive E (a prompt larger than the pool refused at once: HTTP 400 after 0.1 s, server idle after), keep-alive
-F/Q/R (pings every 5 s, headers after 5.1 s, order kept); scheduler P1, cache-hit and the third request: below.
+F/Q/R (pings every 5 s, headers after 5.1 s, order kept); scheduler P1 (a priority-5 request displaces the
+running one, which resumes after 67-69 s and finishes); cache-hit (the second A and B restore from RAM: `cached
+n_tokens = 22221` / `12337`, no prefill); the third request (a 42-token request runs next to the generating 12.3k
+one while the second 12.3k waits). Rerun on the review-fixed build (`r5`, commits `46b6c069d`..`9441764e1`): fork
+F1/F5/F3/F4 (same counts; F4's victim is now displaced by the decision at a tick, before the overflow, since the
+shared prefix is charged: `14993 of 16384 cells committed` where the first build logged 2600), kvu 2 and 5,
+scheduler P1, the third request: all pass.
+
+Released as `b3fe31f24` on 2026-10-07 23:50 (both launchers). Launcher check: health in 20 s, log-probs as in every
+earlier check, VRAM 15.5-15.9 GiB. The 88k precompaction pair on the 120k launcher (`fkl-014`): the compaction request
+forked at 88852 tokens (22 to process), both generated together, no waiting for cells; the pair stays in the 120k pool,
+so no tail save happens there (that needs a third conversation to push them out, as F5 does at 16k).
