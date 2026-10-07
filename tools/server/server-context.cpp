@@ -2270,9 +2270,9 @@ private:
                     slot.state == SLOT_STATE_SUSPENDED || slot.state == SLOT_STATE_WAIT_OTHER) {
                 continue;
             }
-            if (llama_memory_seq_pos_min(mem, slot.id) != 0) {
-                continue;
-            }
+            // the slot's tokens start at position 0 and are all in the pool (the prompt loop cuts tokens and cells
+            // together; this model cannot shift). Not llama_memory_seq_pos_min: for a hybrid memory it is the
+            // recurrent cell's position, the last one, so it is never 0 for a sequence with cells
             const int32_t n = std::min<int32_t>((int32_t) slot.prompt.tokens.size(), llama_memory_seq_pos_max(mem, slot.id) + 1);
             if (n <= 0) {
                 continue;
