@@ -232,7 +232,10 @@ void llama_memory_hybrid_idx::state_read(llama_io_read_i & io, llama_seq_id seq_
             get_mem_attn()->state_read_sinfo(io, seq_id, flags, mem_idx ? &sinfos_attn : nullptr, nullptr);
         }
 
-        get_mem_recr()->state_read(io, seq_id, flags);
+        // customware (entry 014): a prefix segment carries the attention (and indexer) cells only
+        if ((flags & LLAMA_STATE_SEQ_FLAGS_ATTN_ONLY) == 0) {
+            get_mem_recr()->state_read(io, seq_id, flags);
+        }
 
         // [TAG_HYBRID_IDX_STATE] must mirror the write order in state_write
         if ((flags & LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) == 0) {

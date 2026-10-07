@@ -168,6 +168,9 @@ public:
 
     const llama_kv_cells & get_cells(llama_seq_id seq_id) const;
 
+    // customware (entry 014): the position window of the per-sequence state I/O (see llama_memory_set_state_range)
+    void set_state_range(llama_pos p0, llama_pos p1);
+
     // state_read, plus the cells the restored tokens were placed in
     // a cache that mirrors another one (the qwen4exp indexer) must not search for its own cells: two searches agree only by luck
     //   sinfos_out: if set, filled with the layout used; a stream with no cells leaves an empty entry
@@ -284,6 +287,11 @@ private:
 
     // env: LLAMA_KV_CACHE_DEBUG
     int debug = 0;
+
+    // customware (entry 014): per-sequence state I/O keeps only the cells with state_p0 <= pos < state_p1 (write) and
+    // replaces the sequence's cells from state_p0 on (read); -1 = no bound
+    llama_pos state_p0 = -1;
+    llama_pos state_p1 = -1;
 
     // this is the SWA type of the cache - not to be confused with the model SWA type
     const llama_swa_type swa_type = LLAMA_SWA_TYPE_NONE;

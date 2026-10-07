@@ -8,6 +8,7 @@
 #include "llama-io.h"
 #include "llama-memory.h"
 #include "llama-memory-hybrid.h"
+#include "llama-memory-hybrid-idx.h"
 #include "llama-kv-cache.h"
 #include "llama-mmap.h"
 #include "llama-model.h"
@@ -24,6 +25,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 
 //
@@ -4432,6 +4434,41 @@ uint32_t llama_memory_n_cells_owned(llama_memory_t mem, const llama_seq_id * seq
     }
 
     return n;
+}
+
+bool llama_memory_set_state_range(llama_memory_t mem, llama_pos p0, llama_pos p1) {
+    if (!mem) {
+        return false;
+    }
+
+    // only the plain attention cache honours the window; the variants with state paths of their own (dsa, iswa,
+    // msa, dsv4) do not, and a window they ignored would save a whole sequence under a tail's label
+    const auto plain = [](const llama_kv_cache * kv) {
+        return kv != nullptr && typeid(*kv) == typeid(llama_kv_cache);
+    };
+
+    llama_kv_cache * attn = nullptr;
+    llama_kv_cache * idx  = nullptr;
+
+    if (auto * hybrid = dynamic_cast<llama_memory_hybrid *>(mem)) {
+        attn = hybrid->get_mem_attn();
+        if (auto * hybrid_idx = dynamic_cast<llama_memory_hybrid_idx *>(mem)) {
+            idx = hybrid_idx->get_mem_idx();
+        }
+    } else {
+        attn = dynamic_cast<llama_kv_cache *>(mem);
+    }
+
+    if (!plain(attn) || (idx != nullptr && !plain(idx))) {
+        return false;
+    }
+
+    attn->set_state_range(p0, p1);
+    if (idx != nullptr) {
+        idx->set_state_range(p0, p1);
+    }
+
+    return true;
 }
 
 // llama state API

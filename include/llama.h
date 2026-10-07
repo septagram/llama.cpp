@@ -821,6 +821,14 @@ extern "C" {
     // the sum of their token counts. 0 if unknown.
     LLAMA_API uint32_t llama_memory_n_cells_owned(llama_memory_t mem, const llama_seq_id * seq_ids, size_t n_seq_ids);
 
+    // customware (entry 014): a position window for the per-sequence state writes and reads of the attention cache(s)
+    // behind this memory, until it is set again: a write keeps only the sequence's cells with p0 <= pos < p1 (p1 < 0:
+    // no upper bound); a read replaces the sequence's cells from p0 on instead of all of them, so the cells below p0
+    // (re-attached from another sequence with llama_memory_seq_cp) stay. -1, -1 = the whole sequence, the default.
+    // Whole-memory state I/O ignores the window. Returns false when the memory has no plain attention cache; then
+    // every save is whole.
+    LLAMA_API bool llama_memory_set_state_range(llama_memory_t mem, llama_pos p0, llama_pos p1);
+
     //
     // State / sessions
     //
@@ -931,6 +939,10 @@ extern "C" {
 // Keeps the tensor data on device buffers (i.e. not accessible in host memory, but faster save/load).
 // Getting the state for a seq_id with this flag invalidates all prior states gotten for that seq_id with this flag.
 #define LLAMA_STATE_SEQ_FLAGS_ON_DEVICE 2
+
+// customware (entry 014): the attention cells only; a hybrid memory skips its recurrent part. A prefix segment shared
+// by several conversations carries no state of its own, so it is written and read with this flag.
+#define LLAMA_STATE_SEQ_FLAGS_ATTN_ONLY (1u << 8)
 
     typedef uint32_t llama_state_seq_flags;
 

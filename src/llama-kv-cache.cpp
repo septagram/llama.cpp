@@ -2079,6 +2079,13 @@ void llama_kv_cache::state_write(llama_io_write_i & io, llama_seq_id seq_id, lla
             add_cell = add_cell && !cells.is_empty(i);
             add_cell = add_cell && (seq_id == -1 || cells.seq_has(i, seq_id));
 
+            // customware (entry 014): the position window of a tail or prefix save
+            if (add_cell && seq_id != -1 && state_p0 >= 0) {
+                const llama_pos pos = cells.pos_get(i);
+
+                add_cell = pos >= state_p0 && (state_p1 < 0 || pos < state_p1);
+            }
+
             // check the cell is not SWA-masked
             if (add_cell && seq_id != -1) {
                 const bool is_masked = llama_hparams::is_masked_swa(n_swa, swa_type, cells.pos_get(i), cells.seq_pos_max(seq_id));
@@ -2124,6 +2131,11 @@ void llama_kv_cache::state_write(llama_io_write_i & io, llama_seq_id seq_id, lla
 
 void llama_kv_cache::state_read(llama_io_read_i & io, llama_seq_id seq_id, llama_state_seq_flags flags) {
     state_read_sinfo(io, seq_id, flags, nullptr, nullptr);
+}
+
+void llama_kv_cache::set_state_range(llama_pos p0, llama_pos p1) {
+    state_p0 = p0;
+    state_p1 = p1;
 }
 
 void llama_kv_cache::state_read_sinfo(
@@ -2340,7 +2352,9 @@ bool llama_kv_cache::state_read_meta(llama_io_read_i & io, uint32_t strm, uint32
 
     if (dest_seq_id != -1) {
         // single sequence
-        seq_rm(dest_seq_id, -1, -1);
+        // customware (entry 014): under a position window only the cells from state_p0 on are replaced; the ones below
+        // (re-attached from another sequence) stay
+        seq_rm(dest_seq_id, state_p0 >= 0 ? state_p0 : -1, -1);
 
         llama_batch_allocr balloc(hparams.n_pos_per_embd());
 
