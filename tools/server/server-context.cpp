@@ -3346,8 +3346,9 @@ private:
                         // for cells that never come is not an answer (a 44k prompt on a 32k pool waited until the
                         // client gave up)
                         if (task.n_tokens() >= kv_pool_size()) {
-                            send_error(task, string_format("request (%d tokens) exceeds the available context size (%d tokens), try increasing it",
-                                    task.n_tokens(), kv_pool_size()), ERROR_TYPE_EXCEED_CONTEXT_SIZE);
+                            // the id overload: the context-exceeded error carries the counts (the task overload asserts without them)
+                            send_error(task.id, string_format("request (%d tokens) exceeds the available context size (%d tokens), try increasing it",
+                                    task.n_tokens(), kv_pool_size()), ERROR_TYPE_EXCEED_CONTEXT_SIZE, task.n_tokens(), kv_pool_size());
                             break;
                         }
                         const sched_output out = schedule("task", &task, SCHED_FULL);
