@@ -598,12 +598,62 @@ struct server_prompt_data {
     }
 };
 
+// customware (entry 014): a sequence in the pool holding the first n_tokens of `tokens` with its cells; a tail entry
+// whose prefix one of them covers re-attaches to it on restore (labels only) instead of restoring the prefix
+struct server_prefix_holder {
+    int                   id       = -1;      // slot id = sequence id
+    const server_tokens * tokens   = nullptr;
+    int32_t               n_tokens = 0;       // how many of them are in the pool
+};
+
+using server_prefix_holders = std::vector<server_prefix_holder>;
+
+// customware (entry 014): what a restore from the cache would cost
+struct server_prompt_cache_peek {
+    int64_t n_tokens = -1; // the entry's length; -1 if none
+    int64_t n_cells  = 0;  // cells the restore allocates: the whole entry, or its tail when a holder covers the prefix
+    int     holder   = -1; // the slot whose cells the prefix re-attaches to
+};
+
+// customware (entry 014): what a restore did
+struct server_prompt_restore {
+    int     fork_of   = -1; // the holder the prefix re-attached to
+    int32_t n_shared  = 0;  // cells shared with it
+    int32_t n_segment = 0;  // cells restored from a prefix segment
+    int32_t n_tail    = 0;  // cells restored from the entry itself
+};
+
+// customware (entry 014): the position window of the attention cache's per-sequence state I/O, reset on scope exit
+struct server_state_range {
+    llama_memory_t mem;
+    bool ok;
+
+    server_state_range(llama_memory_t mem, llama_pos p0, llama_pos p1) : mem(mem) {
+        ok = llama_memory_set_state_range(mem, p0, p1);
+    }
+
+    ~server_state_range() {
+        if (ok) {
+            llama_memory_set_state_range(mem, -1, -1);
+        }
+    }
+};
+
 struct server_prompt_cache_state {
     server_prompt prompt;
     server_prompt_data data;
 
     // customware: the saved state of a suspended (preempted) slot; never evicted, erased on resume
     bool pinned = false;
+
+    // customware (entry 014): data.main holds the attention cells from position p0 on (and the recurrent state at
+    // the end); 0 = the whole sequence. A tail (p0 > 0) needs its prefix [0, p0) from a live holder or a segment
+    llama_pos p0 = 0;
+
+    // customware (entry 014): a prefix segment: the attention cells [0, tokens.size()) of its tokens, no recurrent
+    // state, no checkpoints. Shared by the tails of one family; never matched as a prompt, never restored alone,
+    // evicted only after the last tail it covers
+    bool segment = false;
 
     size_t size() const {
         size_t res = data.size();
@@ -644,11 +694,31 @@ struct server_prompt_cache {
 
     server_prompt_cache_state * alloc(const server_prompt & prompt, size_t state_size_main, size_t state_size_drft);
 
-    bool load(server_prompt & prompt, const server_tokens & tokens_new, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
+    bool load(server_prompt & prompt, const server_tokens & tokens_new, const server_prefix_holders & holders, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot, server_prompt_restore & out);
 
-    // customware: the length in tokens of the entry load() would restore for tokens_new, -1 if none. Under a
-    // unified KV pool the caller needs that many free cells before it asks for the restore.
-    int64_t peek(const server_prompt & prompt, const server_tokens & tokens_new) const;
+    // customware: what the entry load() would restore for tokens_new costs: its length, the cells it allocates (its
+    // tail only when a holder covers the prefix), the holder; n_tokens = -1 if none. Under a unified KV pool the
+    // caller needs that many free cells before it asks for the restore.
+    server_prompt_cache_peek peek(const server_prompt & prompt, const server_tokens & tokens_new, const server_prefix_holders & holders) const;
+
+    // customware (entry 014): save the sequence `id` (its prompt) as a whole, or as a tail behind the longest prefix
+    // (>= tail_min() tokens) that a holder or a segment covers; a segment is written first when none covers it.
+    // Pinned for a suspended slot (no checkpoints then; the tokens are kept for the coverage checks).
+    server_prompt_cache_state * save(const server_prompt & prompt, const server_prefix_holders & holders, int32_t id, llama_context * ctx_tgt, llama_context * ctx_dft, bool pinned);
+
+    // customware (entry 014): put an entry's state into the sequence id_slot: the prefix of a tail re-attached to a
+    // holder (seq_cp) or restored from a segment, then the entry's own cells. `tokens` are the conversation's
+    // (the entry's, or the slot's for a pinned one). Nothing of the sequence is left on failure; the entry stays.
+    bool restore(server_prompt_cache_state & state, const server_tokens & tokens, const server_prefix_holders & holders, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot, server_prompt_restore & out);
+
+    // customware (entry 014): the holder (not id_self) whose cells cover [0, c) of tokens; nullptr if none
+    static const server_prefix_holder * find_holder(const server_tokens & tokens, int32_t c, const server_prefix_holders & holders, int32_t id_self);
+
+    // customware (entry 014): a segment whose tokens cover [0, c) of tokens; nullptr if none
+    const server_prompt_cache_state * find_segment(const server_tokens & tokens, int32_t c) const;
+
+    // customware (entry 014): shorter shared prefixes are saved whole (env LLAMA_TAIL_MIN, default 4096; 0 = never a tail)
+    static int32_t tail_min();
 
     void update();
 
@@ -657,18 +727,33 @@ struct server_prompt_cache {
     // erased by load_exact() or erase().
     server_prompt_cache_state * alloc_pinned(size_t state_size_main, size_t state_size_drft);
 
-    bool load_exact(server_prompt_cache_state * state, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
+    bool load_exact(server_prompt_cache_state * state, const server_tokens & tokens, const server_prefix_holders & holders, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot, server_prompt_restore & out);
 
     void erase(server_prompt_cache_state * state);
 
     size_t n_pinned() const;
 
 private:
-    // the entry that best extends tokens_new while keeping most of its own context; states.end() if none
-    std::list<server_prompt_cache_state>::const_iterator select(const server_prompt & prompt, const server_tokens & tokens_new, float & f_keep_best, float & f_sim_best) const;
+    // the entry that best extends tokens_new while keeping most of its own context; states.end() if none.
+    // customware (entry 014): a tail with neither a holder nor a segment for its prefix cannot be restored and is skipped
+    std::list<server_prompt_cache_state>::const_iterator select(const server_prompt & prompt, const server_tokens & tokens_new, const server_prefix_holders & holders, float & f_keep_best, float & f_sim_best) const;
 
-    // evict the oldest entry that is not pinned; false if there is none
+    // evict the oldest entry that is not pinned and not a segment some tail still needs; false if there is none
     bool evict_oldest();
+
+    // customware (entry 014): true if an entry (not pinned, not a segment) holds all of tokens
+    bool has_prompt(const server_tokens & tokens) const;
+
+    // customware (entry 014): the longest prefix of tokens (>= tail_min()) that a holder (not id_self) or a segment
+    // covers; 0 if none. The provider found comes back through holder / segment (a segment covering the chosen
+    // prefix is reported even when a holder chose it, so no second one is written).
+    int32_t split_point(const server_tokens & tokens, const server_prefix_holders & holders, int32_t id_self, const server_prefix_holder ** holder, const server_prompt_cache_state ** segment) const;
+
+    // customware (entry 014): a segment entry for the first c tokens of tokens, its data sized; nullptr if no room
+    server_prompt_cache_state * alloc_segment(const server_tokens & tokens, int32_t c, size_t state_size);
+
+    // customware (entry 014): the segment of the tail being saved, kept through the eviction its allocation may run
+    const server_prompt_cache_state * seg_hold = nullptr;
 
     // customware: evict until a state of bytes_new leaves reserve_bytes of RAM available; false if it cannot
     bool make_room(size_t bytes_new);

@@ -340,19 +340,16 @@ struct server_slot {
     bool suspend() {
         GGML_ASSERT(cache_for_suspend != nullptr && suspended_state == nullptr);
 
-        const size_t size_tgt =           llama_state_seq_get_size_ext(ctx_tgt, id, LLAMA_STATE_SEQ_FLAGS_NONE);
-        const size_t size_dft = ctx_dft ? llama_state_seq_get_size_ext(ctx_dft, id, LLAMA_STATE_SEQ_FLAGS_NONE) : 0;
-
-        auto * st = cache_for_suspend->alloc_pinned(size_tgt, size_dft);
+        // customware (entry 014): a tail when another sequence or a segment covers the prefix: the pinned entry then
+        // holds the private cells only
+        auto * st = cache_for_suspend->save(prompt, prefix_holders(), id, ctx_tgt, ctx_dft, true);
         if (st == nullptr) {
-            SLT_ERR(*this, "cannot park the sequence state (%.1f MiB) in the prompt cache\n", (size_tgt + size_dft) / (1024.0 * 1024.0));
+            SLT_ERR(*this, "%s", "cannot park the sequence state in the prompt cache\n");
             return false;
         }
 
-        llama_state_seq_get_data_ext(ctx_tgt, st->data.main.data(), size_tgt, id, LLAMA_STATE_SEQ_FLAGS_NONE);
-        if (ctx_dft) {
-            llama_state_seq_get_data_ext(ctx_dft, st->data.drft.data(), size_dft, id, LLAMA_STATE_SEQ_FLAGS_NONE);
-        }
+        const size_t size_tgt = st->data.main.size();
+        const size_t size_dft = st->data.drft.size();
 
         mem.seq_rm(id, -1, -1);
 
@@ -369,7 +366,9 @@ struct server_slot {
     bool resume() {
         GGML_ASSERT(state == SLOT_STATE_SUSPENDED && suspended_state != nullptr);
 
-        const bool ok = cache_for_suspend->load_exact(suspended_state, ctx_tgt, ctx_dft, id);
+        server_prompt_restore rs;
+
+        const bool ok = cache_for_suspend->load_exact(suspended_state, prompt.tokens, prefix_holders(), ctx_tgt, ctx_dft, id, rs);
 
         if (!ok) {
             // the parked state stays in the cache for another attempt
@@ -379,6 +378,15 @@ struct server_slot {
 
         suspended_state = nullptr;
         resume_failures = 0;
+
+        // customware (entry 014): a parked tail came back behind its prefix: shared again, or private from a segment
+        fork_of       = rs.n_shared > 0 ? rs.fork_of : -1;
+        n_fork_shared = rs.n_shared;
+        if (rs.n_shared > 0) {
+            SLT_INF(*this, "restored a parked tail of %d tokens behind the %d shared with slot %d\n", rs.n_tail, rs.n_shared, rs.fork_of);
+        } else if (rs.n_segment > 0) {
+            SLT_INF(*this, "restored a parked tail of %d tokens behind %d cells restored from a prefix segment\n", rs.n_tail, rs.n_segment);
+        }
 
         // customware (entry 013): a request suspended during its prompt returns to the prompt loop, which finds the
         // processed prefix in place and continues; a generating one picks up with its pending sampled token
@@ -394,31 +402,30 @@ struct server_slot {
             return false;
         }
 
-        const size_t cur_size_tgt =           llama_state_seq_get_size_ext(ctx_tgt, id, LLAMA_STATE_SEQ_FLAGS_NONE);
-        const size_t cur_size_dft = ctx_dft ? llama_state_seq_get_size_ext(ctx_dft, id, LLAMA_STATE_SEQ_FLAGS_NONE) : 0;
+        // customware (entry 014): a tail when another sequence, or a segment in RAM, covers a prefix of this conversation
+        auto * cur = prompt_cache.save(prompt, prefix_holders(), id, ctx_tgt, ctx_dft, false);
 
-        const size_t cur_size = cur_size_tgt + cur_size_dft;
-
-        SRV_TRC(" - saving prompt with length %d, total state size = %.3f MiB (draft: %.3f MiB)\n",
-                (int) prompt.tokens.size(), cur_size / (1024.0 * 1024.0), cur_size_dft / (1024.0 * 1024.0));
-
-        auto * cur = prompt_cache.alloc(prompt, cur_size_tgt, cur_size_dft);
-        if (cur == nullptr) {
-            return false;
-        }
-
-        llama_state_seq_get_data_ext(ctx_tgt, cur->data.main.data(), cur_size_tgt, id, LLAMA_STATE_SEQ_FLAGS_NONE);
-        if (ctx_dft) {
-            llama_state_seq_get_data_ext(ctx_dft, cur->data.drft.data(), cur_size_dft, id, LLAMA_STATE_SEQ_FLAGS_NONE);
-        }
-
-        return true;
+        return cur != nullptr;
     }
 
     bool prompt_load(server_prompt_cache & prompt_cache, const server_tokens & tokens) {
-        bool res = prompt_cache.load(prompt, tokens, ctx_tgt, ctx_dft, id);
+        server_prompt_restore rs;
+
+        bool res = prompt_cache.load(prompt, tokens, prefix_holders(), ctx_tgt, ctx_dft, id, rs);
         if (!res) {
             SLT_WRN(*this, "%s", "failed to load prompt from cache\n");
+            return res;
+        }
+
+        // customware (entry 014): a tail came back behind its prefix: shared with a live holder, or private from a segment
+        fork_of       = rs.n_shared > 0 ? rs.fork_of : -1;
+        n_fork_shared = rs.n_shared;
+        if (rs.n_shared > 0) {
+            SLT_INF(*this, "restored a tail of %d tokens behind the %d shared with slot %d; pool %u of %d cells\n",
+                    rs.n_tail, rs.n_shared, rs.fork_of, llama_memory_n_cells_used(llama_get_memory(ctx_tgt)), n_ctx);
+        } else if (rs.n_segment > 0) {
+            SLT_INF(*this, "restored a tail of %d tokens behind %d cells restored from a prefix segment; pool %u of %d cells\n",
+                    rs.n_tail, rs.n_segment, llama_memory_n_cells_used(llama_get_memory(ctx_tgt)), n_ctx);
         }
 
         return res;
@@ -489,6 +496,13 @@ struct server_slot {
     std::function<void(int /* id_slot */)>   callback_on_release;
     std::function<void(const server_slot &)> callback_on_reset; // called before reset()
     std::function<void(server_slot &)>       callback_on_turn_end; // customware: a generation ended, state still live
+
+    // customware (entry 014): the sequences a tail of this slot can re-attach its prefix to (this slot excluded)
+    std::function<server_prefix_holders(const server_slot &)> callback_prefix_holders;
+
+    server_prefix_holders prefix_holders() const {
+        return callback_prefix_holders ? callback_prefix_holders(*this) : server_prefix_holders{};
+    }
 
     // this is for printing timings with slot progress, not part of metrics
     int64_t t_print_last = 0;
@@ -1538,6 +1552,11 @@ private:
         // customware: suspended slots park their state in the prompt cache's RAM budget
         for (auto & slot : slots) {
             slot.cache_for_suspend = prompt_cache.get();
+
+            // customware (entry 014): the sequences a tail can re-attach its prefix to
+            slot.callback_prefix_holders = [this](const server_slot & s) {
+                return prefix_holders(&s);
+            };
         }
         if (params_base.kv_unified) {
             SRV_INF("unified KV pool of %d cells: requests that do not fit next to the active ones wait, and a pool overflow suspends one sequence (%s)\n",
@@ -1790,6 +1809,38 @@ private:
                     update_cache = true;
                 }
             }
+
+            // customware (entry 014): when the cache holds more of this conversation than the idle slot does (its
+            // tail, behind the prefix that slot holds), the tail is restored into another idle slot and re-attached:
+            // both conversations stay whole in the pool, sharing the prefix, instead of the takeover cutting the
+            // sibling's tail. Only when another idle slot is there.
+            if (ret != nullptr && !update_cache && prompt_cache && params_base.kv_unified &&
+                    task.type == SERVER_TASK_TYPE_COMPLETION && task.params.cache_prompt) {
+                const size_t lcp_ret = ret->prompt.tokens.get_common_prefix(task.tokens);
+                const auto   pk      = prompt_cache->peek(ret->prompt, task.tokens, prefix_holders(nullptr));
+
+                if (pk.n_tokens > 0 && pk.holder >= 0 && (size_t) pk.n_tokens > lcp_ret) {
+                    server_slot * dst = nullptr;
+                    for (auto & slot : slots) {
+                        if (&slot == ret || slot.is_processing()) {
+                            continue;
+                        }
+                        const bool empty = slot.prompt.tokens.size() == 0;
+                        if (dst == nullptr ||
+                            (empty && dst->prompt.tokens.size() > 0) ||
+                            (empty == (dst->prompt.tokens.size() == 0) && slot.t_last_used < dst->t_last_used)) {
+                            dst = &slot;
+                        }
+                    }
+
+                    if (dst != nullptr) {
+                        SLT_INF(*dst, "the cache holds %lld tokens of this conversation behind the %zu that slot %d has: restoring the tail here, next to it\n",
+                                (long long) pk.n_tokens, lcp_ret, ret->id);
+                        ret = dst;
+                        update_cache = true;
+                    }
+                }
+            }
         }
 
         // customware (entry 012): when a busy slot holds a longer prefix of the new prompt than any idle one, the
@@ -1885,16 +1936,28 @@ private:
         if (ret == nullptr) {
             int64_t t_last = -1;
 
-            for (server_slot & slot : slots) {
-                // skip the slot if it is not available
-                if (slot.is_processing()) {
-                    continue;
-                }
+            // customware (entry 014): a cached tail re-attaches its prefix to a live holder; a restore into the
+            // holder's own slot would lose that sharing, so another idle slot is preferred when there is one
+            int holder = -1;
+            if (prompt_cache && params_base.kv_unified && task.type == SERVER_TASK_TYPE_COMPLETION && task.params.cache_prompt) {
+                holder = prompt_cache->peek(server_prompt{}, task.tokens, prefix_holders(nullptr)).holder;
+            }
 
-                // select the current slot if the criteria match
-                if (!ret || slot.t_last_used <= t_last) {
-                    t_last = slot.t_last_used;
-                    ret = &slot;
+            for (int pass = 0; pass < 2 && ret == nullptr; ++pass) {
+                for (server_slot & slot : slots) {
+                    // skip the slot if it is not available
+                    if (slot.is_processing()) {
+                        continue;
+                    }
+                    if (pass == 0 && slot.id == holder) {
+                        continue;
+                    }
+
+                    // select the current slot if the criteria match
+                    if (!ret || slot.t_last_used <= t_last) {
+                        t_last = slot.t_last_used;
+                        ret = &slot;
+                    }
                 }
             }
 
@@ -1926,7 +1989,10 @@ private:
                 bool can_load = true;
 
                 if (params_base.kv_unified) {
-                    const int64_t need = prompt_cache->peek(ret->prompt, task.tokens);
+                    // customware (entry 014): a tail behind a live holder costs its own cells only, and the holder is
+                    // never purged to make room for it
+                    const auto    pk   = prompt_cache->peek(ret->prompt, task.tokens, prefix_holders(ret));
+                    const int64_t need = pk.n_tokens > 0 ? pk.n_cells : -1;
 
                     // what the active and suspended sequences will hold once their prompts are in. A restore that fits the
                     // cells free at this instant but not next to those is purged again by the first decode that runs out
@@ -1947,7 +2013,7 @@ private:
                         while (cells_free() < need) {
                             server_slot * idle = nullptr;
                             for (auto & slot : slots) {
-                                if (&slot == ret || slot.is_processing() || slot.prompt.n_tokens() == 0) {
+                                if (&slot == ret || slot.is_processing() || slot.prompt.n_tokens() == 0 || slot.id == pk.holder) {
                                     continue;
                                 }
                                 if (!idle || slot.t_last_used < idle->t_last_used) {
@@ -2175,6 +2241,31 @@ private:
 
     // cells the given sequences own together (every label in the set): what removing all of them frees. In a
     // unified pool a fork shares its prefix with its source, so this is not the sum of token counts.
+    // customware (entry 014): the sequences in the pool a tail can re-attach its prefix to: every slot with cells
+    // (not suspended, not waiting on a parent), `exclude` left out; n_tokens = how many of its tokens are in the pool
+    server_prefix_holders prefix_holders(const server_slot * exclude) const {
+        server_prefix_holders res;
+
+        llama_memory_t mem = llama_get_memory(ctx_tgt);
+
+        for (const auto & slot : slots) {
+            if (&slot == exclude || slot.prompt.tokens.size() == 0 ||
+                    slot.state == SLOT_STATE_SUSPENDED || slot.state == SLOT_STATE_WAIT_OTHER) {
+                continue;
+            }
+            if (llama_memory_seq_pos_min(mem, slot.id) != 0) {
+                continue;
+            }
+            const int32_t n = std::min<int32_t>((int32_t) slot.prompt.tokens.size(), llama_memory_seq_pos_max(mem, slot.id) + 1);
+            if (n <= 0) {
+                continue;
+            }
+            res.push_back({ slot.id, &slot.prompt.tokens, n });
+        }
+
+        return res;
+    }
+
     int32_t kv_cells_owned(const std::vector<llama_seq_id> & ids) const {
         if (ids.empty()) {
             return 0;
@@ -2998,10 +3089,10 @@ private:
         }
 
         if (prompt_cache) {
-            const int64_t entry = prompt_cache->peek(server_prompt{}, task.tokens);
-            if (entry > 0) {
-                // the entry is restored whole, then trimmed and extended
-                pl.need = kv_need(std::max((int32_t) entry, n), task.params.n_predict);
+            const auto pk = prompt_cache->peek(server_prompt{}, task.tokens, prefix_holders(nullptr));
+            if (pk.n_tokens > 0) {
+                // the entry is restored (whole, or its tail behind a live holder), then trimmed and extended
+                pl.need = kv_need((int32_t) pk.n_cells + std::max(0, n - (int32_t) pk.n_tokens), task.params.n_predict);
                 return pl;
             }
         }
@@ -3018,6 +3109,8 @@ private:
         in.now          = ggml_time_us();
         in.t_age        = sched_age_us();
 
+        const server_prefix_holders holders = prefix_holders(nullptr);
+
         for (const auto & slot : slots) {
             if (slot.state == SLOT_STATE_SUSPENDED) {
                 sched_req r;
@@ -3026,6 +3119,11 @@ private:
                 r.t_arrival = slot.task->t_arrival;
                 r.state     = SCHED_REQ_SUSPENDED;
                 r.need      = slot.prompt.n_tokens() + kv_resume_margin();
+                // customware (entry 014): a parked tail behind a live holder comes back with its own cells only
+                if (slot.suspended_state != nullptr && slot.suspended_state->p0 > 0 &&
+                        server_prompt_cache::find_holder(slot.prompt.tokens, slot.suspended_state->p0, holders, slot.id) != nullptr) {
+                    r.need -= slot.suspended_state->p0;
+                }
                 r.has_slot  = true;
                 in.reqs.push_back(r);
                 continue;
