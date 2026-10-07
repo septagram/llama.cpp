@@ -1984,10 +1984,11 @@ private:
                 ret->prompt_save(*prompt_cache);
 
                 // customware: under a unified pool the restore needs free cells, and the other idle slots keep
-                // theirs until the launch below clears them. Free them here first (saved, as the launch would),
-                // and do not ask for a restore that cannot fit: the entry stays for the retry after admission
-                // defers the task. Before this, a continuation of a cached 99k prompt behind a 70k prefill was
-                // re-prefilled from zero with its state sitting in RAM.
+                // theirs until a decision purges them, or until the loop below frees them for this restore (saved,
+                // as a purge would). A restore that cannot fit even then is not asked for and the task falls through
+                // to a cold start; the decision that admitted it charges shared cells and the running requests'
+                // reserves, so that fall-through should not be reached. Before this, a continuation of a cached 99k
+                // prompt behind a 70k prefill was re-prefilled from zero with its state sitting in RAM.
                 bool can_load = true;
 
                 if (params_base.kv_unified) {
@@ -2098,8 +2099,10 @@ private:
     }
 
     // cells spoken for: active slots (their prompt, or the full prompt still being processed, plus the growth
-    // margin) and, optionally, suspended slots (they come back before anything new is admitted). Idle retained
-    // slots are purgeable and not counted.
+    // margin) and, with include_suspended, the suspended slots. Nobody passes true any more: the decision owns the
+    // suspended slots (it resumes them when they fit, possibly behind a higher-ranked newcomer), and the two fit
+    // checks in get_available_slot measure what the decision measures. Idle retained slots are purgeable and not
+    // counted.
     int32_t kv_resident(bool include_suspended) const {
         int32_t n = 0;
         for (const auto & slot : slots) {
@@ -2234,9 +2237,10 @@ private:
     }
 
     // what the pool has to hold: the cells in use now, minus the purgeable idle ones, plus what the active sequences
-    // will still take (the rest of a prompt being processed and a growth margin each) and, optionally, the suspended
-    // ones (they come back before anything new is admitted). Falls back to the bookkeeping when the cache does not
-    // report its occupancy.
+    // will still take (the rest of a prompt being processed and a growth margin each) and, with include_suspended,
+    // the suspended ones. Nobody passes true any more: the decision owns the suspended slots and may start a
+    // higher-ranked newcomer ahead of them, so a fit check that counted them would refuse what the decision
+    // admitted. Falls back to the bookkeeping when the cache does not report its occupancy.
     int32_t kv_committed(bool include_suspended, const server_slot * exclude_idle = nullptr) const {
         const int32_t used = kv_cells_used();
         if (used == 0 && kv_idle_retained() + kv_resident(false) > 0) {

@@ -38,7 +38,7 @@ post() { # <name> <request>
   curl -s -m 3600 "http://127.0.0.1:$PORT/v1/chat/completions" -H "Content-Type: application/json" -d @"$2" > "customware/ab-$label-$1.json"
   python -c "
 import json
-d=json.load(open('customware/ab-$label-$1.json'))
+d=json.load(open('customware/ab-$label-$1.json', encoding='utf-8'))
 if 'error' in d: print('  $1: ERROR', d['error']); raise SystemExit
 t=d.get('timings',{}); print('  $1: posted +%d s, done +%d s: prompt_n=%d cache_n=%d predicted_n=%d at %.2f t/s' % ($t0-$T0, $(date +%s)-$T0, t.get('prompt_n',0), t.get('cache_n',0), t.get('predicted_n',0), t.get('predicted_per_second',0)))"
 }
@@ -69,8 +69,8 @@ if [[ $ONLY == *5* ]]; then
   python - <<EOF2
 import json
 for x in ('A', 'B'):
-    a = json.load(open('customware/ab-$label-%s.json' % x))['choices'][0]['message'].get('content') or ''
-    b = json.load(open('customware/ab-$label-%s3.json' % x))['choices'][0]['message'].get('content') or ''
+    a = json.load(open('customware/ab-$label-%s.json' % x, encoding='utf-8'))['choices'][0]['message'].get('content') or ''
+    b = json.load(open('customware/ab-$label-%s3.json' % x, encoding='utf-8'))['choices'][0]['message'].get('content') or ''
     n = 0
     while n < min(len(a), len(b)) and a[n] == b[n]: n += 1
     print('  %s3 vs %s: %s (%d and %d chars)' % (x, x, 'IDENTICAL' if a == b else 'same for the first %d chars' % n, len(a), len(b)))
@@ -81,7 +81,7 @@ if [[ $ONLY == *3* ]]; then
   post C customware/fk-B.json
   python - <<EOF
 import json
-b = json.load(open('customware/ab-$label-B.json'))['choices'][0]['message']; c = json.load(open('customware/ab-$label-C.json'))['choices'][0]['message']
+b = json.load(open('customware/ab-$label-B.json', encoding='utf-8'))['choices'][0]['message']; c = json.load(open('customware/ab-$label-C.json', encoding='utf-8'))['choices'][0]['message']
 tb = (b.get('content') or ''); tc = (c.get('content') or '')
 n = 0
 while n < min(len(tb), len(tc)) and tb[n] == tc[n]: n += 1
@@ -94,7 +94,7 @@ if [[ $ONLY == *4* ]]; then
   post A2 customware/fk-A2.json & sleep 3
   post B2 customware/fk-B2.json
   wait
-  echo "  suspended: $(clean | grep -c 'KV pool overflow: suspended')   resumed: $(clean | grep -c 'resumed after')   collective errors: $(clean | grep -c 'Context size has been exceeded')   purges: $(clean | grep -c 'purging slot')"
+  echo "  suspended: $(clean | grep -cE 'KV pool overflow: suspended|displaced: higher-ranked')   resumed: $(clean | grep -c 'resumed after')   collective errors: $(clean | grep -c 'Context size has been exceeded')   purges: $(clean | grep -c 'purging slot')"
   clean | grep -E "suspended slot|resumed after|purging slot|Context size" | sed -E 's/^[0-9.]+ [IWE] //' | cut -c1-150 | tail -6
 fi
 echo "== /slots at the end"; curl -s "http://127.0.0.1:$PORT/slots" | python -c "import json,sys; [print('  slot', s['id'], 'fork_of', s.get('fork_of'), 'n_fork_shared', s.get('n_fork_shared')) for s in json.load(sys.stdin)]"
