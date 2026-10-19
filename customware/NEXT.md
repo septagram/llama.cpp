@@ -15,6 +15,9 @@ Items keep their numbers; the order of work is the list right below, not the num
    (iterations 1-3 fixed and converged; the second full review's findings are with the user).
 5. The remaining optimization hypotheses below (items 2-8, 10, 11, 13), in the order of their expected value.
 6. **Checkpoint policy** (item 14, `notes-checkpoint-policy.md`): last, the least defined of them.
+   Evidence for it (2026-10-19): a cancelled 83k prefill left 32768 cells with no checkpoint, so the next request sharing
+   25477 of those tokens re-prefilled from zero ("forcing full prompt re-processing due to lack of cache data"); a
+   checkpoint every 8192 tokens during long prefills (112 MiB each) would have made it a 900-token continuation.
 
 The 160k launcher: "not yet" (the user may switch, mainly because the model often ends one or two messages short
 of finishing a chunk under 120k).
