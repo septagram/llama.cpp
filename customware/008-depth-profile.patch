@@ -1,0 +1,438 @@
+diff --git a/ggml/src/ggml-backend.cpp b/ggml/src/ggml-backend.cpp
+index 3295a762bb83ee12937fc8f7af7eef4d00d88601..fc07bceb65e45220730bac310a0e3d955673ca32 100644
+--- a/ggml/src/ggml-backend.cpp
++++ b/ggml/src/ggml-backend.cpp
+@@ -1669,6 +1669,41 @@ static int ggml_sched_prof_level() {
+     return level;
+ }
+ 
++// GGML_SCHED_PROFILE_NODES=1 computes the dumped graphs node by node with a sync after each and ranks the ops by time.
++// The sync exposes launch latency, so this ranks the costs rather than measuring them exactly.
++static bool ggml_sched_prof_nodes() {
++    static const bool nodes = [] {
++        const char * env = getenv("GGML_SCHED_PROFILE_NODES");
++        return env ? atoi(env) > 0 : false;
++    }();
++    return nodes;
++}
++
++struct ggml_sched_prof_node_acc {
++    int64_t us = 0;
++    int     n  = 0;
++    int     backend_id = -1;
++};
++
++// nodes of one op whose names differ only in the "-<layer>" suffix share a row; unnamed nodes ("node_1234") too
++static std::string ggml_sched_prof_node_key(const ggml_tensor * node) {
++    std::string name = node->name;
++    const auto digits = [](std::string::const_iterator a, std::string::const_iterator b) {
++        return a != b && std::all_of(a, b, [](char c) { return c >= '0' && c <= '9'; });
++    };
++    const size_t dash = name.rfind('-');
++    if (dash != std::string::npos && digits(name.begin() + dash + 1, name.end())) {
++        name.erase(dash);
++    }
++    if (name.rfind("node_", 0) == 0 && digits(name.begin() + 5, name.end())) {
++        name.clear();
++    }
++    if (name.empty()) {
++        name = "?";
++    }
++    return std::string(ggml_op_desc(node)) + " " + name;
++}
++
+ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
+     GGML_ASSERT(sched);
+     struct ggml_backend_sched_split * splits = sched->splits;
+@@ -1685,6 +1720,8 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+     const int64_t prof_t_graph = prof ? ggml_time_us() : 0;
+     ggml_sched_prof_backend prof_b[GGML_SCHED_MAX_BACKENDS];
+     std::vector<ggml_sched_prof_row> prof_rows;
++    const bool prof_nodes = prof_dump && ggml_sched_prof_nodes();
++    std::unordered_map<std::string, ggml_sched_prof_node_acc> prof_node_accs;
+ 
+     for (int split_id = 0; split_id < sched->n_splits; split_id++) {
+         struct ggml_backend_sched_split * split = &splits[split_id];
+@@ -1839,7 +1876,21 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+             prof_t1 = ggml_time_us();
+         }
+ 
+-        if (!sched->callback_eval) {
++        if (prof_nodes) {
++            for (int j = 0; j < split->graph.n_nodes; j++) {
++                struct ggml_cgraph gv = ggml_graph_view(&split->graph, j, j + 1);
++                const int64_t t0 = ggml_time_us();
++                enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &gv);
++                if (ec != GGML_STATUS_SUCCESS) {
++                    return ec;
++                }
++                ggml_backend_synchronize(split_backend);
++                ggml_sched_prof_node_acc & acc = prof_node_accs[ggml_sched_prof_node_key(split->graph.nodes[j])];
++                acc.us += ggml_time_us() - t0;
++                acc.n  += 1;
++                acc.backend_id = split_backend_id;
++            }
++        } else if (!sched->callback_eval) {
+             enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &split->graph);
+             if (ec != GGML_STATUS_SUCCESS) {
+                 return ec;
+@@ -1908,6 +1959,21 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+                 fprintf(stderr, "sched-prof:   split %3zu %-6s nodes=%4d copy=%8.1f us comp=%8.1f us  %s\n",
+                         i, ggml_backend_name(sched->backends[r.backend_id]), r.n_nodes, (double) r.us_copy, (double) r.us_comp, r.name);
+             }
++            if (!prof_node_accs.empty()) {
++                std::vector<std::pair<std::string, ggml_sched_prof_node_acc>> rows(prof_node_accs.begin(), prof_node_accs.end());
++                std::sort(rows.begin(), rows.end(), [](const auto & a, const auto & b) { return a.second.us > b.second.us; });
++                int64_t us_nodes = 0;
++                for (const auto & r : rows) {
++                    us_nodes += r.second.us;
++                }
++                fprintf(stderr, "sched-prof:   nodes: %zu kinds, %.2f ms with a sync after every node\n", rows.size(), us_nodes / 1000.0);
++                for (size_t i = 0; i < rows.size() && i < 48; i++) {
++                    const auto & r = rows[i];
++                    fprintf(stderr, "sched-prof:   node %-6s n=%4d total=%9.1f us mean=%8.1f us  %s\n",
++                            ggml_backend_name(sched->backends[r.second.backend_id]), r.second.n, (double) r.second.us,
++                            (double) r.second.us / r.second.n, r.first.c_str());
++                }
++            }
+         }
+         std::string line;
+         for (int b = 0; b < sched->n_backends; b++) {
+diff --git a/ggml/src/ggml-cuda/fattn.cu b/ggml/src/ggml-cuda/fattn.cu
+index d1fcf58cb17f23dd79d2f408e095b260aa0142fe..5a442210a39854ce5726fcc15a378571ebce1745 100644
+--- a/ggml/src/ggml-cuda/fattn.cu
++++ b/ggml/src/ggml-cuda/fattn.cu
+@@ -4,6 +4,7 @@
+ #include "fattn-tile.cuh"
+ #include "fattn-vec.cuh"
+ #include "fattn.cuh"
++#include "getrows.cuh"
+ 
+ #if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
+ // one list per group of ncols1 queries: a column is selected if any query of the group can see it
+@@ -513,12 +514,167 @@ static void ggml_cuda_flash_attn_ext_vec(ggml_backend_cuda_context & ctx, ggml_t
+     vec_case(ctx, dst);
+ }
+ 
++// customware (entry 008): sparse decode on a quantized K/V cache. The vector kernel reads quantized K/V but walks the
++// whole context; the sparse MMA kernel walks only the selected cells but wants f16 K/V, which launch_fattn provides by
++// converting the entire cache on every call. Here the mask is compacted to the selected cells, only those rows are
++// gathered and dequantized into f16 scratch, the mask is compacted with them, and the dense MMA kernel runs on the
++// compact tensors: O(n_kv_max) per query instead of O(n_kv). One index list per query, laid out list after list.
++#if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
++// get_rows must never read row -1 (the list padding), so clamp; the padded columns are masked out below
++static __global__ void flash_attn_gather_rows(
++        const int32_t * __restrict__ indices, int32_t * __restrict__ rows, const int n_sel, const int n_kv_pad, const int n_head_kv) {
++    const int j = blockIdx.x*blockDim.x + threadIdx.x;
++    if (j >= n_kv_pad) {
++        return;
++    }
++    const int row = j < n_sel ? max(indices[j], 0) : 0;
++    for (int h = 0; h < n_head_kv; ++h) {
++        rows[h*n_kv_pad + j] = row;
++    }
++}
++
++// mask_c[q][j]: the original mask value at the gathered cell when column j belongs to query q's list, else -inf
++static __global__ void flash_attn_gather_mask(
++        const half * __restrict__ mask, const int32_t * __restrict__ indices, half * __restrict__ mask_c,
++        const int n_lists, const int n_kv_max, const int n_kv_pad, const int64_t s31) {
++    const int j = blockIdx.x*blockDim.x + threadIdx.x;
++    const int q = blockIdx.y;
++    if (j >= n_kv_pad) {
++        return;
++    }
++    half v = __float2half(-INFINITY);
++    if (j < n_lists*n_kv_max && j/n_kv_max == q) {
++        const int idx = indices[j];
++        if (idx >= 0) {
++            v = mask[q*s31 + idx];
++        }
++    }
++    mask_c[(int64_t) q*n_kv_pad + j] = v;
++}
++#endif // !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
++
++static bool ggml_cuda_flash_attn_ext_shall_use_gather(const int cc, const ggml_tensor * dst) {
++#if defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
++    GGML_UNUSED_VARS(cc, dst);
++    return false;
++#else
++    const ggml_tensor * Q    = dst->src[0];
++    const ggml_tensor * K    = dst->src[1];
++    const ggml_tensor * V    = dst->src[2];
++    const ggml_tensor * mask = dst->src[3];
++
++    float max_bias = 0.0f;
++    float logit_softcap = 0.0f;
++    memcpy(&max_bias,      (const float *) dst->op_params + 1, sizeof(float));
++    memcpy(&logit_softcap, (const float *) dst->op_params + 2, sizeof(float));
++
++    const int32_t n_kv_max = ggml_get_op_params_i32(dst, 4);
++
++    // the gather reads and writes n_kv_max rows per query for K and V and the kernel reads them again,
++    // the vector kernel reads every row of the cache once: worth it from a few times n_kv_max
++    return GGML_CUDA_CC_IS_NVIDIA(cc) && turing_mma_available(cc) &&
++        (ggml_is_quantized(K->type) || ggml_is_quantized(V->type)) &&
++        (K->ne[0] == 64 || K->ne[0] == 128 || K->ne[0] == 256) && V->ne[0] == K->ne[0] &&
++        mask != nullptr && n_kv_max > 0 && max_bias == 0.0f && logit_softcap == 0.0f &&
++        mask->ne[0] == K->ne[1] && mask->ne[1] >= Q->ne[1] && mask->ne[2] == 1 && mask->ne[3] == 1 &&
++        Q->ne[1] <= 2 && Q->ne[3] == 1 && K->ne[3] == 1 && V->ne[3] == 1 &&
++        K->ne[1] >= 4*int64_t(n_kv_max)*Q->ne[1];
++#endif // defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
++}
++
++static void ggml_cuda_flash_attn_ext_mma_f16_gather(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
++#if defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
++    GGML_UNUSED_VARS(ctx, dst);
++    GGML_ABORT("sparse flash attention is only supported on NVIDIA CUDA");
++#else
++    const ggml_tensor * Q    = dst->src[0];
++    const ggml_tensor * K    = dst->src[1];
++    const ggml_tensor * V    = dst->src[2];
++    const ggml_tensor * mask = dst->src[3];
++
++    const int32_t n_kv_max  = ggml_get_op_params_i32(dst, 4);
++    const int     n_lists   = Q->ne[1];
++    const int     n_sel     = n_lists*n_kv_max;
++    const int     n_kv_pad  = GGML_PAD(n_sel, FATTN_KQ_STRIDE);
++    const int64_t D         = K->ne[0];
++    const int64_t n_head_kv = K->ne[2];
++
++    ggml_cuda_pool & pool = ctx.pool();
++    cudaStream_t stream = ctx.stream();
++
++    // the lists, then one count per list
++    ggml_cuda_pool_alloc<int32_t> indices(pool, size_t(n_sel) + n_lists);
++    ggml_cuda_flash_attn_ext_compact_mask(mask, indices.get(), indices.get() + n_sel, Q->ne[1], 1, n_kv_max, stream);
++
++    ggml_cuda_pool_alloc<int32_t> rows(pool, size_t(n_kv_pad)*n_head_kv);
++    {
++        const dim3 blocks((n_kv_pad + 255)/256, 1, 1);
++        flash_attn_gather_rows<<<blocks, 256, 0, stream>>>(indices.get(), rows.get(), n_sel, n_kv_pad, n_head_kv);
++        CUDA_CHECK(cudaGetLastError());
++    }
++
++    // K_c, V_c: [D, n_kv_pad, n_head_kv] f16
++    ggml_cuda_pool_alloc<half> K_c(pool, size_t(n_kv_pad)*D*n_head_kv);
++    ggml_cuda_pool_alloc<half> V_c(pool, size_t(n_kv_pad)*D*n_head_kv);
++    for (int t = 0; t < 2; ++t) {
++        const ggml_tensor * src = t == 0 ? K : V;
++        half * dst_c = t == 0 ? K_c.get() : V_c.get();
++        get_rows_cuda(src->data, src->type, rows.get(), dst_c, GGML_TYPE_F16,
++            D, src->nb[1], src->nb[2], src->nb[3],
++            n_kv_pad, n_head_kv, 1, sizeof(int32_t), size_t(n_kv_pad)*sizeof(int32_t), 0,
++            D*sizeof(half), size_t(n_kv_pad)*D*sizeof(half), 0, stream);
++    }
++
++    ggml_cuda_pool_alloc<half> mask_c(pool, size_t(n_kv_pad)*mask->ne[1]);
++    {
++        const dim3 blocks((n_kv_pad + 255)/256, mask->ne[1], 1);
++        flash_attn_gather_mask<<<blocks, 256, 0, stream>>>((const half *) mask->data, indices.get(), mask_c.get(),
++            n_lists, n_kv_max, n_kv_pad, mask->nb[1]/sizeof(half));
++        CUDA_CHECK(cudaGetLastError());
++    }
++
++    // the dense kernel on the compact tensors: shallow copies with the scratch as data
++    ggml_tensor K2 = *K;
++    K2.type  = GGML_TYPE_F16;
++    K2.data  = K_c.get();
++    K2.ne[1] = n_kv_pad;
++    K2.nb[0] = sizeof(half);
++    K2.nb[1] = D*sizeof(half);
++    K2.nb[2] = size_t(n_kv_pad)*K2.nb[1];
++    K2.nb[3] = size_t(n_head_kv)*K2.nb[2];
++    K2.view_src  = nullptr;
++    K2.view_offs = 0;
++
++    ggml_tensor V2 = K2;
++    V2.data = V_c.get();
++
++    ggml_tensor M2 = *mask;
++    M2.data  = mask_c.get();
++    M2.ne[0] = n_kv_pad;
++    M2.nb[0] = sizeof(half);
++    M2.nb[1] = size_t(n_kv_pad)*sizeof(half);
++    M2.nb[2] = size_t(mask->ne[1])*M2.nb[1];
++    M2.nb[3] = M2.nb[2];
++    M2.view_src  = nullptr;
++    M2.view_offs = 0;
++
++    ggml_tensor dst2 = *dst;
++    dst2.src[1] = &K2;
++    dst2.src[2] = &V2;
++    dst2.src[3] = &M2;
++    ggml_set_op_params_i32(&dst2, 4, 0); // dense over the compact cells
++
++    ggml_cuda_flash_attn_ext_mma_f16(ctx, &dst2);
++#endif // defined(GGML_USE_HIP) || defined(GGML_USE_MUSA)
++}
++
+ // Best FlashAttention kernel for a specific GPU:
+ enum best_fattn_kernel {
+     BEST_FATTN_KERNEL_NONE    =   0,
+     BEST_FATTN_KERNEL_TILE    = 200,
+     BEST_FATTN_KERNEL_VEC     = 100,
+     BEST_FATTN_KERNEL_MMA_F16 = 400,
++    BEST_FATTN_KERNEL_MMA_F16_GATHER = 450, // customware: quantized K/V, selected cells gathered to f16
+ };
+ 
+ // K/V types for which there is a vector kernel template instance, other kernels convert these to f16:
+@@ -636,6 +792,10 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
+ 
+     // If Turing tensor cores are available, use them:
+     if (turing_mma_available(cc) && Q->ne[0] != 40 && Q->ne[0] != 72) {
++        // customware: sparse decode on a quantized cache: gather the selected cells into f16, dense MMA over them
++        if (gqa_opt_applies && ggml_cuda_flash_attn_ext_shall_use_gather(cc, dst)) {
++            return BEST_FATTN_KERNEL_MMA_F16_GATHER;
++        }
+         if (can_use_vector_kernel) {
+             if (!ggml_is_quantized(K->type) && !ggml_is_quantized(V->type)) {
+                 // the sparse gather exists only in the MMA kernel: (DKQ, DV, 1, 8) with GQA > 4
+@@ -737,6 +897,9 @@ size_t ggml_cuda_flash_attn_ext_get_alloc_size(int device, const ggml_tensor * d
+             need_f16_K = true;
+             need_f16_V = true;
+             break;
++        case BEST_FATTN_KERNEL_MMA_F16_GATHER:
++            // the gathered f16 rows live in the pool, no scratch after dst
++            break;
+         case BEST_FATTN_KERNEL_VEC: {
+             const bool f16_fallback = ggml_cuda_get_fattn_vec_case(Q->ne[0], K->type, V->type) == nullptr;
+             need_f16_K = K->type == GGML_TYPE_F32 || f16_fallback;
+@@ -766,6 +929,9 @@ void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst
+         case BEST_FATTN_KERNEL_MMA_F16:
+             ggml_cuda_flash_attn_ext_mma_f16(ctx, dst);
+             break;
++        case BEST_FATTN_KERNEL_MMA_F16_GATHER:
++            ggml_cuda_flash_attn_ext_mma_f16_gather(ctx, dst);
++            break;
+     }
+ }
+ 
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index b0e6705f77635b08518e8175303b8e7257e1374b..edec3fbaf241a0ab957f332513bf5d25dfc5dc35 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -1596,12 +1596,19 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+ 
+     // set the input data for the input tensors
+     {
+-        //const auto t_start_us = ggml_time_us();
++        // customware: the CPU side of a ubatch (masks, QSA block tables) under the same variable as the node profile
++        static const bool prof_inputs = [] {
++            const char * env = getenv("GGML_SCHED_PROFILE_NODES");
++            return env ? atoi(env) > 0 : false;
++        }();
++        const auto t_start_us = prof_inputs ? ggml_time_us() : 0;
+ 
+         // FIXME this call causes a crash if any model inputs were not used in the graph and were therefore not allocated
+         res->set_inputs(&ubatch);
+ 
+-        //LLAMA_LOG_INFO("graph set inputs time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
++        if (prof_inputs) {
++            LLAMA_LOG_INFO("sched-prof: set_inputs %.3f ms for %u tokens\n", (ggml_time_us() - t_start_us)/1000.0, ubatch.n_tokens);
++        }
+     }
+ 
+     const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
+diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
+index cdefd03beb81c7f86e7b7bd0a256c763c13a8627..ad4261d0b5f5fb33a1afe0161f2d33ea4ad085d8 100644
+--- a/src/models/qwen4exp.cpp
++++ b/src/models/qwen4exp.cpp
+@@ -606,19 +606,13 @@ ggml_tensor * llama_model_qwen4exp::graph::build_qsa_top_k(
+     ggml_tensor * k_all = mctx_idx->get_k(ctx0, il);
+     k_all = ggml_view_3d(ctx0, k_all, idx_dim, n_kv, n_stream, k_all->nb[2], k_all->nb[3], 0);
+ 
+-    // gathers per stream: blk_cells row s indexes stream s's own cells
++    // gathers per stream: blk_cells row s indexes stream s's own cells: [idx_dim, r*n_blocks, n_stream]
+     ggml_tensor * members = ggml_get_rows(ctx0, k_all, inp->blk_cells);
+-    members = ggml_reshape_4d(ctx0, members, idx_dim, r, n_blocks, n_stream);
+-
+-    // mean over the block members; r is small, so summing slices beats a transpose plus sum_rows
+-    ggml_tensor * pooled = nullptr;
+-    for (int64_t i = 0; i < r; ++i) {
+-        ggml_tensor * slice = ggml_cont(ctx0,
+-                ggml_view_3d(ctx0, members, idx_dim, n_blocks, n_stream,
+-                        members->nb[2], members->nb[3], i*members->nb[1]));
+-        pooled = pooled ? ggml_add(ctx0, pooled, slice) : slice;
+-    }
+-    pooled = ggml_scale(ctx0, pooled, 1.0f/(float) r);
++
++    // mean over the block members: an average pool with a window of r rows reads the gathered keys once.
++    // customware (entry 008): this replaces r slice copies and r-1 adds that read and wrote them four times over,
++    // 5 ms per token at 88k context
++    ggml_tensor * pooled = ggml_pool_2d(ctx0, members, GGML_OP_POOL_AVG, 1, r, 1, r, 0, 0);
+     cb(pooled, "indexer_k_pooled", il);
+ 
+     // count blocks along ne1: rms_norm launches gridDim.y = ne2, capped at 65535, and 262144/4 = 65536
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index 8402fcfe0f19148d8671cffebba1f9111bb6f346..ea7558a516be396d254edb2cc952f016e0cdb532 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -10859,6 +10859,13 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+     test_cases.emplace_back(new test_flash_attn_ext(128, 128, 1, { 8, 1}, 4096,  1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false, 512));
+     test_cases.emplace_back(new test_flash_attn_ext(128, 128, 1, { 8, 1}, 4096, 64, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false, 512));
+ 
++    // customware (entry 008): sparse decode on a quantized cache gathers the selected cells (qwen4exp shape: 256/256,
++    // gqa 12, budget 2048; one and two queries, mixed K/V types), CUDA takes the gather path from 4*budget*queries cells
++    test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {12, 1},  8192, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false, 2048));
++    test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {12, 1}, 16384, 2, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false, 2048));
++    test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {12, 1},  8192, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q4_0, GGML_TYPE_Q4_0, {0, 1, 2, 3}, true, false, 2048));
++    test_cases.emplace_back(new test_flash_attn_ext(128, 128, 2, { 8, 1},  8192, 2, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false,  512));
++
+     // Qwen QSA: 256/256, gqa 12, budget 2048.
+     test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {12, 1}, 8192, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_F16, GGML_TYPE_F16, {0, 1, 2, 3}, true, false, 2048));
+ 
+@@ -11344,6 +11351,12 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
+     test_cases.emplace_back(new test_flash_attn_ext(576, 512, 1, {16, 1}, 49152, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_F16, GGML_TYPE_F16, {0, 1, 2, 3}, true, true,     0));
+     test_cases.emplace_back(new test_flash_attn_ext(576, 512, 1, {16, 1}, 49152, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_F16, GGML_TYPE_F16, {0, 1, 2, 3}, true, true,  2048));
+ 
++    // customware (entry 008): sparse decode on a q8_0 cache at agent depths, dense vector kernel vs the gather path
++    for (auto kv : {24576, 49152, 90112}) {
++        test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {12, 1}, kv, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false,    0));
++        test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {12, 1}, kv, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0, {0, 1, 2, 3}, true, false, 2048));
++    }
++
+     // q8_0 KV cases with long context (decode and prompt)
+     test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {16, 1},   128, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0));
+     test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {16, 1},   512, 1, true, false, 0, 0, GGML_PREC_F32, GGML_TYPE_Q8_0, GGML_TYPE_Q8_0));
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 90078ee063dd493d706fc83b2d753a1867010991..d913204dcb40afc8068c1dac5a89e89aa3b0c54a 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -1792,9 +1792,17 @@ private:
+         return margin;
+     }
+ 
+-    // cells a request needs: its prompt plus room to generate (its n_predict when set, else the margin)
++    // room to generate that admission demands beyond the prompt: the request's n_predict, capped (clients send
++    // max_tokens of 32k as a matter of course; a real overflow is handled by preemption, so the cap only has to
++    // cover a short head start), else the margin. env LLAMA_KV_RESERVE, default 2048.
++    static int32_t kv_reserve_cap() {
++        static const int32_t cap = getenv("LLAMA_KV_RESERVE") ? atoi(getenv("LLAMA_KV_RESERVE")) : 2048;
++        return cap;
++    }
++
++    // cells a request needs: its prompt plus the generation reserve
+     static int32_t kv_need(int32_t n_prompt, int32_t n_predict) {
+-        return n_prompt + (n_predict > 0 ? n_predict : kv_margin());
++        return n_prompt + (n_predict > 0 ? std::min(n_predict, kv_reserve_cap()) : kv_margin());
+     }
+ 
+     // cells spoken for: active slots (their prompt, or the full prompt still being processed, plus the growth
+@@ -2746,11 +2754,14 @@ private:
+                     // customware (entry 007): under --kv-unified a request starts only when it fits next to the active
+                     // and suspended sequences; otherwise it waits in the deferred queue (retried when a slot releases).
+                     // Latency, never an error: a prompt too large for the pool alone still fails at launch as before.
++                    // A request only ever waits for cells that other sequences hold: with nothing committed there is
++                    // nothing to wait for, so it starts even when prompt + reserve exceeds the pool (the prompt fits,
++                    // and generation ends at the pool like any context limit).
+                     if (params_base.kv_unified && task.n_tokens() <= n_ctx_slot()) {
+                         const int32_t need = kv_need(task.n_tokens(), task.params.n_predict);
+                         const int32_t used = kv_committed(true);
+                         const int32_t pool = kv_pool_size();
+-                        if (used + need > pool) {
++                        if (used > 0 && used + need > pool) {
+                             SRV_WRN("task %d needs %d cells (prompt %d) but %d of %d are spoken for: waiting for cells\n",
+                                     id_task, need, task.n_tokens(), used, pool);
+                             n_kv_deferred++;

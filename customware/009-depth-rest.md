@@ -127,3 +127,11 @@ tonight is read as an A/B pair run back to back under the same load, never again
 
 The prefill-side sort over `ub x n_kv` rows; a block-key cache (VRAM); anything that needs the user's sessions
 (H17, adaptive tuning on real traces).
+
+## Final commit list
+
+Sealed 2026-10-20 into `009-depth-rest.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `b4ba3b3fa` cuda : fused get_rows + avg pool for the indexer block mean; one thread per element for tall narrow gathers
+- `ea2d1ce84` cuda : the get_rows + pool fusion actually fires (subgraph gate), switchable; tall gather behind an env
+- `6bd072ce9` customware: entry 009 notes closed for the night; check-box.sh tells whether the box can run or measure the model (notes only)

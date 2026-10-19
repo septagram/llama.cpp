@@ -107,8 +107,14 @@ gains little from the hot set (it streams all 512 experts per ubatch anyway; the
 
 ## Final commit list
 
-- 1fdd1bd9e llama : hot experts parked in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS)
-- 6b858f249 customware: entry 005 measurements, launcher back to 160k with the parked hot experts
+Sealed 2026-10-20 with no patch file of its own (see below).
+
+- `aa3b888ad` customware: entry 005 draft (prefill/decode modes) and the launcher verification response (notes only)
+- `6b858f249` customware: entry 005 measurements, launcher back to 160k with the parked hot experts (notes only)
+- `1a7dd9ac8` customware: second launcher (120k, ub 4096, 6 GB set), quiet-box numbers, speculation measured (notes only)
+- `98fb93872` customware: echo request with thinking disabled (speculation test input) (notes only)
+
+No patch of its own: its code commit `1fdd1bd9e` is carried at the head of `004-adaptive-hot-experts.patch` (it landed before 004's code, and 004 edits the same lines). Its other commits are notes and launchers.
 
 ## Follow-up experiments (2026-09-25, quiet box, launcher's learned stats, swaps on)
 

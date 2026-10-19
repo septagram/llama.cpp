@@ -1,0 +1,733 @@
+diff --git a/include/llama.h b/include/llama.h
+index 31bbf8b0d98726a4c4627ce415f0cac9395ad996..b564e02c58dc853836cc4116d15e9a8111f75617 100644
+--- a/include/llama.h
++++ b/include/llama.h
+@@ -812,6 +812,9 @@ extern "C" {
+     // Check if the memory supports shifting
+     LLAMA_API bool llama_memory_can_shift(llama_memory_t mem);
+ 
++    // customware: cells in use in the attention cache behind this memory (the unified pool's occupancy); 0 if unknown
++    LLAMA_API uint32_t llama_memory_n_cells_used(llama_memory_t mem);
++
+     //
+     // State / sessions
+     //
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index 2b6e9239ea7f85c69ee19fab9e756f537f03bbc7..b0e6705f77635b08518e8175303b8e7257e1374b 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -7,6 +7,8 @@
+ #include "llama-batch.h"
+ #include "llama-io.h"
+ #include "llama-memory.h"
++#include "llama-memory-hybrid.h"
++#include "llama-kv-cache.h"
+ #include "llama-mmap.h"
+ #include "llama-model.h"
+ #include "llama-hot-experts.h"
+@@ -4356,6 +4358,24 @@ bool llama_memory_can_shift(llama_memory_t mem) {
+     return mem->get_can_shift();
+ }
+ 
++uint32_t llama_memory_n_cells_used(llama_memory_t mem) {
++    if (!mem) {
++        return 0;
++    }
++
++    const llama_kv_cache * kv = nullptr;
++    if (auto * hybrid = dynamic_cast<llama_memory_hybrid *>(mem)) {
++        kv = hybrid->get_mem_attn();
++    } else {
++        kv = dynamic_cast<llama_kv_cache *>(mem);
++    }
++    if (!kv) {
++        return 0;
++    }
++
++    return kv->get_cells(0).get_used();
++}
++
+ // llama state API
+ 
+ // deprecated
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 274af9b05b4a4fc653c342aeac2817a9ee2ca6b3..90078ee063dd493d706fc83b2d753a1867010991 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -104,6 +104,7 @@ enum slot_state {
+     SLOT_STATE_PROCESSING_PROMPT,
+     SLOT_STATE_DONE_PROMPT,
+     SLOT_STATE_GENERATING,
++    SLOT_STATE_SUSPENDED,  // customware: preempted from the unified KV pool, state parked in RAM, waiting for cells
+ };
+ 
+ struct server_slot; // forward declaration
+@@ -213,6 +214,32 @@ struct server_batch {
+         batch_rendered = true;
+     }
+ 
++    // customware: drop a slot's tokens at indices >= from (a preempted slot leaves the batch) and re-render;
++    // returns the removed indices, ascending, so the callers can shift the batch indices of the other slots
++    std::vector<int32_t> remove_slot_tokens(int32_t id_slot, int32_t from) {
++        GGML_ASSERT(!has_embd);
++
++        std::vector<int32_t> removed;
++        std::vector<token>   kept;
++        kept.reserve(tokens.size());
++
++        for (int32_t i = 0; i < (int32_t) tokens.size(); i++) {
++            if (i >= from && tokens[i].id_slot == id_slot) {
++                removed.push_back(i);
++            } else {
++                kept.push_back(tokens[i]);
++            }
++        }
++
++        if (!removed.empty()) {
++            tokens = std::move(kept);
++            batch_rendered = false;
++            render();
++        }
++
++        return removed;
++    }
++
+     llama_batch get_view(int32_t off, int32_t n_tokens) const {
+         GGML_ASSERT(batch.pos != nullptr);
+         GGML_ASSERT(batch_rendered);
+@@ -296,6 +323,63 @@ struct server_slot {
+ 
+     server_prompt prompt;
+ 
++    // customware (entry 007): preemption under --kv-unified. A suspended slot keeps its task, sampler, tokens and
++    // streamed position; only its sequence state leaves the KV pool for the prompt cache's RAM budget.
++    server_prompt_cache       * cache_for_suspend = nullptr;
++    server_prompt_cache_state * suspended_state   = nullptr;
++    int64_t                     t_suspended       = 0;
++    int                         resume_failures   = 0;
++    int32_t                     resume_last_used  = -1;
++
++    bool suspend() {
++        GGML_ASSERT(cache_for_suspend != nullptr && suspended_state == nullptr);
++
++        const size_t size_tgt =           llama_state_seq_get_size_ext(ctx_tgt, id, LLAMA_STATE_SEQ_FLAGS_NONE);
++        const size_t size_dft = ctx_dft ? llama_state_seq_get_size_ext(ctx_dft, id, LLAMA_STATE_SEQ_FLAGS_NONE) : 0;
++
++        auto * st = cache_for_suspend->alloc_pinned(size_tgt, size_dft);
++        if (st == nullptr) {
++            SLT_ERR(*this, "cannot park the sequence state (%.1f MiB) in the prompt cache\n", (size_tgt + size_dft) / (1024.0 * 1024.0));
++            return false;
++        }
++
++        llama_state_seq_get_data_ext(ctx_tgt, st->data.main.data(), size_tgt, id, LLAMA_STATE_SEQ_FLAGS_NONE);
++        if (ctx_dft) {
++            llama_state_seq_get_data_ext(ctx_dft, st->data.drft.data(), size_dft, id, LLAMA_STATE_SEQ_FLAGS_NONE);
++        }
++
++        mem.seq_rm(id, -1, -1);
++
++        suspended_state = st;
++        t_suspended     = ggml_time_us();
++        i_batch         = -1;
++        state           = SLOT_STATE_SUSPENDED;
++
++        SLT_WRN(*this, "suspended: %d tokens parked in RAM (%.1f MiB), cells freed\n", prompt.n_tokens(), (size_tgt + size_dft) / (1024.0 * 1024.0));
++
++        return true;
++    }
++
++    bool resume() {
++        GGML_ASSERT(state == SLOT_STATE_SUSPENDED && suspended_state != nullptr);
++
++        const bool ok = cache_for_suspend->load_exact(suspended_state, ctx_tgt, ctx_dft, id);
++
++        if (!ok) {
++            // the parked state stays in the cache for another attempt
++            SLT_ERR(*this, "%s", "failed to restore the parked sequence state\n");
++            return false;
++        }
++
++        suspended_state = nullptr;
++        resume_failures = 0;
++        state           = SLOT_STATE_GENERATING;
++
++        SLT_WRN(*this, "resumed after %.1f s with %d tokens\n", (ggml_time_us() - t_suspended) / 1e6, prompt.n_tokens());
++
++        return true;
++    }
++
+     bool prompt_save(server_prompt_cache & prompt_cache) const {
+         if (prompt.tokens.size() == 0) {
+             return false;
+@@ -549,10 +633,18 @@ struct server_slot {
+ 
+             t_last_used = ggml_time_us();
+ 
++            // customware: a suspended slot that ends here (cancelled) holds no cells; drop its parked state and its
++            // token list, which no longer has a KV behind it
++            const bool was_suspended = state == SLOT_STATE_SUSPENDED;
++            if (suspended_state) {
++                cache_for_suspend->erase(suspended_state);
++                suspended_state = nullptr;
++            }
++
+             state = SLOT_STATE_IDLE;
+ 
+             // do not keep context of the child slots - the parent's context is enough
+-            if (task->is_child()) {
++            if (task->is_child() || was_suspended) {
+                 prompt_clear();
+             }
+ 
+@@ -691,6 +783,7 @@ struct server_slot {
+             {"n_ctx",         n_ctx},
+             {"speculative",   can_speculate()},
+             {"is_processing", is_processing()},
++            {"suspended",     state == SLOT_STATE_SUSPENDED},
+         };
+ 
+         const auto & ptask = task ? task : task_prev;
+@@ -912,6 +1005,10 @@ private:
+ 
+     int n_empty_consecutive = 0;
+ 
++    // customware (entry 007): unified KV pool accounting
++    int64_t n_kv_deferred  = 0; // tasks that waited for cells
++    int64_t n_kv_preempted = 0; // sequences suspended by a pool overflow
++
+     std::unique_ptr<server_prompt_cache> prompt_cache;
+ 
+     server_metrics metrics;
+@@ -1360,6 +1457,15 @@ private:
+         } else {
+             SRV_TRC("%s", "prompt cache is disabled - use `--cache-ram N` to enable it\n");
+         }
++
++        // customware: suspended slots park their state in the prompt cache's RAM budget
++        for (auto & slot : slots) {
++            slot.cache_for_suspend = prompt_cache.get();
++        }
++        if (params_base.kv_unified) {
++            SRV_INF("unified KV pool of %d cells: requests that do not fit next to the active ones wait, and a pool overflow suspends one sequence (%s)\n",
++                    llama_n_ctx(ctx_tgt), prompt_cache ? "parked in the prompt cache" : "disabled: no prompt cache, use --cache-ram N");
++        }
+         SRV_TRC("%s", "for more info see https://github.com/ggml-org/llama.cpp/pull/16391\n");
+ 
+         if (params_base.n_ctx_checkpoints > 0) {
+@@ -1664,6 +1770,228 @@ private:
+     //       - smarter decision which slot to clear (LRU or longest prompt?)
+     //       - move slot to level 2 cache instead of removing?
+     //       - instead of purging, try to store and resume later?
++    //
++    // customware (entry 007): KV-aware admission, preemption and resume under --kv-unified
++    //
++
++    // the unified pool: every slot reports it as its n_ctx, so it is the real budget
++    int32_t kv_pool_size() const {
++        return (int32_t) llama_n_ctx(ctx_tgt);
++    }
++
++    // growth margin counted for every active sequence (env LLAMA_KV_MARGIN, default 256; 0 makes overflows easy to
++    // reproduce), and the extra room a suspended sequence needs before it is brought back (hysteresis against
++    // ping-pong between two sequences that cannot coexist)
++    static int32_t kv_margin() {
++        static const int32_t margin = getenv("LLAMA_KV_MARGIN") ? atoi(getenv("LLAMA_KV_MARGIN")) : 256;
++        return margin;
++    }
++
++    static int32_t kv_resume_margin() {
++        static const int32_t margin = getenv("LLAMA_KV_RESUME_MARGIN") ? atoi(getenv("LLAMA_KV_RESUME_MARGIN")) : 1024;
++        return margin;
++    }
++
++    // cells a request needs: its prompt plus room to generate (its n_predict when set, else the margin)
++    static int32_t kv_need(int32_t n_prompt, int32_t n_predict) {
++        return n_prompt + (n_predict > 0 ? n_predict : kv_margin());
++    }
++
++    // cells spoken for: active slots (their prompt, or the full prompt still being processed, plus the growth
++    // margin) and, optionally, suspended slots (they come back before anything new is admitted). Idle retained
++    // slots are purgeable and not counted.
++    int32_t kv_resident(bool include_suspended) const {
++        int32_t n = 0;
++        for (const auto & slot : slots) {
++            if (slot.state == SLOT_STATE_SUSPENDED) {
++                if (include_suspended) {
++                    n += slot.prompt.n_tokens() + kv_margin();
++                }
++                continue;
++            }
++            if (!slot.is_processing()) {
++                continue;
++            }
++            const int32_t n_prompt = slot.task ? std::max((int32_t) slot.prompt.n_tokens(), slot.task->n_tokens()) : (int32_t) slot.prompt.n_tokens();
++            n += n_prompt + kv_margin();
++        }
++        return n;
++    }
++
++    // the sequence to suspend when the pool overflows: the smallest resident generating sequence, ties to the most
++    // recently admitted. One function, so a policy by API key or priority can replace it later.
++    server_slot * pick_victim() {
++        server_slot * best = nullptr;
++        for (auto & slot : slots) {
++            if (slot.state != SLOT_STATE_GENERATING || !slot.task) {
++                continue;
++            }
++            if (slot.task->is_child() || slot.task->is_parent() || !slot.spec_draft.empty()) {
++                continue;
++            }
++            if (best == nullptr ||
++                slot.prompt.n_tokens() <  best->prompt.n_tokens() ||
++                (slot.prompt.n_tokens() == best->prompt.n_tokens() && slot.task->id > best->task->id)) {
++                best = &slot;
++            }
++        }
++        return best;
++    }
++
++    // called when a decode found no free cells even for a 1-token batch: suspend one sequence and retry
++    bool try_preempt(int32_t off) {
++        if (!prompt_cache) {
++            SRV_WRN("%s", "the KV pool overflowed and no prompt cache is available to park a sequence (--cache-ram 0)\n");
++            return false;
++        }
++
++        server_slot * victim = pick_victim();
++        if (victim == nullptr) {
++            return false;
++        }
++
++        const int32_t n_before = victim->prompt.n_tokens();
++
++        // its not-yet-decoded token leaves the batch; the batch indices of the other slots shift accordingly
++        const auto removed = batch.remove_slot_tokens(victim->id, off);
++        for (auto & slot : slots) {
++            if (&slot == victim) {
++                continue;
++            }
++            auto shift = [&](int32_t & idx) {
++                if (idx < 0) {
++                    return;
++                }
++                int32_t d = 0;
++                for (int32_t r : removed) {
++                    if (r < idx) {
++                        d++;
++                    }
++                }
++                idx -= d;
++            };
++            shift(slot.i_batch);
++            for (auto & i : slot.spec_i_batch) {
++                shift(i);
++            }
++        }
++
++        // the sampled token was appended to the prompt when it entered the batch; it was not decoded
++        if (!removed.empty()) {
++            victim->prompt.tokens.keep_first(victim->prompt.tokens.size() - removed.size());
++        }
++
++        if (!victim->suspend()) {
++            return false;
++        }
++
++        n_kv_preempted++;
++
++        SRV_WRN("KV pool overflow: suspended slot %d (task %d, %d tokens, %d in this batch); %d cells spoken for by the others\n",
++                victim->id, victim->task->id, n_before, (int) removed.size(), kv_resident(false));
++
++        return true;
++    }
++
++    // bring suspended sequences back, oldest first, as soon as their cells are free; idle retained slots give way
++    void try_resume_suspended() {
++        std::vector<server_slot *> suspended;
++        for (auto & slot : slots) {
++            if (slot.state == SLOT_STATE_SUSPENDED) {
++                suspended.push_back(&slot);
++            }
++        }
++        if (suspended.empty()) {
++            return;
++        }
++
++        std::sort(suspended.begin(), suspended.end(), [](const server_slot * a, const server_slot * b) { return a->t_suspended < b->t_suspended; });
++
++        for (auto * slot : suspended) {
++            const int32_t need = slot->prompt.n_tokens() + kv_resume_margin();
++            const int32_t pool = kv_pool_size();
++
++            // the cells in use right now plus the rest of any prompt still being processed; no growth margins here,
++            // the resume headroom covers that. Idle retained slots still hold cells until purged: purge them one by
++            // one if that is what it takes
++            auto used_now = [&]() {
++                int32_t n = kv_cells_used();
++                for (const auto & s : slots) {
++                    if (s.is_processing() && s.state != SLOT_STATE_SUSPENDED && s.task) {
++                        n += std::max(0, s.task->n_tokens() - (int32_t) s.prompt.n_tokens());
++                    }
++                }
++                return n;
++            };
++            int32_t used = used_now();
++            while (used + need > pool && try_clear_idle_slots()) {
++                used = used_now();
++            }
++            if (used + need > pool) {
++                break; // the next ones are younger and wait too
++            }
++
++            // a restore that failed is retried only once the occupancy has dropped below where it failed
++            const int32_t cells_now = kv_cells_used();
++            if (slot->resume_failures > 0 && cells_now >= slot->resume_last_used) {
++                continue;
++            }
++            slot->resume_last_used = cells_now;
++
++            if (!slot->resume()) {
++                // the parked state is kept; try again on the next pass, give up only if it keeps failing
++                if (++slot->resume_failures >= 8) {
++                    send_error(*slot, "failed to restore a suspended request", ERROR_TYPE_SERVER);
++                    slot->release();
++                } else {
++                    SLT_WRN(*slot, "restore attempt %d failed, retrying later\n", slot->resume_failures);
++                }
++            }
++        }
++    }
++
++    // cells in use right now, from the cache itself (0 when the memory type does not report it)
++    int32_t kv_cells_used() const {
++        return (int32_t) llama_memory_n_cells_used(llama_get_memory(ctx_tgt));
++    }
++
++    // what the pool has to hold: the cells in use now, minus the purgeable idle ones, plus what the active sequences
++    // will still take (the rest of a prompt being processed and a growth margin each) and, optionally, the suspended
++    // ones (they come back before anything new is admitted). Falls back to the bookkeeping when the cache does not
++    // report its occupancy.
++    int32_t kv_committed(bool include_suspended) const {
++        const int32_t used = kv_cells_used();
++        if (used == 0 && kv_idle_retained() + kv_resident(false) > 0) {
++            return kv_resident(include_suspended);
++        }
++        int32_t n = used - kv_idle_retained();
++        for (const auto & slot : slots) {
++            if (slot.state == SLOT_STATE_SUSPENDED) {
++                if (include_suspended) {
++                    n += slot.prompt.n_tokens() + kv_margin();
++                }
++                continue;
++            }
++            if (!slot.is_processing()) {
++                continue;
++            }
++            const int32_t n_left = slot.task ? std::max(0, slot.task->n_tokens() - (int32_t) slot.prompt.n_tokens()) : 0;
++            n += n_left + kv_margin();
++        }
++        return std::max(n, 0);
++    }
++
++    // cells held by idle slots that kept their context (purgeable)
++    int32_t kv_idle_retained() const {
++        int32_t n = 0;
++        for (const auto & slot : slots) {
++            if (!slot.is_processing()) {
++                n += slot.prompt.n_tokens();
++            }
++        }
++        return n;
++    }
++
+     bool try_clear_idle_slots() {
+         bool res = false;
+ 
+@@ -2415,6 +2743,22 @@ private:
+                         break;
+                     }
+ 
++                    // customware (entry 007): under --kv-unified a request starts only when it fits next to the active
++                    // and suspended sequences; otherwise it waits in the deferred queue (retried when a slot releases).
++                    // Latency, never an error: a prompt too large for the pool alone still fails at launch as before.
++                    if (params_base.kv_unified && task.n_tokens() <= n_ctx_slot()) {
++                        const int32_t need = kv_need(task.n_tokens(), task.params.n_predict);
++                        const int32_t used = kv_committed(true);
++                        const int32_t pool = kv_pool_size();
++                        if (used + need > pool) {
++                            SRV_WRN("task %d needs %d cells (prompt %d) but %d of %d are spoken for: waiting for cells\n",
++                                    id_task, need, task.n_tokens(), used, pool);
++                            n_kv_deferred++;
++                            queue_tasks.defer(std::move(task));
++                            break;
++                        }
++                    }
++
+                     if (task.is_parent()) {
+                         // try getting free slots for all child tasks
+                         size_t n_child_tasks = task.child_tasks.size();
+@@ -2831,6 +3175,11 @@ private:
+             }
+         }
+ 
++        // customware (entry 007): suspended sequences come back as soon as their cells are free
++        if (params_base.kv_unified) {
++            try_resume_suspended();
++        }
++
+         try {
+             scoped_timer t(t_pre_decode, n_pre_decode);
+             pre_decode();
+@@ -3546,12 +3895,20 @@ private:
+                             /* is_prompt = */ true);
+                         slot.prompt.tokens.push_back(cur_tok);
+ 
+-                        // break at the last user message, or at user messages at least min step past the last checkpoint
++                        // break at the last user message, so that a checkpoint can be created right before it
++                        // customware: upstream also breaks at user messages past the checkpoint spacing (and at the
++                        // first one), which only aligns checkpoints with message boundaries. The checkpoint list the
++                        // loop sees lags one batch behind (a batch's checkpoint is created after this loop), so that
++                        // rule cut nearly every message start into its own batch, and on this box every prompt batch
++                        // above the CPU threshold streams the whole expert set: a 500-token batch costs almost as much
++                        // as a 4096-token one. Checkpoints are still created at batch starts with the same spacing;
++                        // a prefix mismatch inside a batch re-prefills up to one batch more than with aligned ones.
+                         if (do_checkpoint && spans.is_user_start(slot.prompt.n_tokens())) {
+                             const auto pos = slot.prompt.n_tokens();
+-                            const auto & checkpoints = slot.prompt.checkpoints;
+ 
+-                            if (pos == last_user_pos || checkpoints.empty() || pos > checkpoints.back().n_tokens + params_base.checkpoint_min_step) {
++                            if (pos == last_user_pos) {
++                                SLT_DBG(slot, "prompt batch cut at the last user message, pos = %d, n_in_batch = %d\n",
++                                        (int) pos, (int) (batch.size() - n_tokens_prev));
+                                 break;
+                             }
+                         }
+@@ -3573,6 +3930,8 @@ private:
+                                 }
+                             }
+                             if (should_break) {
++                                SLT_DBG(slot, "prompt batch cut before the end of the prompt, pos = %d, n_in_batch = %d\n",
++                                        (int) slot.prompt.n_tokens(), (int) (batch.size() - n_tokens_prev));
+                                 break;
+                             }
+                         }
+@@ -3686,6 +4045,18 @@ private:
+         });
+ 
+         if (ret != 0) {
++            // customware (entry 007): under --kv-unified, running out of cells is a scheduling event. Before the
++            // collective failure below: purge an idle slot if there is one, else suspend one sequence and retry.
++            if (ret == 1 && n_batch == 1 && params_base.kv_unified) {
++                if (try_clear_idle_slots()) {
++                    return false; // retry with the same batch
++                }
++                if (try_preempt(off)) {
++                    n_batch = llama_n_batch(ctx_tgt);
++                    return false; // retry the (now smaller) batch at full size
++                }
++            }
++
+             {
+                 std::string err;
+ 
+@@ -3710,7 +4081,8 @@ private:
+                     SRV_ERR("%s off = %d, n_batch = %d, ret = %d\n", err.c_str(), off, n_batch, ret);
+ 
+                     for (auto & slot : slots) {
+-                        if (slot.is_processing()) {
++                        // customware: parked sequences were not part of this batch and keep their state
++                        if (slot.is_processing() && slot.state != SLOT_STATE_SUSPENDED) {
+                             send_error(slot, err);
+                             slot.release();
+ 
+diff --git a/tools/server/server-task.cpp b/tools/server/server-task.cpp
+index 0d3beb313ceabbb903de57d185140a8e5a079e4b..c647edf452fb2d2baca79613898960e3c0cf9bbb 100644
+--- a/tools/server/server-task.cpp
++++ b/tools/server/server-task.cpp
+@@ -1750,10 +1750,9 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
+     if (limit_size > 0) {
+         // make room before allocating the new vectors to avoid breaching the limit
+         while (!states.empty() && size() + state_size_new > limit_size) {
+-            SRV_WRN(" - making room for prompt cache entry, removing oldest entry (size = %.3f MiB)\n",
+-                    states.front().size() / (1024.0 * 1024.0));
+-
+-            states.pop_front();
++            if (!evict_oldest()) {
++                break; // only pinned entries left
++            }
+         }
+     }
+ 
+@@ -1785,6 +1784,7 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
+             /*.main =*/ std::move(state_data_tgt),
+             /*.drft =*/ std::move(state_data_dft),
+         },
++        /*.pinned =*/ false,
+     });
+ 
+     return &states.back();
+@@ -1867,12 +1867,110 @@ bool server_prompt_cache::load(server_prompt & prompt, const server_tokens & tok
+     return true;
+ }
+ 
++bool server_prompt_cache::evict_oldest() {
++    for (auto it = states.begin(); it != states.end(); ++it) {
++        if (it->pinned) {
++            continue;
++        }
++
++        SRV_WRN(" - cache limit reached, removing oldest entry (size = %.3f MiB)\n", it->size() / (1024.0 * 1024.0));
++
++        states.erase(it);
++
++        return true;
++    }
++
++    return false;
++}
++
++server_prompt_cache_state * server_prompt_cache::alloc_pinned(size_t state_size_tgt, size_t state_size_dft) {
++    const size_t state_size_new = state_size_tgt + state_size_dft;
++
++    if (limit_size > 0) {
++        while (!states.empty() && size() + state_size_new > limit_size) {
++            if (!evict_oldest()) {
++                break;
++            }
++        }
++    }
++
++    std::vector<uint8_t> state_data_tgt;
++    std::vector<uint8_t> state_data_dft;
++
++    try {
++        state_data_tgt.resize(state_size_tgt);
++        state_data_dft.resize(state_size_dft);
++    } catch (const std::bad_alloc & e) {
++        SRV_ERR("failed to allocate memory for a suspended slot state: %s\n", e.what());
++        return nullptr;
++    }
++
++    states.push_back({
++        /*.prompt =*/ {},
++        /*.data   =*/ {
++            /*.main =*/ std::move(state_data_tgt),
++            /*.drft =*/ std::move(state_data_dft),
++        },
++        /*.pinned =*/ true,
++    });
++
++    return &states.back();
++}
++
++bool server_prompt_cache::load_exact(server_prompt_cache_state * state, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot) {
++    if (!state) {
++        return false;
++    }
++
++    bool ok = true;
++    {
++        auto & data = state->data.main;
++        const size_t n = llama_state_seq_set_data_ext(ctx_tgt, data.data(), data.size(), id_slot, 0);
++        if (n != data.size()) {
++            SRV_ERR("failed to restore the suspended state with size %zu\n", data.size());
++            ok = false;
++        }
++    }
++    if (ok && !state->data.drft.empty()) {
++        GGML_ASSERT(ctx_dft);
++        auto & data = state->data.drft;
++        const size_t n = llama_state_seq_set_data_ext(ctx_dft, data.data(), data.size(), id_slot, 0);
++        if (n != data.size()) {
++            SRV_ERR("failed to restore the suspended draft state with size %zu\n", data.size());
++            ok = false;
++        }
++    }
++
++    if (ok) {
++        erase(state);
++    }
++
++    return ok;
++}
++
++void server_prompt_cache::erase(server_prompt_cache_state * state) {
++    for (auto it = states.begin(); it != states.end(); ++it) {
++        if (&*it == state) {
++            states.erase(it);
++            return;
++        }
++    }
++}
++
++size_t server_prompt_cache::n_pinned() const {
++    size_t n = 0;
++    for (const auto & state : states) {
++        n += state.pinned ? 1 : 0;
++    }
++    return n;
++}
++
+ void server_prompt_cache::update() {
+     if (limit_size > 0) {
+         while (!states.empty() && size() > limit_size) {
+-            SRV_WRN(" - cache size limit reached, removing oldest entry (size = %.3f MiB)\n", states.front().size() / (1024.0 * 1024.0));
+-
+-            states.pop_front();
++            if (!evict_oldest()) {
++                break;
++            }
+         }
+     }
+ 
+@@ -1884,10 +1982,11 @@ void server_prompt_cache::update() {
+ 
+     if (limit_tokens > 0) {
+         while (!states.empty() && n_tokens() > limit_tokens_cur) {
+-            SRV_WRN(" - cache token limit (%zu, est: %zu) reached, removing oldest entry (size = %.3f MiB)\n",
+-                    limit_tokens, limit_tokens_cur, states.front().size() / (1024.0 * 1024.0));
++            SRV_WRN(" - cache token limit (%zu, est: %zu) reached\n", limit_tokens, limit_tokens_cur);
+ 
+-            states.pop_front();
++            if (!evict_oldest()) {
++                break;
++            }
+         }
+     }
+ 
+diff --git a/tools/server/server-task.h b/tools/server/server-task.h
+index 9c99143f8e1983f2cbe45245d68d8e5937b7f6c6..287c979b4be3c66458fd06881439e48a774f0000 100644
+--- a/tools/server/server-task.h
++++ b/tools/server/server-task.h
+@@ -598,6 +598,9 @@ struct server_prompt_cache_state {
+     server_prompt prompt;
+     server_prompt_data data;
+ 
++    // customware: the saved state of a suspended (preempted) slot; never evicted, erased on resume
++    bool pinned = false;
++
+     size_t size() const {
+         size_t res = data.size();
+ 
+@@ -632,6 +635,21 @@ struct server_prompt_cache {
+     bool load(server_prompt & prompt, const server_tokens & tokens_new, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
+ 
+     void update();
++
++    // customware: suspended slots park their sequence state here, in the same RAM budget as the cached prompts.
++    // A pinned entry carries the state only (the slot keeps its tokens and checkpoints), is never evicted, and is
++    // erased by load_exact() or erase().
++    server_prompt_cache_state * alloc_pinned(size_t state_size_main, size_t state_size_drft);
++
++    bool load_exact(server_prompt_cache_state * state, llama_context * ctx_tgt, llama_context * ctx_dft, int32_t id_slot);
++
++    void erase(server_prompt_cache_state * state);
++
++    size_t n_pinned() const;
++
++private:
++    // evict the oldest entry that is not pinned; false if there is none
++    bool evict_oldest();
+ };
+ 
+ // used exclusively by router mode

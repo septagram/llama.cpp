@@ -98,3 +98,12 @@ Release check on the deployed 120k launcher with its default 30 s interval
 generates 700 tokens at 11.21 t/s; B (44k, cannot fit next to A) is posted as a stream while A generates: headers
 after 30.2 s, 6 pings before its first data event at 197.8 s (the wait for A, then its own cold prefill), longest
 silence 30.2 s, 34 data events, `[DONE]`. No restore failure.
+
+## Final commit list
+
+Sealed 2026-10-20 into `011-keepalive.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `f5f79c20b` server : a waiting stream starts with a ping after one interval; a slot release retries the whole deferred queue
+- `d071a9646` server : a task's begin marker is not streamed as "data: null" after an early ping; entry 011 results
+- `17138311b` customware: entry 011 note: repair a line where an escape had turned into newlines (notes only)
+- `78f546959` customware: entry 011 verified on the deployed launcher; NEXT.md and the fork handoff (notes only)

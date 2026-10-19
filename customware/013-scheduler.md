@@ -160,3 +160,18 @@ in entry 007: logits depend on the batch composition), cache-hit passed, keep-al
 
 The suite itself was stopped by the harness at its 2-hour limit while the keep-alive stage hung on scenario E;
 its child script kept running into the next morning (see `check-box.sh`'s leftover-process check).
+
+## Final commit list
+
+Sealed 2026-10-20 into `013-scheduler.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `f257465c6` customware: scheduler design note (parked, after forking); NEXT.md leads with the order of work (notes only)
+- `d39d22e07` server : one scheduler instead of five rules under --kv-unified; explicit priority; aging; prefill suspension
+- `3511e93a0` server : the scheduler caps the requests running at once; a takeover is charged the kept prefix, not the conversation
+- `5d5c6b4c1` customware: entry 013 scenario results and the measured cost of a third concurrent generation (notes only)
+- `3374cecd2` server : among running equals the scheduler displaces the one holding the fewest cells; honest message
+- `e49f3c06a` server : the scheduler refuses a prompt the pool cannot hold, charges at most the pool, and fails an overflow victim that could never return
+- `cdda90e0b` server : the refusal of a prompt the pool cannot hold carries the counts the context-exceeded error asserts on
+- `c83093965` customware: entry 013 follow-up notes, order of work updated, check-box.sh lists leftover test processes (notes only)
+
+`e49f3c06a` and `cdda90e0b` are the follow-ups from the regression suite; they landed after entry 014's engine commit and apply here in sequence.

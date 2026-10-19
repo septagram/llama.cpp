@@ -1,0 +1,1202 @@
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 9b3a4fcc4bbf6afc77cc8554fa14412722b887b4..0b9f2af88f7717ca1aa3e1df3b2fc9a8a239dfee 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -116,6 +116,9 @@ function(llama_build_and_test source)
+     set_property(TEST ${TEST_TARGET} PROPERTY LABELS ${LLAMA_TEST_LABEL})
+ endfunction()
+ 
++# customware (entry 013): the server scheduler decision, no model needed
++llama_build_and_test(test-server-sched.cpp ${PROJECT_SOURCE_DIR}/tools/server/server-sched.cpp)
++
+ # build test-tokenizer-0 target once and add many tests
+ llama_build(test-tokenizer-0.cpp)
+ 
+diff --git a/tests/test-server-sched.cpp b/tests/test-server-sched.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..855a76dd8e42c02fa1648a4a6ec9d9ec6cf8848b
+--- /dev/null
++++ b/tests/test-server-sched.cpp
+@@ -0,0 +1,229 @@
++// customware (entry 013): the scheduler's decision function, on the shapes seen in the launcher logs
++
++#include "../tools/server/server-sched.h"
++
++#include <algorithm>
++#include <cstdio>
++#include <cstdlib>
++#include <vector>
++
++static int n_fail = 0;
++
++#define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); n_fail++; } } while (0)
++
++static bool has(const std::vector<int> & v, int id) {
++    return std::find(v.begin(), v.end(), id) != v.end();
++}
++
++static sched_req req(int id, sched_req_state st, int32_t held, int32_t need, int prio = 0, int64_t t = 0, int reuse = -1, int32_t reuse_keep = 0) {
++    sched_req r;
++    r.id = id; r.state = st; r.held = held; r.need = need; r.prio = prio; r.t_arrival = t; r.reuse = reuse; r.reuse_keep = reuse_keep;
++    r.has_slot = st != SCHED_REQ_WAITING;
++    return r;
++}
++
++static sched_conv conv(int id, int32_t owned, int64_t t_last) {
++    sched_conv c;
++    c.id = id; c.owned = owned; c.t_last = t_last;
++    return c;
++}
++
++static sched_input base(int32_t pool, int n_slots) {
++    sched_input in;
++    in.pool = pool; in.n_slots = n_slots; in.now = 1000; in.t_age = 0;
++    return in;
++}
++
++int main() {
++    // 1. the user's day: two ~93k agents alternate in a 120k pool, an 8k request arrives while one generates and the
++    //    other waits: the small one starts next to the active one, the large one keeps waiting (no preemption among
++    //    equals)
++    {
++        auto in = base(120064, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 93000, 256, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_WAITING, 0, 93000 + 256, 0, 20));
++        in.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 8000 + 256, 0, 30));
++        auto out = sched_decide(in);
++        CHECK(has(out.keep, 1));
++        CHECK(!has(out.start, 2));
++        CHECK(has(out.start, 3));
++        CHECK(out.suspend.empty());
++    }
++
++    // 2. a fork pair: each holds only its tail; both fit although their token counts would not
++    {
++        auto in = base(16384, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 12400 + 1500, 256, 0, 10)); // the parent owns the prefix and its tail
++        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1500, 256, 0, 20));         // the fork owns its tail
++        auto out = sched_decide(in);
++        CHECK(out.keep.size() == 2);
++        CHECK(out.suspend.empty());
++    }
++
++    // 3. priority: a higher class arrives with no room; the lowest-ranked running request is displaced
++    {
++        auto in = base(120064, 3);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 60000, 256, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 50000, 256, 0, 20));
++        in.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 30000 + 256, 5, 30));
++        auto out = sched_decide(in);
++        CHECK(has(out.start, 3));
++        CHECK(has(out.keep, 1));
++        CHECK(has(out.suspend, 2));
++    }
++
++    // 4. equal class: running is sticky, the waiter waits even when it arrived earlier than the running one started
++    {
++        auto in = base(120064, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 100000, 256, 0, 50));
++        in.reqs.push_back(req(2, SCHED_REQ_WAITING, 0, 50000, 0, 10));
++        auto out = sched_decide(in);
++        CHECK(has(out.keep, 1));
++        CHECK(out.start.empty());
++        CHECK(out.suspend.empty());
++    }
++
++    // 5. aging: after t_age the waiter is promoted one class and displaces an equal-class running request
++    {
++        auto in = base(120064, 2);
++        in.t_age = 100;
++        in.now = 1000;
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 100000, 256, 0, 950));
++        in.reqs.push_back(req(2, SCHED_REQ_WAITING, 0, 50000, 0, 10)); // waited 990 > 100
++        auto out = sched_decide(in);
++        CHECK(has(out.start, 2));
++        CHECK(has(out.suspend, 1));
++    }
++
++    // 6. purges: idle conversations are purged least recent first, only as far as needed, and the one a request
++    //    continues is never purged
++    {
++        auto in = base(30000, 3);
++        in.idle.push_back(conv(0, 12000, 100)); // oldest
++        in.idle.push_back(conv(1, 10000, 200));
++        in.idle.push_back(conv(2, 5000, 300));  // the one being continued
++        in.reqs.push_back(req(1, SCHED_REQ_WAITING, 0, 20000, 0, 10, /*reuse*/ 2, /*keeps*/ 5000));
++        auto out = sched_decide(in);
++        CHECK(has(out.start, 1));
++        // cost = 20000 + 5000 (kept of the taken-over one) = 25000; idle left: 12000 + 10000 = 22000 -> 47000 > 30000: purge 0 (-> 35000), then 1 (-> 25000)
++        CHECK(out.purge.size() == 2);
++        CHECK(out.purge[0] == 0 && out.purge[1] == 1);
++        CHECK(!has(out.purge, 2));
++    }
++
++    // 7. a waiting request needs a slot: with two slots held by running requests and one idle conversation, the
++    //    idle one is purged for its slot; with three running, the waiter waits
++    {
++        auto in = base(200000, 3);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 1000, 256, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1000, 256, 0, 20));
++        in.idle.push_back(conv(2, 1000, 5));
++        in.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 1000, 0, 30));
++        auto out = sched_decide(in);
++        CHECK(has(out.start, 3));
++        CHECK(has(out.purge, 2));
++
++        auto in2 = base(200000, 3);
++        in2.reqs.push_back(req(1, SCHED_REQ_RUNNING, 1000, 256, 0, 10));
++        in2.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1000, 256, 0, 20));
++        in2.reqs.push_back(req(4, SCHED_REQ_RUNNING, 1000, 256, 0, 25));
++        in2.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 1000, 0, 30));
++        auto out2 = sched_decide(in2);
++        CHECK(!has(out2.start, 3));
++        CHECK(out2.suspend.empty());
++    }
++
++    // 8. a suspended request keeps its slot and comes back before a waiter of its class, when its cells are free
++    {
++        auto in = base(120064, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 20000, 256, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_SUSPENDED, 0, 93000 + 1024, 0, 20));
++        in.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 8000, 0, 30));
++        auto out = sched_decide(in);
++        CHECK(has(out.start, 2));
++        CHECK(out.start.size() == 1 && out.start[0] == 2); // the suspended one first
++        CHECK(!has(out.start, 3));                          // no slot left: 1 running + 2 suspended-holding = 2
++    }
++
++    // 9. a suspended request whose cells are not free yet stays suspended; nothing is displaced for it
++    {
++        auto in = base(120064, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 93000, 256, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_SUSPENDED, 0, 93000 + 1024, 0, 20));
++        auto out = sched_decide(in);
++        CHECK(has(out.keep, 1));
++        CHECK(out.start.empty());
++        CHECK(out.suspend.empty());
++    }
++
++    // 10. the overflow victim: among the kept running requests, the lowest class, then the fewest held cells
++    {
++        auto in = base(120064, 3);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 50000, 256, 1, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 30000, 256, 0, 20));
++        in.reqs.push_back(req(3, SCHED_REQ_RUNNING, 10000, 256, 0, 30));
++        auto out = sched_decide(in);
++        CHECK(out.victim == 3);
++    }
++
++    // 11. the reserve of a running request keeps a lower-ranked waiter out even when its held cells alone would fit
++    {
++        auto in = base(10000, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 9000, 900, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_WAITING, 0, 500, 0, 20));
++        auto out = sched_decide(in);
++        CHECK(has(out.keep, 1));
++        CHECK(!has(out.start, 2));
++    }
++
++    // 12. a takeover keeps only the common prefix: a 42-token request continuing a 13k conversation by a 10-token
++    //     prefix costs 10 + its need, not 13k, so the other idle conversation is not purged
++    {
++        auto in = base(24576, 3);
++        in.idle.push_back(conv(0, 13000, 100));
++        in.idle.push_back(conv(2, 12940, 200));
++        in.reqs.push_back(req(1, SCHED_REQ_WAITING, 0, 42 - 10 + 16, 0, 10, /*reuse*/ 2, /*keeps*/ 10));
++        auto out = sched_decide(in);
++        CHECK(has(out.start, 1));
++        CHECK(out.purge.empty());
++    }
++
++    // 13. at most n_active_max run at once: three slots, two generating, a third waiter waits although cells and a
++    //     slot are free; a higher class still gets in by displacing the lowest-ranked running one
++    {
++        auto in = base(200000, 3);
++        in.n_active_max = 2;
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 1000, 256, 0, 10));
++        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 1000, 256, 0, 20));
++        in.reqs.push_back(req(3, SCHED_REQ_WAITING, 0, 1000, 0, 30));
++        auto out = sched_decide(in);
++        CHECK(out.keep.size() == 2);
++        CHECK(!has(out.start, 3));
++        CHECK(out.suspend.empty());
++
++        in.reqs.push_back(req(4, SCHED_REQ_WAITING, 0, 1000, 3, 40));
++        auto out2 = sched_decide(in);
++        CHECK(has(out2.start, 4));
++        CHECK(has(out2.suspend, 2));
++        CHECK(has(out2.keep, 1));
++        CHECK(!has(out2.start, 3));
++    }
++
++    // 14. the pool within one reserve of full: the walk displaces the running request holding the fewest cells
++    //     (the cheapest to park), not the younger one
++    {
++        auto in = base(20000, 2);
++        in.reqs.push_back(req(1, SCHED_REQ_RUNNING, 6000, 900, 0, 10));  // older, smaller
++        in.reqs.push_back(req(2, SCHED_REQ_RUNNING, 13500, 900, 0, 20)); // younger, larger
++        auto out = sched_decide(in);
++        CHECK(has(out.keep, 2));
++        CHECK(has(out.suspend, 1));
++    }
++
++    if (n_fail == 0) {
++        printf("test-server-sched: all cases passed\n");
++        return 0;
++    }
++    printf("test-server-sched: %d failures\n", n_fail);
++    return 1;
++}
+diff --git a/tools/server/CMakeLists.txt b/tools/server/CMakeLists.txt
+index 4adaaceefd23b6038c982bf96d653f30600de67f..a47bd6a14682f9561242027d259fd1a0da3a5884 100644
+--- a/tools/server/CMakeLists.txt
++++ b/tools/server/CMakeLists.txt
+@@ -23,6 +23,8 @@ add_library(${TARGET} STATIC
+     server-mcp.h
+     server-schema.cpp
+     server-schema.h
++    server-sched.cpp
++    server-sched.h
+ )
+ 
+ if (BUILD_SHARED_LIBS)
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 2c66479c74fd058da25ac882a023fed0c09708e3..7f8032846efd8eb1ff75a588d567c379100be281 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -1,4 +1,5 @@
+ #include "server-context.h"
++#include "server-sched.h"
+ #include "server-chat.h"
+ #include "server-common.h"
+ #include "server-http.h"
+@@ -378,7 +379,10 @@ struct server_slot {
+ 
+         suspended_state = nullptr;
+         resume_failures = 0;
+-        state           = SLOT_STATE_GENERATING;
++
++        // customware (entry 013): a request suspended during its prompt returns to the prompt loop, which finds the
++        // processed prefix in place and continues; a generating one picks up with its pending sampled token
++        state = task && prompt.n_tokens() < task->n_tokens() ? SLOT_STATE_STARTED : SLOT_STATE_GENERATING;
+ 
+         SLT_WRN(*this, "resumed after %.1f s with %d tokens\n", (ggml_time_us() - t_suspended) / 1e6, prompt.n_tokens());
+ 
+@@ -838,6 +842,7 @@ struct server_slot {
+ 
+         if (ptask) {
+             res["id_task"] = ptask->id;
++            res["priority"] = ptask->params.priority;
+             res["n_prompt_tokens"]           = (int32_t) prompt.tokens.size();
+             res["n_prompt_tokens_processed"] = stats.n_prompt_processed;
+             res["n_prompt_tokens_cache"]     = stats.n_prompt_cached;
+@@ -1058,6 +1063,12 @@ private:
+     int64_t n_kv_preempted = 0; // sequences suspended by a pool overflow
+     int64_t n_forks        = 0; // customware (entry 012): requests that started as a fork of a busy slot's conversation
+ 
++    // customware (entry 013): the scheduler runs on events and, in update_slots, when something changed or every 2 s
++    bool    sched_dirty       = true;
++    int64_t t_sched_last      = 0;
++    int64_t n_sched_decisions = 0;
++    int32_t sched_purged_last = 0;
++
+     std::unique_ptr<server_prompt_cache> prompt_cache;
+ 
+     server_metrics metrics;
+@@ -1446,7 +1457,14 @@ private:
+             SLT_TRC(slot, "new slot, n_ctx = %d\n", slot.n_ctx);
+ 
+             slot.callback_on_release = [this](int id_slot) {
+-                queue_tasks.pop_deferred_task(id_slot);
++                if (params_base.kv_unified) {
++                    // customware (entry 013): a decision pulls what can start now; it may run from inside the slot
++                    // loop, so it moves no state (LIGHT), the next full pass does
++                    sched_dirty = true;
++                    schedule("release", nullptr, SCHED_LIGHT);
++                } else {
++                    queue_tasks.pop_deferred_task(id_slot);
++                }
+             };
+ 
+             slot.callback_on_reset = [this](const server_slot & slot) {
+@@ -2056,16 +2074,30 @@ private:
+     }
+ 
+     // called when a decode found no free cells even for a 1-token batch: suspend one sequence and retry
+-    bool try_preempt(int32_t off) {
++    bool try_preempt(int32_t off, int id_task_victim = -1) {
+         if (!prompt_cache) {
+             SRV_WRN("%s", "the KV pool overflowed and no prompt cache is available to park a sequence (--cache-ram 0)\n");
+             return false;
+         }
+ 
+-        server_slot * victim = pick_victim();
++        // customware (entry 013): the scheduler names the victim (its lowest-ranked running request, which may be
++        // processing its prompt); without one, the entry 007 choice
++        server_slot * victim = nullptr;
++        if (id_task_victim >= 0) {
++            for (auto & slot : slots) {
++                if (slot.is_processing() && slot.state != SLOT_STATE_SUSPENDED && slot.state != SLOT_STATE_WAIT_OTHER &&
++                        slot.task && slot.task->id == id_task_victim && !slot.task->is_child() && !slot.task->is_parent()) {
++                    victim = &slot;
++                }
++            }
++        }
++        if (victim == nullptr) {
++            victim = pick_victim();
++        }
+         if (victim == nullptr) {
+             return false;
+         }
++        victim->spec_i_batch.clear();
+ 
+         const int32_t n_before = victim->prompt.n_tokens();
+ 
+@@ -2098,6 +2130,23 @@ private:
+             victim->prompt.tokens.keep_first(victim->prompt.tokens.size() - removed.size());
+         }
+ 
++        // customware (entry 013, follow-up): a victim that could never come back (the cells it holds alone plus the
++        // resume margin exceed the pool) is not parked: it fails alone with the context error, its conversation goes
++        // to the cache like any purged one, and the others go on with its cells. Parked, nothing could have brought
++        // it back and its client would have waited forever.
++        {
++            const int32_t owned = kv_cells_owned({ victim->id });
++            if (owned + kv_resume_margin() > kv_pool_size()) {
++                SRV_WRN("KV pool overflow: slot %d (task %d, %d tokens, %d cells of its own) outgrew the pool of %d cells and could not come back: failing it, the others continue\n",
++                        victim->id, victim->task->id, n_before, owned, kv_pool_size());
++                send_error(*victim, string_format("context size exceeded: the request (%d tokens) outgrew the KV pool (%d cells)", n_before, kv_pool_size()),
++                        ERROR_TYPE_EXCEED_CONTEXT_SIZE);
++                victim->release();
++                purge_idle(*victim, owned);
++                return true;
++            }
++        }
++
+         if (!victim->suspend()) {
+             return false;
+         }
+@@ -2110,63 +2159,6 @@ private:
+         return true;
+     }
+ 
+-    // bring suspended sequences back, oldest first, as soon as their cells are free; idle retained slots give way
+-    void try_resume_suspended() {
+-        std::vector<server_slot *> suspended;
+-        for (auto & slot : slots) {
+-            if (slot.state == SLOT_STATE_SUSPENDED) {
+-                suspended.push_back(&slot);
+-            }
+-        }
+-        if (suspended.empty()) {
+-            return;
+-        }
+-
+-        std::sort(suspended.begin(), suspended.end(), [](const server_slot * a, const server_slot * b) { return a->t_suspended < b->t_suspended; });
+-
+-        for (auto * slot : suspended) {
+-            const int32_t need = slot->prompt.n_tokens() + kv_resume_margin();
+-            const int32_t pool = kv_pool_size();
+-
+-            // the cells in use right now plus the rest of any prompt still being processed; no growth margins here,
+-            // the resume headroom covers that. Idle retained slots still hold cells until purged: purge them one by
+-            // one if that is what it takes
+-            auto used_now = [&]() {
+-                int32_t n = kv_cells_used();
+-                for (const auto & s : slots) {
+-                    if (s.is_processing() && s.state != SLOT_STATE_SUSPENDED && s.task) {
+-                        n += std::max(0, s.task->n_tokens() - (int32_t) s.prompt.n_tokens());
+-                    }
+-                }
+-                return n;
+-            };
+-            int32_t used = used_now();
+-            while (used + need > pool && try_clear_idle_slots()) {
+-                used = used_now();
+-            }
+-            if (used + need > pool) {
+-                break; // the next ones are younger and wait too
+-            }
+-
+-            // a restore that failed is retried only once the occupancy has dropped below where it failed
+-            const int32_t cells_now = kv_cells_used();
+-            if (slot->resume_failures > 0 && cells_now >= slot->resume_last_used) {
+-                continue;
+-            }
+-            slot->resume_last_used = cells_now;
+-
+-            if (!slot->resume()) {
+-                // the parked state is kept; try again on the next pass, give up only if it keeps failing
+-                if (++slot->resume_failures >= 8) {
+-                    send_error(*slot, "failed to restore a suspended request", ERROR_TYPE_SERVER);
+-                    slot->release();
+-                } else {
+-                    SLT_WRN(*slot, "restore attempt %d failed, retrying later\n", slot->resume_failures);
+-                }
+-            }
+-        }
+-    }
+-
+     // cells in use right now, from the cache itself (0 when the memory type does not report it)
+     int32_t kv_cells_used() const {
+         return (int32_t) llama_memory_n_cells_used(llama_get_memory(ctx_tgt));
+@@ -2242,22 +2234,24 @@ private:
+         }
+ 
+         if (victim != nullptr) {
+-            auto & slot = *victim;
+-
+-            SRV_WRN("purging slot %d with %zu tokens (%d cells of its own)\n", slot.id, slot.prompt.tokens.size(), victim_owned);
++            purge_idle(*victim, victim_owned);
++            res = true;
++        }
+ 
+-            // customware: a purge is not a cache miss: the prompt goes to the cache first, as a launch would do
+-            if (prompt_cache && params_base.cache_idle_slots) {
+-                slot.prompt_save(*prompt_cache);
+-                prompt_cache->update();
+-            }
++        return res;
++    }
+ 
+-            slot.prompt_clear();
++    // an idle conversation leaves the pool: saved to the prompt cache first (a purge is not a cache miss), then cleared
++    void purge_idle(server_slot & slot, int32_t owned) {
++        SRV_WRN("purging slot %d with %zu tokens (%d cells of its own)\n", slot.id, slot.prompt.tokens.size(), owned);
+ 
+-            res = true;
++        if (prompt_cache && params_base.cache_idle_slots) {
++            slot.prompt_save(*prompt_cache);
++            prompt_cache->update();
+         }
+ 
+-        return res;
++        slot.prompt_clear();
++        sched_dirty = true;
+     }
+ 
+     std::vector<common_adapter_lora_info> construct_lora_list(const std::map<int, float> & config) const {
+@@ -2940,6 +2934,260 @@ private:
+                 cur.pos_max, cur.n_tokens, (float) cur.size() / 1024 / 1024);
+     }
+ 
++    //
++    // customware (entry 013): one scheduler instead of five rules (customware/notes-scheduler.md, 013-scheduler.md)
++    //
++
++    enum sched_mode {
++        SCHED_FULL,      // decide and reconcile: suspend, purge, resume, pull the waiting starts
++        SCHED_LIGHT,     // decide and pull the waiting starts only (from inside the slot loop)
++        SCHED_EMERGENCY, // a decode found no cells: purge what the decision purges; the victim goes through try_preempt
++    };
++
++    static int64_t sched_age_us() {
++        static const int64_t age = (getenv("LLAMA_SCHED_AGE_S") ? atoll(getenv("LLAMA_SCHED_AGE_S")) : 300) * 1000000;
++        return age;
++    }
++
++    // requests running at once (LLAMA_SCHED_MAX_ACTIVE, default 2): a third generation costs every slot a third of
++    // its speed for little in total, so the other slots serve priority starts, suspended requests and idle
++    // conversations that keep their cells
++    static int sched_active_max() {
++        static const int n = getenv("LLAMA_SCHED_MAX_ACTIVE") ? atoi(getenv("LLAMA_SCHED_MAX_ACTIVE")) : 2;
++        return n;
++    }
++
++    struct sched_placement {
++        int32_t need  = 0;  // cells the request needs that are not in the pool yet
++        int     reuse = -1; // the idle slot whose conversation it would continue
++        int32_t keep  = 0;  // cells of that conversation it keeps (the common prefix)
++    };
++
++    // what starting the task would cost, without starting it: the same choice get_available_slot makes
++    sched_placement plan_placement(const server_task & task) const {
++        sched_placement pl;
++        const int32_t n = task.n_tokens();
++
++        if (!task.params.cache_prompt || task.type != SERVER_TASK_TYPE_COMPLETION || task.tokens.size() == 0) {
++            pl.need = kv_need(n, task.params.n_predict);
++            return pl;
++        }
++
++        // the idle slot with the best prefix, and the busy one
++        const server_slot * idle = nullptr; size_t lcp_idle = 0;
++        const server_slot * busy = nullptr; size_t lcp_busy = 0;
++        for (const auto & slot : slots) {
++            if (slot.prompt.tokens.size() == 0 || slot.state == SLOT_STATE_SUSPENDED || slot.state == SLOT_STATE_WAIT_OTHER) {
++                continue;
++            }
++            if (task.id_slot != -1 && slot.id != task.id_slot) {
++                continue;
++            }
++            const size_t lcp = slot.prompt.tokens.get_common_prefix(task.tokens);
++            if (float(lcp) / task.tokens.size() <= slot_prompt_similarity) {
++                continue;
++            }
++            if (slot.is_processing()) {
++                if (lcp > lcp_busy) { lcp_busy = lcp; busy = &slot; }
++            } else {
++                if (lcp > lcp_idle) { lcp_idle = lcp; idle = &slot; }
++            }
++        }
++
++        if (idle != nullptr && lcp_idle >= lcp_busy) {
++            pl.need  = kv_need(n - (int32_t) lcp_idle, task.params.n_predict);
++            pl.reuse = idle->id;
++            pl.keep  = (int32_t) lcp_idle;
++            return pl;
++        }
++
++        if (busy != nullptr && task.id_slot == -1) {
++            int64_t c = 0;
++            for (const auto & cur : busy->prompt.checkpoints) {
++                if (cur.n_tokens <= (int64_t) lcp_busy && cur.n_tokens < (int64_t) task.tokens.size() && cur.n_tokens > c) {
++                    c = cur.n_tokens;
++                }
++            }
++            if (c > 0 && float(c) / task.tokens.size() > slot_prompt_similarity) {
++                pl.need = kv_need(n - (int32_t) c, task.params.n_predict);
++                return pl;
++            }
++        }
++
++        if (prompt_cache) {
++            const int64_t entry = prompt_cache->peek(server_prompt{}, task.tokens);
++            if (entry > 0) {
++                // the entry is restored whole, then trimmed and extended
++                pl.need = kv_need(std::max((int32_t) entry, n), task.params.n_predict);
++                return pl;
++            }
++        }
++
++        pl.need = kv_need(n, task.params.n_predict);
++        return pl;
++    }
++
++    sched_input build_sched_input(const server_task * new_task) const {
++        sched_input in;
++        in.pool         = kv_pool_size();
++        in.n_slots      = (int) slots.size();
++        in.n_active_max = sched_active_max();
++        in.now          = ggml_time_us();
++        in.t_age        = sched_age_us();
++
++        for (const auto & slot : slots) {
++            if (slot.state == SLOT_STATE_SUSPENDED) {
++                sched_req r;
++                r.id        = slot.task->id;
++                r.prio      = slot.task->params.priority;
++                r.t_arrival = slot.task->t_arrival;
++                r.state     = SCHED_REQ_SUSPENDED;
++                r.need      = slot.prompt.n_tokens() + kv_resume_margin();
++                r.has_slot  = true;
++                in.reqs.push_back(r);
++                continue;
++            }
++            if (slot.is_processing()) {
++                if (!slot.task) {
++                    continue;
++                }
++                sched_req r;
++                r.id        = slot.task->id;
++                r.prio      = slot.task->params.priority;
++                r.t_arrival = slot.task->t_arrival;
++                r.state     = SCHED_REQ_RUNNING;
++                r.held      = kv_cells_owned({ slot.id });
++                r.need      = std::max(0, slot.task->n_tokens() - (int32_t) slot.prompt.n_tokens()) + kv_margin();
++                r.has_slot  = true;
++                in.reqs.push_back(r);
++                continue;
++            }
++            if (slot.prompt.n_tokens() > 0) {
++                sched_conv c;
++                c.id     = slot.id;
++                c.owned  = kv_cells_owned({ slot.id });
++                c.t_last = slot.t_last_used;
++                in.idle.push_back(c);
++            }
++        }
++
++        auto add_waiting = [&](const server_task & task) {
++            if (task.type != SERVER_TASK_TYPE_COMPLETION) {
++                return;
++            }
++            const sched_placement pl = plan_placement(task);
++            sched_req r;
++            r.id        = task.id;
++            r.prio      = task.params.priority;
++            r.t_arrival = task.t_arrival;
++            r.state     = SCHED_REQ_WAITING;
++            // a request whose growth reserve exceeds the pool is charged the pool: it runs alone, as entry 007's
++            // admission let it (the prompt fits; a generation that outgrows the pool fails as before)
++            r.need       = std::min(pl.need, in.pool);
++            r.reuse      = pl.reuse;
++            r.reuse_keep = pl.keep;
++            in.reqs.push_back(r);
++        };
++
++        const_cast<server_queue &>(queue_tasks).for_each_deferred([&](const server_task & task) { add_waiting(task); });
++        if (new_task) {
++            add_waiting(*new_task);
++        }
++
++        return in;
++    }
++
++    // one decision and its reconcile; returns it so the caller can read start/victim
++    sched_output schedule(const char * reason, const server_task * new_task, sched_mode mode) {
++        const sched_input in = build_sched_input(new_task);
++        sched_output out = sched_decide(in);
++
++        n_sched_decisions++;
++        t_sched_last      = in.now;
++        sched_dirty       = false;
++        sched_purged_last = 0;
++
++        if (!out.start.empty() || !out.suspend.empty() || !out.purge.empty()) {
++            SRV_INF("scheduler (%s): %s\n", reason, out.why.c_str());
++        }
++
++        auto slot_of_task = [&](int id_task) -> server_slot * {
++            for (auto & slot : slots) {
++                if (slot.is_processing() && slot.task && slot.task->id == id_task) {
++                    return &slot;
++                }
++            }
++            return nullptr;
++        };
++
++        if (mode == SCHED_FULL) {
++            // displaced running requests: a higher class took their cells. Between decodes every token of a slot has
++            // been decoded, so the state is saved as it stands and nothing in a batch has to be undone
++            for (int id : out.suspend) {
++                server_slot * slot = slot_of_task(id);
++                if (slot == nullptr || slot->state == SLOT_STATE_SUSPENDED || slot->state == SLOT_STATE_WAIT_OTHER ||
++                        slot->task->is_child() || slot->task->is_parent() || !prompt_cache) {
++                    continue;
++                }
++                SLT_WRN(*slot, "displaced: higher-ranked requests need its cells or its place among the active ones; suspending (%d tokens)\n", slot->prompt.n_tokens());
++                slot->spec_i_batch.clear();
++                slot->i_batch = -1;
++                if (slot->suspend()) {
++                    n_kv_preempted++;
++                    sched_dirty = true;
++                }
++            }
++        }
++
++        if (mode != SCHED_LIGHT) {
++            for (int id : out.purge) {
++                for (auto & slot : slots) {
++                    if (slot.id == id && !slot.is_processing() && slot.prompt.n_tokens() > 0) {
++                        purge_idle(slot, kv_cells_owned({ slot.id }));
++                        sched_purged_last++;
++                    }
++                }
++            }
++        }
++
++        std::vector<int> waiting_starts;
++        for (int id : out.start) {
++            server_slot * slot = slot_of_task(id);
++            if (slot != nullptr && slot->state == SLOT_STATE_SUSPENDED) {
++                if (mode != SCHED_FULL) {
++                    continue;
++                }
++                // a restore that failed is retried only once the occupancy has dropped below where it failed
++                const int32_t cells_now = kv_cells_used();
++                if (slot->resume_failures > 0 && cells_now >= slot->resume_last_used) {
++                    continue;
++                }
++                slot->resume_last_used = cells_now;
++                if (!slot->resume()) {
++                    if (++slot->resume_failures >= 8) {
++                        send_error(*slot, "failed to restore a suspended request", ERROR_TYPE_SERVER);
++                        slot->release();
++                    } else {
++                        SLT_WRN(*slot, "restore attempt %d failed, retrying later\n", slot->resume_failures);
++                    }
++                }
++                sched_dirty = true;
++                continue;
++            }
++            if (new_task != nullptr && id == new_task->id) {
++                continue; // the caller launches it
++            }
++            waiting_starts.push_back(id);
++        }
++
++        if (!waiting_starts.empty()) {
++            // they come back through process_single_task, where the decision is confirmed and the launch happens
++            queue_tasks.pop_deferred_tasks(waiting_starts);
++        }
++
++        return out;
++    }
++
+     // customware (entry 012): the state at the end of a generation, taken when the generation ends. Before, it was
+     // taken by the next request at the position where it started adding, if one came; a fork needs it now.
+     void checkpoint_at_turn_end(server_slot & slot) {
+@@ -2991,6 +3239,31 @@ private:
+ 
+                     const int id_task = task.id;
+ 
++                    // customware (entry 013): under --kv-unified the scheduler decides whether this request starts now
++                    if (params_base.kv_unified && task.type == SERVER_TASK_TYPE_COMPLETION) {
++                        if (task.t_arrival == 0) {
++                            task.t_arrival = ggml_time_us();
++                        }
++                        // a prompt the pool cannot hold even alone is refused here, as the launch refuses it; waiting
++                        // for cells that never come is not an answer (a 44k prompt on a 32k pool waited until the
++                        // client gave up)
++                        if (task.n_tokens() >= kv_pool_size()) {
++                            // the id overload: the context-exceeded error carries the counts (the task overload asserts without them)
++                            send_error(task.id, string_format("request (%d tokens) exceeds the available context size (%d tokens), try increasing it",
++                                    task.n_tokens(), kv_pool_size()), ERROR_TYPE_EXCEED_CONTEXT_SIZE, task.n_tokens(), kv_pool_size());
++                            break;
++                        }
++                        const sched_output out = schedule("task", &task, SCHED_FULL);
++                        if (std::find(out.start.begin(), out.start.end(), task.id) == out.start.end()) {
++                            const sched_placement pl = plan_placement(task);
++                            SRV_WRN("task %d needs %d cells (prompt %d, priority %d) but %s: waiting for cells\n",
++                                    id_task, pl.need, task.n_tokens(), task.params.priority, out.why.c_str());
++                            n_kv_deferred++;
++                            queue_tasks.defer(std::move(task));
++                            break;
++                        }
++                    }
++
+                     server_slot * slot = get_available_slot(task);
+ 
+                     //
+@@ -3011,27 +3284,7 @@ private:
+                         break;
+                     }
+ 
+-                    // customware (entry 007): under --kv-unified a request starts only when it fits next to the active
+-                    // and suspended sequences; otherwise it waits in the deferred queue (retried when a slot releases).
+-                    // Latency, never an error: a prompt too large for the pool alone still fails at launch as before.
+-                    // A request only ever waits for cells that other sequences hold: with nothing committed there is
+-                    // nothing to wait for, so it starts even when prompt + reserve exceeds the pool (the prompt fits,
+-                    // and generation ends at the pool like any context limit).
+-                    if (params_base.kv_unified && task.n_tokens() <= n_ctx_slot()) {
+-                        // customware (entry 012): the slot's own cells (a continuation's prefix, private or shared with
+-                        // a busy fork source) are in the pool already: charge the rest, and do not count them purgeable
+-                        const int32_t n_held = task.params.cache_prompt ? (int32_t) slot->prompt.tokens.get_common_prefix(task.tokens) : 0;
+-                        const int32_t need = kv_need(task.n_tokens() - n_held, task.params.n_predict);
+-                        const int32_t used = kv_committed(true, slot);
+-                        const int32_t pool = kv_pool_size();
+-                        if (used > 0 && used + need > pool) {
+-                            SRV_WRN("task %d needs %d cells (prompt %d, %d of it in the slot) but %d of %d are spoken for: waiting for cells\n",
+-                                    id_task, need, task.n_tokens(), n_held, used, pool);
+-                            n_kv_deferred++;
+-                            queue_tasks.defer(std::move(task));
+-                            break;
+-                        }
+-                    }
++                    // customware (entry 013): admission is the scheduler's decision above (entry 007's check was here)
+ 
+                     if (task.is_parent()) {
+                         // try getting free slots for all child tasks
+@@ -3051,7 +3304,10 @@ private:
+                         break; // drop the task
+                     }
+ 
+-                    if (params_base.cache_idle_slots) {
++                    // customware (entry 013): under --kv-unified idle conversations keep their cells until a decision
++                    // purges them (least recent first, when cells or a slot are needed); a launch no longer saves and
++                    // clears every idle slot
++                    if (params_base.cache_idle_slots && !params_base.kv_unified) {
+                         for (auto & slot : slots) {
+                             if (!slot.is_processing()) {
+                                 SLT_TRC(slot, "%s", "saving idle slot to prompt cache\n");
+@@ -3449,9 +3705,9 @@ private:
+             }
+         }
+ 
+-        // customware (entry 007): suspended sequences come back as soon as their cells are free
+-        if (params_base.kv_unified) {
+-            try_resume_suspended();
++        // customware (entry 013): a full decision when something changed, and every 2 s for the aging
++        if (params_base.kv_unified && (sched_dirty || ggml_time_us() - t_sched_last > 2000000)) {
++            schedule("tick", nullptr, SCHED_FULL);
+         }
+ 
+         try {
+@@ -4326,11 +4582,16 @@ private:
+             // customware (entry 007): under --kv-unified, running out of cells is a scheduling event. Before the
+             // collective failure below: purge an idle slot if there is one, else suspend one sequence and retry.
+             if (ret == 1 && n_batch == 1 && params_base.kv_unified) {
+-                if (try_clear_idle_slots()) {
++                // customware (entry 013): the decision purges what it would purge; if that frees nothing, its victim
++                // (the lowest-ranked running request, or one it displaced) leaves the batch and is suspended
++                const sched_output out = schedule("overflow", nullptr, SCHED_EMERGENCY);
++                if (sched_purged_last > 0 || try_clear_idle_slots()) {
+                     return false; // retry with the same batch
+                 }
+-                if (try_preempt(off)) {
++                const int victim = !out.suspend.empty() ? out.suspend.front() : out.victim;
++                if (try_preempt(off, victim)) {
+                     n_batch = llama_n_batch(ctx_tgt);
++                    sched_dirty = true;
+                     return false; // retry the (now smaller) batch at full size
+                 }
+             }
+diff --git a/tools/server/server-queue.cpp b/tools/server/server-queue.cpp
+index 5f8e4b6b229bfa0f372b7108a5fecacd2ffe0c0f..14a7b475c93084dacd7992b85e4c8985080260ae 100644
+--- a/tools/server/server-queue.cpp
++++ b/tools/server/server-queue.cpp
+@@ -81,6 +81,29 @@ void server_queue::defer(server_task && task) {
+     condition_tasks.notify_one();
+ }
+ 
++void server_queue::pop_deferred_tasks(const std::vector<int> & ids) {
++    std::unique_lock<std::mutex> lock(mutex_tasks);
++
++    // the named tasks go to the front of the queue in the given order; the others stay deferred in their order
++    std::vector<server_task> picked;
++    for (int id : ids) {
++        for (auto it = queue_tasks_deferred.begin(); it != queue_tasks_deferred.end(); ++it) {
++            if (it->id == id) {
++                QUE_DBG("pop deferred task (scheduler), id_task = %d\n", id);
++                picked.push_back(std::move(*it));
++                queue_tasks_deferred.erase(it);
++                break;
++            }
++        }
++    }
++    for (auto it = picked.rbegin(); it != picked.rend(); ++it) {
++        queue_tasks.emplace_front(std::move(*it));
++    }
++
++    time_last_task = ggml_time_ms();
++    condition_tasks.notify_one();
++}
++
+ int server_queue::get_new_id() {
+     std::unique_lock<std::mutex> lock(mutex_tasks);
+     int new_id = id++;
+diff --git a/tools/server/server-queue.h b/tools/server/server-queue.h
+index e17733a743f68d2e4c8cf78416850a053667cbf1..65cefe9bb2b460ba6f6fe037d1d809bc36e1d9be 100644
+--- a/tools/server/server-queue.h
++++ b/tools/server/server-queue.h
+@@ -65,6 +65,17 @@ public:
+     // prioritize tasks that use the specified slot (otherwise, pop the first deferred task)
+     void pop_deferred_task(int id_slot);
+ 
++    // customware (entry 013): the scheduler reads the deferred tasks and pulls the ones it starts, in its order
++    template <class F>
++    void for_each_deferred(F && f) {
++        std::unique_lock<std::mutex> lock(mutex_tasks);
++        for (const auto & task : queue_tasks_deferred) {
++            f(task);
++        }
++    }
++
++    void pop_deferred_tasks(const std::vector<int> & ids);
++
+     // if sleeping, request exiting sleep state and wait until it is done
+     // returns immediately if not sleeping
+     void wait_until_no_sleep();
+diff --git a/tools/server/server-sched.cpp b/tools/server/server-sched.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..7914229c1d1acf03f2a82c4b4223472580a5b56d
+--- /dev/null
++++ b/tools/server/server-sched.cpp
+@@ -0,0 +1,186 @@
++#include "server-sched.h"
++
++#include <algorithm>
++#include <cstdio>
++#include <map>
++
++int sched_eff_prio(const sched_req & r, const sched_input & in) {
++    int prio = r.prio;
++    if (r.state == SCHED_REQ_WAITING && in.t_age > 0 && in.now - r.t_arrival > in.t_age) {
++        prio += 1;
++    }
++    return prio;
++}
++
++static int sched_state_rank(sched_req_state s) {
++    switch (s) {
++        case SCHED_REQ_RUNNING:   return 0;
++        case SCHED_REQ_SUSPENDED: return 1;
++        case SCHED_REQ_WAITING:   return 2;
++    }
++    return 3;
++}
++
++bool sched_before(const sched_req & a, const sched_req & b, const sched_input & in) {
++    const int pa = sched_eff_prio(a, in);
++    const int pb = sched_eff_prio(b, in);
++    if (pa != pb) {
++        return pa > pb;
++    }
++    const int ra = sched_state_rank(a.state);
++    const int rb = sched_state_rank(b.state);
++    if (ra != rb) {
++        return ra < rb;
++    }
++    // among running requests of one class the one holding more cells ranks first: when one of them has to
++    // leave, it is the cheapest to park and to bring back, as the overflow victim rule chooses
++    if (a.state == SCHED_REQ_RUNNING && b.state == SCHED_REQ_RUNNING && a.held != b.held) {
++        return a.held > b.held;
++    }
++    if (a.t_arrival != b.t_arrival) {
++        return a.t_arrival < b.t_arrival;
++    }
++    return a.id < b.id;
++}
++
++sched_output sched_decide(const sched_input & in) {
++    sched_output out;
++
++    std::vector<const sched_req *> order;
++    order.reserve(in.reqs.size());
++    for (const auto & r : in.reqs) {
++        order.push_back(&r);
++    }
++    std::stable_sort(order.begin(), order.end(), [&](const sched_req * a, const sched_req * b) {
++        return sched_before(*a, *b, in);
++    });
++
++    // idle conversations: purgeable, least recent first
++    std::vector<const sched_conv *> idle;
++    idle.reserve(in.idle.size());
++    for (const auto & c : in.idle) {
++        idle.push_back(&c);
++    }
++    std::stable_sort(idle.begin(), idle.end(), [](const sched_conv * a, const sched_conv * b) {
++        return a->t_last < b->t_last;
++    });
++
++    std::map<int, const sched_conv *> idle_by_id;
++    for (const auto * c : idle) {
++        idle_by_id[c->id] = c;
++    }
++    std::vector<int> taken_over; // idle conversations continued by a kept request: not purgeable
++
++    // suspended requests hold their slot whether or not they come back now
++    int slots_used = 0;
++    for (const auto & r : in.reqs) {
++        if (r.state == SCHED_REQ_SUSPENDED) {
++            slots_used++;
++        }
++    }
++
++    // how many may run at once: a third generation costs every slot a third of its speed for little in total
++    const int active_max = in.n_active_max > 0 ? std::min(in.n_active_max, in.n_slots) : in.n_slots;
++    int active = 0;
++
++    // the walk: idle cells count as free (they can be purged); the purge list is settled afterwards
++    int32_t cells_used = 0;
++    const sched_req * victim = nullptr;
++
++    for (const auto * r : order) {
++        const bool continues = r->reuse >= 0 && idle_by_id.count(r->reuse) > 0 &&
++            std::find(taken_over.begin(), taken_over.end(), r->reuse) == taken_over.end();
++
++        // what the request costs the pool: its own cells, what it still needs, and what it keeps of the
++        // conversation it continues (the rest of that conversation is freed by the takeover)
++        const int32_t cost = r->held + r->need + (continues ? std::min(r->reuse_keep, idle_by_id[r->reuse]->owned) : 0);
++
++        bool fits_cells = false;
++        bool fits_slot  = false;
++
++        switch (r->state) {
++            case SCHED_REQ_RUNNING:
++                // it stays unless the cells it actually holds do not fit next to the higher-ranked ones, or a
++                // higher-ranked request took its place among the active ones; its growth reserve is charged
++                // either way, so nothing lower-ranked starts into it
++                fits_cells = cells_used + r->held <= in.pool;
++                fits_slot  = active + 1 <= active_max;
++                break;
++            case SCHED_REQ_SUSPENDED:
++                fits_cells = cells_used + cost <= in.pool;
++                fits_slot  = active + 1 <= active_max; // it kept its slot
++                break;
++            case SCHED_REQ_WAITING:
++                fits_cells = cells_used + cost <= in.pool;
++                // an idle conversation's slot can be purged or taken over, so only slots of requests count
++                fits_slot  = slots_used + 1 <= in.n_slots && active + 1 <= active_max;
++                break;
++        }
++
++        if (fits_cells && fits_slot) {
++            cells_used += cost;
++            active++;
++            switch (r->state) {
++                case SCHED_REQ_RUNNING:
++                    out.keep.push_back(r->id);
++                    slots_used++;
++                    if (victim == nullptr ||
++                        sched_eff_prio(*r, in) <  sched_eff_prio(*victim, in) ||
++                        (sched_eff_prio(*r, in) == sched_eff_prio(*victim, in) &&
++                            (r->held < victim->held || (r->held == victim->held && r->t_arrival > victim->t_arrival)))) {
++                        victim = r;
++                    }
++                    break;
++                case SCHED_REQ_SUSPENDED:
++                    out.start.push_back(r->id);
++                    break;
++                case SCHED_REQ_WAITING:
++                    out.start.push_back(r->id);
++                    slots_used++;
++                    break;
++            }
++            if (continues) {
++                taken_over.push_back(r->reuse);
++            }
++        } else if (r->state == SCHED_REQ_RUNNING) {
++            // displaced: a higher class took the cells it holds, or its place among the active ones
++            out.suspend.push_back(r->id);
++            slots_used++; // it keeps its slot while suspended
++        }
++        // suspended and waiting requests that do not fit simply wait
++    }
++
++    out.victim = victim ? victim->id : -1;
++
++    // purges: least recent idle conversations until the kept set fits in cells and in slots
++    int32_t idle_cells = 0;
++    int     idle_slots = 0;
++    for (const auto * c : idle) {
++        if (std::find(taken_over.begin(), taken_over.end(), c->id) != taken_over.end()) {
++            continue;
++        }
++        idle_cells += c->owned;
++        idle_slots += 1;
++    }
++    for (const auto * c : idle) {
++        if (std::find(taken_over.begin(), taken_over.end(), c->id) != taken_over.end()) {
++            continue;
++        }
++        const bool cells_ok = cells_used + idle_cells <= in.pool;
++        const bool slots_ok = slots_used + idle_slots <= in.n_slots;
++        if (cells_ok && slots_ok) {
++            break;
++        }
++        out.purge.push_back(c->id);
++        idle_cells -= c->owned;
++        idle_slots -= 1;
++    }
++
++    char buf[256];
++    snprintf(buf, sizeof(buf), "keep %zu, start %zu, suspend %zu, purge %zu; %d of %d cells committed, %d of %d slots, %d of %d active",
++             out.keep.size(), out.start.size(), out.suspend.size(), out.purge.size(),
++             cells_used, in.pool, slots_used, in.n_slots, active, active_max);
++    out.why = buf;
++
++    return out;
++}
+diff --git a/tools/server/server-sched.h b/tools/server/server-sched.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..4c0c5405a19f92df4411efc9a931764b4a624a04
+--- /dev/null
++++ b/tools/server/server-sched.h
+@@ -0,0 +1,68 @@
++#pragma once
++
++// customware (entry 013): the scheduler of the unified KV pool as one pure decision.
++//
++// One ordered list of everything that wants to run (requests running, suspended or waiting), the idle
++// conversations that hold reclaimable cells, and the two capacities (cells, slots). The decision walks the
++// list in order and keeps what fits; what does not fit waits, a running request displaced by a higher class is
++// suspended, and idle conversations are purged least-recently-used first when cells or slots are needed.
++// Nothing is remembered between decisions except the list, so the server's separate rules (admission, the
++// idle-slot clearing at launch, the overflow path, the resume pass) collapse into this function plus one
++// reconcile step. No llama dependency: a unit test exercises it with the shapes seen in the logs.
++
++#include <cstdint>
++#include <string>
++#include <vector>
++
++enum sched_req_state {
++    SCHED_REQ_RUNNING,   // in a slot, cells in the pool
++    SCHED_REQ_SUSPENDED, // in a slot, state parked in RAM (entry 007), no cells
++    SCHED_REQ_WAITING,   // deferred, no slot
++};
++
++struct sched_req {
++    int     id        = -1;    // task id
++    int     prio      = 0;     // explicit priority, higher first
++    int64_t t_arrival = 0;     // when it arrived (us): order within a class, and the aging
++    sched_req_state state = SCHED_REQ_WAITING;
++    int32_t held      = 0;     // RUNNING: cells its sequence owns alone (what a suspension frees)
++    int32_t need      = 0;     // cells it still needs beyond `held` and beyond what `reuse` provides
++    int     reuse     = -1;    // idle conversation (slot id) it would continue
++    int32_t reuse_keep = 0;    // cells of that conversation it keeps (the common prefix); the rest is freed by the takeover
++    bool    has_slot  = false; // RUNNING and SUSPENDED hold a slot
++};
++
++struct sched_conv {
++    int     id     = -1;       // slot id
++    int32_t owned  = 0;        // cells purging it frees
++    int64_t t_last = 0;        // last use (us); purged least recent first
++};
++
++struct sched_input {
++    int32_t pool    = 0;       // cells
++    int     n_slots = 0;
++    int     n_active_max = 0;  // requests running at once (generating or prefilling); 0 = n_slots. Slots are contexts, not parallelism
++    int64_t now     = 0;       // us
++    int64_t t_age   = 0;       // a request waiting longer than this (us) is promoted one class; 0 = off
++    std::vector<sched_req>  reqs;
++    std::vector<sched_conv> idle;
++};
++
++struct sched_output {
++    std::vector<int> keep;     // RUNNING ids that stay, in rank order
++    std::vector<int> start;    // SUSPENDED (resume) and WAITING (launch) ids that fit, in rank order
++    std::vector<int> suspend;  // RUNNING ids displaced by a higher class
++    std::vector<int> purge;    // idle conversation ids to purge, least recent first, as many as needed
++    int              victim = -1; // the RUNNING request to suspend if the pool overflows anyway (lowest rank; ties: fewest held, youngest)
++    std::string      why;      // one line for the log
++};
++
++// the ordering key: effective priority (explicit, plus one class after t_age of waiting) descending, then
++// running before suspended before waiting, then (running only) more held cells first, then earlier arrival,
++// then lower id. A running request can be displaced by the walk a little before the pool overflows: the
++// reserve of the higher-ranked ones is charged first, so the lowest-ranked one no longer fits when the pool
++// is within one reserve of full. Among equals that is the one holding the fewest cells.
++int  sched_eff_prio(const sched_req & r, const sched_input & in);
++bool sched_before(const sched_req & a, const sched_req & b, const sched_input & in);
++
++sched_output sched_decide(const sched_input & in);
+diff --git a/tools/server/server-schema.cpp b/tools/server/server-schema.cpp
+index 27ecafb7a5952677a997c62f4b26a1b67f7a36d9..ae76080807d63217212304b395f941016ee83095 100644
+--- a/tools/server/server-schema.cpp
++++ b/tools/server/server-schema.cpp
+@@ -37,6 +37,9 @@ std::vector<std::unique_ptr<field>> make_llama_cmpl_schema(const common_params &
+     add((new field_bool("return_progress", params.return_progress))
+         ->set_desc("Include prompt processing progress events in stream mode"));
+ 
++    add((new field_num("priority", params.priority))
++        ->set_desc("Scheduling priority (default 0, higher first). A request of a higher class may suspend a running request of a lower class when it needs its cells; among equals, running requests are never interrupted"));
++
+     add((new field_num("sse_ping_interval", params.sse_ping_interval))
+         ->set_hard_limits(-1, INT32_MAX)
+         ->set_desc("Interval in seconds between SSE comment pings emitted while the stream stays silent, -1 disables pings"));
+diff --git a/tools/server/server-task.h b/tools/server/server-task.h
+index 19c7272b89e1ae80e43105de92042ddb95082be4..90cfc584fd945e1cdb39a5bcd4fa8de5572913ca 100644
+--- a/tools/server/server-task.h
++++ b/tools/server/server-task.h
+@@ -56,6 +56,8 @@ struct task_params {
+ 
+     int32_t sse_ping_interval = 30; // seconds between SSE comment pings while the stream stays silent, -1 disables
+ 
++    int32_t priority = 0; // customware (entry 013): scheduling class, higher first; a higher class may suspend a running lower one
++
+     int32_t n_keep    =  0; // number of tokens to keep from initial prompt
+     int32_t n_discard =  0; // number of tokens after n_keep that may be discarded when shifting context, 0 defaults to half
+     int32_t n_predict = -1; // new tokens to predict
+@@ -143,6 +145,8 @@ struct server_task {
+     int id_target = -1;
+     int id_slot   = -1;
+ 
++    int64_t t_arrival = 0; // customware (entry 013): when the scheduler first saw it (us); order within a class, aging
++
+     // used by parallel sampling (multiple completions from same prompt)
+     int id_parent  = -1;
+     // temporary store of child tasks for scheduling

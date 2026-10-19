@@ -68,5 +68,8 @@ experts (0.66 s) that the next prefill batch evicts again (16 restores in the te
 
 ## Final commit list
 
-- 8866fc27e llama : no hot-expert restore inside a prefill batch; launcher logs; entry 006/007 plans
-- (the server-side batch-cut change lands with entry 007's server commit)
+Sealed 2026-10-20 into `006-prefill-batching.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `8866fc27e` llama : no hot-expert restore inside a prefill batch; launcher logs; entry 006/007 plans
+
+Its server-side batch-cut change landed in entry 007's commit `df79272fd` and travels in `007-kvu-queueing-preemption.patch`.

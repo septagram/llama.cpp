@@ -161,3 +161,11 @@ immediate remedy; keep-alive bytes on a queued streaming response would be the s
 
 Deriving the reserve from the model automatically (the table's touched rows are not knowable up front); a
 `--cache-ram` CLI flag for it (env, like the other customware knobs).
+
+## Final commit list
+
+Sealed 2026-10-20 into `010-cache-reserve.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `d8a68dfff` server : under --kv-unified a cached prompt is restored after the idle slots are freed, never before
+- `dfa8b58dc` server : restore a cached prompt only when it fits next to what the active sequences are committed to
+- `23d1877d3` customware: entry 010 verified on the deployed launcher; H12 answered from the field logs; open items (notes only)

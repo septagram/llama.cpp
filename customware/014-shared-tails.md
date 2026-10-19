@@ -217,3 +217,24 @@ Released as `b3fe31f24` on 2026-10-07 23:50 (both launchers). Launcher check: he
 earlier check, VRAM 15.5-15.9 GiB. The 88k precompaction pair on the 120k launcher (`fkl-014`): the compaction request
 forked at 88852 tokens (22 to process), both generated together, no waiting for cells; the pair stays in the 120k pool,
 so no tail save happens there (that needs a third conversation to push them out, as F5 does at 16k).
+
+## Final commit list
+
+Sealed 2026-10-20 into `014-shared-tails.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `88de1d50e` llama : a position window for per-sequence state I/O of the attention cache; attention-only state flag
+- `de2360b44` server : a fork pushed to RAM stays shared: tail saves behind live holders or prefix segments, re-attached on restore
+- `c7c82797d` customware: entry 014 plan and patches; fork test F5 (the pair leaves the pool and comes back shared); the regression suite runs it (notes only)
+- `56b24a07b` server : prefix holders are the slots' token lists, not the hybrid memory's position minimum
+- `46b6c069d` server : the scheduler charges shared cells, caps a request's cost at the pool, charges a parked prefill its whole prompt; the slot refusals stop counting suspended slots
+- `6e708180e` server : infill goes through the scheduler; no tail across a media chunk; the owned-cells comment back in place; the suite header names what the fork stage runs
+- `9441764e1` customware: entry 014 implementation notes and results (fork F1/F5/F3/F4, kvu, keep-alive on the real model) (notes only)
+- `3d68d48f6` server : a takeover that keeps a prefix shared only between idle conversations is charged it
+- `b3fe31f24` server : comments on kv_resident, kv_committed and the restore block say what the scheduler does now; fork test reads UTF-8 and counts displacements
+- `078c1a86c` customware: entry 014 results on the review-fixed build and the launcher; order of work marks 014 done and released (notes only)
+- `739fa64e0` customware: the report of 2026-10-07 (scheduler finished, entry 014 released, review cadence over entries 010-014 paused after the second full review) (notes only)
+- `5c6a27f06` server : a parked request resumes as generating only if it was generating when parked
+- `8cb144dc4` customware: the checkpoint-policy item gets its first field evidence (a cancelled prefill leaves cells without a checkpoint) (notes only)
+- `fba9e9252` customware: the report records the iteration 4 fix taken on 2026-10-19 (notes only)
+
+This patch also carries the fixes of the review cadence over entries 010-014 (`46b6c069d`, `6e708180e`, `3d68d48f6`, `b3fe31f24`, `5c6a27f06`): they touch the code of 010-014 together and were written on top of 014. The findings, verdicts and what each fix is for: `customware/REPORT-2026-10-07.md`.

@@ -154,8 +154,19 @@ construct the runtime object.
 
 ## Final commit list
 
-- 35299131e llama : adaptive hot experts (LLAMA_HOT_EXPERTS_STATS, runtime swaps, placement from stats)
-- a14357033 customware: seed the adaptive hot experts with the placement's own statistics
+Sealed 2026-10-20 into `004-adaptive-hot-experts.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `1fdd1bd9e` llama : hot experts parked in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS)
+- `35299131e` llama : adaptive hot experts (LLAMA_HOT_EXPERTS_STATS, runtime swaps, placement from stats)
+- `a14357033` customware: seed the adaptive hot experts with the placement's own statistics
+- `47de4e9af` customware: entries 004/005 notes: seeded coverage numbers and commit lists (notes only)
+- `bf0c4a1ab` llama : routing trace (LLAMA_HOT_EXPERTS_TRACE) and an offline replay simulator for the swap policy
+- `db463d126` customware: pi-driven agentic runs (runner, task) and the first agentic trace findings (notes only)
+- `6b942ba4e` customware: depth series script and requests; H17 (prompt cache vs page cache) confirmed (notes only)
+- `409993d70` customware: entry 004 notes: fresh-launcher depth point and a handover list (notes only)
+- `2106c4415` customware: clean depth series numbers (notes only)
+
+This patch also carries entry 005's code commit `1fdd1bd9e` (hot experts parked in the compute buffer tail), at its head: it landed before 004's code, and 004's adaptive experts edit the same lines, so the two cannot be separated (a three-way merge conflicts).
 
 ## First agentic trace (2026-09-25, pi driving the 120k launcher on a Rust refactor task, 10 minutes)
 

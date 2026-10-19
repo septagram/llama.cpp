@@ -1,0 +1,515 @@
+diff --git a/include/llama.h b/include/llama.h
+index b564e02c58dc853836cc4116d15e9a8111f75617..e0efb537da1af9f425c192b64e4bb5ae153a8e40 100644
+--- a/include/llama.h
++++ b/include/llama.h
+@@ -815,6 +815,12 @@ extern "C" {
+     // customware: cells in use in the attention cache behind this memory (the unified pool's occupancy); 0 if unknown
+     LLAMA_API uint32_t llama_memory_n_cells_used(llama_memory_t mem);
+ 
++    // customware: cells of the attention cache that the given sequences own together: non-empty cells whose every
++    // label is one of seq_ids. With one id, the cells only that sequence holds (what removing it frees); with the ids
++    // of all idle sequences, what purging them all frees. In a unified pool sequences share cells, so this is not
++    // the sum of their token counts. 0 if unknown.
++    LLAMA_API uint32_t llama_memory_n_cells_owned(llama_memory_t mem, const llama_seq_id * seq_ids, size_t n_seq_ids);
++
+     //
+     // State / sessions
+     //
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index edec3fbaf241a0ab957f332513bf5d25dfc5dc35..6b59918fac22bd2f4067cf2baa0074312a7cedfe 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -16,6 +16,8 @@
+ #include "llama-sampler.h"
+ #include "llama.h"
+ 
++#include <algorithm>
++#include <bitset>
+ #include <cinttypes>
+ #include <cmath>
+ #include <cstring>
+@@ -4383,6 +4385,55 @@ uint32_t llama_memory_n_cells_used(llama_memory_t mem) {
+     return kv->get_cells(0).get_used();
+ }
+ 
++uint32_t llama_memory_n_cells_owned(llama_memory_t mem, const llama_seq_id * seq_ids, size_t n_seq_ids) {
++    if (!mem || !seq_ids || n_seq_ids == 0) {
++        return 0;
++    }
++
++    const llama_kv_cache * kv = nullptr;
++    if (auto * hybrid = dynamic_cast<llama_memory_hybrid *>(mem)) {
++        kv = hybrid->get_mem_attn();
++    } else {
++        kv = dynamic_cast<llama_kv_cache *>(mem);
++    }
++    if (!kv) {
++        return 0;
++    }
++
++    std::bitset<LLAMA_MAX_SEQ> mask;
++    for (size_t i = 0; i < n_seq_ids; ++i) {
++        if (seq_ids[i] >= 0 && seq_ids[i] < LLAMA_MAX_SEQ) {
++            mask.set(seq_ids[i]);
++        }
++    }
++
++    // one pass per distinct stream: a unified pool has one, a partitioned cache one per sequence
++    std::vector<const llama_kv_cells *> streams;
++    for (size_t i = 0; i < n_seq_ids; ++i) {
++        if (seq_ids[i] < 0 || seq_ids[i] >= LLAMA_MAX_SEQ) {
++            continue;
++        }
++        const llama_kv_cells * cells = &kv->get_cells(seq_ids[i]);
++        if (std::find(streams.begin(), streams.end(), cells) == streams.end()) {
++            streams.push_back(cells);
++        }
++    }
++
++    uint32_t n = 0;
++    for (const llama_kv_cells * cells : streams) {
++        for (uint32_t i = 0; i < cells->size(); ++i) {
++            if (cells->is_empty(i)) {
++                continue;
++            }
++            if ((cells->seq_get_all(i) & ~mask).none()) {
++                n++;
++            }
++        }
++    }
++
++    return n;
++}
++
+ // llama state API
+ 
+ // deprecated
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 119c062d66859bfd97dafeebc2207ccbf9226360..2c66479c74fd058da25ac882a023fed0c09708e3 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -293,6 +293,11 @@ struct server_slot {
+     // used to determine the slot that has been used the longest
+     int64_t t_last_used = -1;
+ 
++    // customware (entry 012): this conversation was forked from another slot's and shares its first n_fork_shared
++    // cells with it (as long as both stay in the pool); -1 / 0 when not forked or taken over since
++    int32_t fork_of        = -1;
++    int32_t n_fork_shared  = 0;
++
+     // generation props
+     int32_t n_ctx   = 0;  // context size per slot
+     int32_t n_keep  = 0;
+@@ -421,6 +426,40 @@ struct server_slot {
+         mem.seq_rm(id, -1, -1);
+ 
+         prompt.clear();
++
++        fork_of       = -1;
++        n_fork_shared = 0;
++    }
++
++    // customware (entry 012): become a fork of `src` at its checkpoint `ckpt` (n_tokens = c): share src's cells
++    // [0, c) in the pool (labels only, nothing copied), put the recurrent state at c into this sequence, and
++    // start with src's first c tokens and that one checkpoint. The prompt loop then finds a full prefix match
++    // and processes the suffix. Order matters: the copy shares src's current recurrent state and the restore
++    // detaches from it, so the restore comes last.
++    void fork_from(const server_slot & src, const common_prompt_checkpoint & ckpt) {
++        GGML_ASSERT(!is_processing());
++        GGML_ASSERT(&src != this);
++        GGML_ASSERT(ckpt.n_tokens > 0 && ckpt.n_tokens <= (int64_t) src.prompt.tokens.size());
++
++        const int32_t c = (int32_t) ckpt.n_tokens;
++
++        mem.seq_rm(id, -1, -1);
++        mem.seq_cp(src.id, id, 0, c);
++
++        ckpt.load_tgt(ctx_tgt, id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
++        ckpt.load_dft(ctx_dft, id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
++        common_speculative_set_state(spec, id, ckpt.data_spec);
++
++        prompt.tokens = src.prompt.tokens.clone();
++        prompt.tokens.keep_first(c);
++        prompt.checkpoints.clear();
++        prompt.checkpoints.push_back(ckpt);
++
++        fork_of       = src.id;
++        n_fork_shared = c;
++
++        SLT_INF(*this, "forked from slot %d at %d tokens: the first %d cells are shared, the checkpoint there is the state\n",
++                src.id, c, c);
+     }
+ 
+     std::vector<common_adapter_lora_info> lora;
+@@ -445,6 +484,7 @@ struct server_slot {
+ 
+     std::function<void(int /* id_slot */)>   callback_on_release;
+     std::function<void(const server_slot &)> callback_on_reset; // called before reset()
++    std::function<void(server_slot &)>       callback_on_turn_end; // customware: a generation ended, state still live
+ 
+     // this is for printing timings with slot progress, not part of metrics
+     int64_t t_print_last = 0;
+@@ -633,6 +673,12 @@ struct server_slot {
+ 
+             t_last_used = ggml_time_us();
+ 
++            // customware (entry 012): the recurrent state at the end of this generation is what a fork or a
++            // continuation needs; take it now rather than when (if) the next request arrives
++            if (callback_on_turn_end && state != SLOT_STATE_SUSPENDED && !task->is_child() && prompt.n_tokens() > 0) {
++                callback_on_turn_end(*this);
++            }
++
+             // customware: a suspended slot that ends here (cancelled) holds no cells; drop its parked state and its
+             // token list, which no longer has a KV behind it
+             const bool was_suspended = state == SLOT_STATE_SUSPENDED;
+@@ -784,6 +830,8 @@ struct server_slot {
+             {"speculative",   can_speculate()},
+             {"is_processing", is_processing()},
+             {"suspended",     state == SLOT_STATE_SUSPENDED},
++            {"fork_of",       fork_of},
++            {"n_fork_shared", n_fork_shared},
+         };
+ 
+         const auto & ptask = task ? task : task_prev;
+@@ -1008,6 +1056,7 @@ private:
+     // customware (entry 007): unified KV pool accounting
+     int64_t n_kv_deferred  = 0; // tasks that waited for cells
+     int64_t n_kv_preempted = 0; // sequences suspended by a pool overflow
++    int64_t n_forks        = 0; // customware (entry 012): requests that started as a fork of a busy slot's conversation
+ 
+     std::unique_ptr<server_prompt_cache> prompt_cache;
+ 
+@@ -1407,6 +1456,10 @@ private:
+                 }
+             };
+ 
++            slot.callback_on_turn_end = [this](server_slot & slot) {
++                checkpoint_at_turn_end(slot);
++            };
++
+             slot.reset();
+         }
+ 
+@@ -1721,6 +1774,95 @@ private:
+             }
+         }
+ 
++        // customware (entry 012): when a busy slot holds a longer prefix of the new prompt than any idle one, the
++        // request becomes a fork of that conversation: it shares the prefix cells and starts from the source's
++        // checkpoint at the fork point. Idle sources are taken over as before (ties go to idle).
++        if (params_base.kv_unified && task.id_slot == -1 && task.type == SERVER_TASK_TYPE_COMPLETION &&
++                task.params.cache_prompt && slot_prompt_similarity != 0.0f && task.tokens.size() > 0) {
++            server_slot * src = nullptr;
++            size_t lcp_src = 0;
++            for (auto & slot : slots) {
++                if (!slot.is_processing() || slot.state == SLOT_STATE_SUSPENDED || slot.state == SLOT_STATE_WAIT_OTHER) {
++                    continue;
++                }
++                if (slot.prompt.tokens.size() == 0) {
++                    continue;
++                }
++                const size_t lcp = slot.prompt.tokens.get_common_prefix(task.tokens);
++                if (lcp > lcp_src) {
++                    lcp_src = lcp;
++                    src = &slot;
++                }
++            }
++
++            const size_t lcp_idle = ret ? ret->prompt.tokens.get_common_prefix(task.tokens) : 0;
++
++            if (src != nullptr && lcp_src > lcp_idle && float(lcp_src) / task.tokens.size() > slot_prompt_similarity) {
++                // the destination: an empty idle slot, else the least recently used idle one
++                server_slot * dst = nullptr;
++                for (auto & slot : slots) {
++                    if (slot.is_processing()) {
++                        continue;
++                    }
++                    const bool empty = slot.prompt.tokens.size() == 0;
++                    if (dst == nullptr ||
++                        (empty && dst->prompt.tokens.size() > 0) ||
++                        (empty == (dst->prompt.tokens.size() == 0) && slot.t_last_used < dst->t_last_used)) {
++                        dst = &slot;
++                    }
++                }
++
++                if (dst == nullptr) {
++                    SRV_INF("task %d shares %zu of its %zu tokens with the busy slot %d and no slot is free to fork into: waiting\n",
++                            task.id, lcp_src, task.tokens.size(), src->id);
++                    return nullptr;
++                }
++
++                // the fork point: the source's latest checkpoint at or before the common prefix, leaving at least one
++                // token to process
++                const common_prompt_checkpoint * ckpt = nullptr;
++                for (const auto & cur : src->prompt.checkpoints) {
++                    if (cur.n_tokens <= (int64_t) lcp_src && cur.n_tokens < (int64_t) task.tokens.size() &&
++                            (ckpt == nullptr || cur.n_tokens > ckpt->n_tokens)) {
++                        ckpt = &cur;
++                    }
++                }
++
++                if (ckpt == nullptr || float(ckpt->n_tokens) / task.tokens.size() <= slot_prompt_similarity) {
++                    SRV_INF("task %d shares %zu tokens with the busy slot %d but it has no checkpoint there to fork from: not forking\n",
++                            task.id, lcp_src, src->id);
++                } else {
++                    const int32_t need      = kv_need((int32_t) task.tokens.size() - (int32_t) ckpt->n_tokens, task.params.n_predict);
++                    const int32_t committed = kv_committed(true);
++                    const int32_t pool      = kv_pool_size();
++
++                    if (committed + need > pool) {
++                        SRV_INF("task %d could fork from slot %d at %lld tokens but needs %d more cells next to the %d spoken for: not forking\n",
++                                task.id, src->id, (long long) ckpt->n_tokens, need, committed);
++                    } else {
++                        // the destination's own conversation goes to the cache first, as the LRU path does
++                        if (prompt_cache && dst->prompt.tokens.size() > 0) {
++                            dst->prompt_save(*prompt_cache);
++                        }
++
++                        dst->fork_from(*src, *ckpt);
++
++                        if (prompt_cache) {
++                            prompt_cache->update();
++                        }
++
++                        n_forks++;
++
++                        SRV_INF("task %d: fork of slot %d at %lld tokens (common prefix %zu of %zu), %zu tokens to process\n",
++                                task.id, src->id, (long long) ckpt->n_tokens, lcp_src, task.tokens.size(),
++                                task.tokens.size() - (size_t) ckpt->n_tokens);
++
++                        return dst;
++                    }
++                }
++            }
++        }
++
+         // find the slot that has been least recently used
+         if (ret == nullptr) {
+             int64_t t_last = -1;
+@@ -1893,6 +2035,7 @@ private:
+     // recently admitted. One function, so a policy by API key or priority can replace it later.
+     server_slot * pick_victim() {
+         server_slot * best = nullptr;
++        int32_t best_owned = 0;
+         for (auto & slot : slots) {
+             if (slot.state != SLOT_STATE_GENERATING || !slot.task) {
+                 continue;
+@@ -1900,10 +2043,13 @@ private:
+             if (slot.task->is_child() || slot.task->is_parent() || !slot.spec_draft.empty()) {
+                 continue;
+             }
++            // customware (entry 012): what a suspension frees is what the slot owns alone, not its token count
++            const int32_t owned = kv_cells_owned({ slot.id });
+             if (best == nullptr ||
+-                slot.prompt.n_tokens() <  best->prompt.n_tokens() ||
+-                (slot.prompt.n_tokens() == best->prompt.n_tokens() && slot.task->id > best->task->id)) {
++                owned <  best_owned ||
++                (owned == best_owned && slot.task->id > best->task->id)) {
+                 best = &slot;
++                best_owned = owned;
+             }
+         }
+         return best;
+@@ -2030,12 +2176,12 @@ private:
+     // will still take (the rest of a prompt being processed and a growth margin each) and, optionally, the suspended
+     // ones (they come back before anything new is admitted). Falls back to the bookkeeping when the cache does not
+     // report its occupancy.
+-    int32_t kv_committed(bool include_suspended) const {
++    int32_t kv_committed(bool include_suspended, const server_slot * exclude_idle = nullptr) const {
+         const int32_t used = kv_cells_used();
+         if (used == 0 && kv_idle_retained() + kv_resident(false) > 0) {
+             return kv_resident(include_suspended);
+         }
+-        int32_t n = used - kv_idle_retained();
++        int32_t n = used - kv_idle_retained(exclude_idle);
+         for (const auto & slot : slots) {
+             if (slot.state == SLOT_STATE_SUSPENDED) {
+                 if (include_suspended) {
+@@ -2052,15 +2198,25 @@ private:
+         return std::max(n, 0);
+     }
+ 
+-    // cells held by idle slots that kept their context (purgeable)
+-    int32_t kv_idle_retained() const {
+-        int32_t n = 0;
++    // cells the given sequences own together (every label in the set): what removing all of them frees. In a
++    // unified pool a fork shares its prefix with its source, so this is not the sum of token counts.
++    int32_t kv_cells_owned(const std::vector<llama_seq_id> & ids) const {
++        if (ids.empty()) {
++            return 0;
++        }
++        return (int32_t) llama_memory_n_cells_owned(llama_get_memory(ctx_tgt), ids.data(), ids.size());
++    }
++
++    // cells held by idle slots that kept their context and that purging them all would free; `exclude` is an idle
++    // slot about to be reused, whose cells stay
++    int32_t kv_idle_retained(const server_slot * exclude = nullptr) const {
++        std::vector<llama_seq_id> ids;
+         for (const auto & slot : slots) {
+-            if (!slot.is_processing()) {
+-                n += slot.prompt.n_tokens();
++            if (!slot.is_processing() && &slot != exclude && slot.prompt.n_tokens() > 0) {
++                ids.push_back(slot.id);
+             }
+         }
+-        return n;
++        return kv_cells_owned(ids);
+     }
+ 
+     bool try_clear_idle_slots() {
+@@ -2070,27 +2226,35 @@ private:
+             return res;
+         }
+ 
++        // customware (entry 012): purge the idle slot whose cells free the most; one that shares all of its cells
++        // with a busy fork source frees nothing and is left alone (its save would only cost RAM)
++        server_slot * victim = nullptr;
++        int32_t victim_owned = 0;
+         for (auto & slot : slots) {
+-            if (slot.is_processing()) {
++            if (slot.is_processing() || slot.prompt.n_tokens() == 0) {
+                 continue;
+             }
++            const int32_t owned = kv_cells_owned({ slot.id });
++            if (owned > victim_owned) {
++                victim = &slot;
++                victim_owned = owned;
++            }
++        }
+ 
+-            if (slot.prompt.n_tokens() > 0) {
+-                SRV_WRN("purging slot %d with %zu tokens\n", slot.id, slot.prompt.tokens.size());
++        if (victim != nullptr) {
++            auto & slot = *victim;
+ 
+-                // customware: a purge is not a cache miss: the prompt goes to the cache first, as a launch would do
+-                if (prompt_cache && params_base.cache_idle_slots) {
+-                    slot.prompt_save(*prompt_cache);
+-                    prompt_cache->update();
+-                }
++            SRV_WRN("purging slot %d with %zu tokens (%d cells of its own)\n", slot.id, slot.prompt.tokens.size(), victim_owned);
+ 
+-                slot.prompt_clear();
++            // customware: a purge is not a cache miss: the prompt goes to the cache first, as a launch would do
++            if (prompt_cache && params_base.cache_idle_slots) {
++                slot.prompt_save(*prompt_cache);
++                prompt_cache->update();
++            }
+ 
+-                res = true;
++            slot.prompt_clear();
+ 
+-                // clear slots one by one
+-                break;
+-            }
++            res = true;
+         }
+ 
+         return res;
+@@ -2776,6 +2940,33 @@ private:
+                 cur.pos_max, cur.n_tokens, (float) cur.size() / 1024 / 1024);
+     }
+ 
++    // customware (entry 012): the state at the end of a generation, taken when the generation ends. Before, it was
++    // taken by the next request at the position where it started adding, if one came; a fork needs it now.
++    void checkpoint_at_turn_end(server_slot & slot) {
++        if (params_base.n_ctx_checkpoints <= 0) {
++            return;
++        }
++        if (!slot.task || slot.task->type != SERVER_TASK_TYPE_COMPLETION) {
++            return;
++        }
++        if (!(ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_FULL ||
++              ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_RS ||
++              n_swa > 0)) {
++            return;
++        }
++        if (!slot.prompt.checkpoints.empty() && slot.prompt.checkpoints.back().n_tokens == slot.prompt.n_tokens()) {
++            return;
++        }
++
++        const auto pos_min = llama_memory_seq_pos_min(llama_get_memory(ctx_tgt), slot.id);
++        const auto pos_max = llama_memory_seq_pos_max(llama_get_memory(ctx_tgt), slot.id);
++        if (pos_min < 0 || pos_max < 0) {
++            return;
++        }
++
++        create_checkpoint(slot, 0, pos_min, pos_max);
++    }
++
+     // returns false to decline the task, it is offered again after the decode is done
+     bool process_single_task(server_task && task, bool is_yielding) {
+         // while yielding, an encode / decode is running and only reading the server state is safe
+@@ -2827,12 +3018,15 @@ private:
+                     // nothing to wait for, so it starts even when prompt + reserve exceeds the pool (the prompt fits,
+                     // and generation ends at the pool like any context limit).
+                     if (params_base.kv_unified && task.n_tokens() <= n_ctx_slot()) {
+-                        const int32_t need = kv_need(task.n_tokens(), task.params.n_predict);
+-                        const int32_t used = kv_committed(true);
++                        // customware (entry 012): the slot's own cells (a continuation's prefix, private or shared with
++                        // a busy fork source) are in the pool already: charge the rest, and do not count them purgeable
++                        const int32_t n_held = task.params.cache_prompt ? (int32_t) slot->prompt.tokens.get_common_prefix(task.tokens) : 0;
++                        const int32_t need = kv_need(task.n_tokens() - n_held, task.params.n_predict);
++                        const int32_t used = kv_committed(true, slot);
+                         const int32_t pool = kv_pool_size();
+                         if (used > 0 && used + need > pool) {
+-                            SRV_WRN("task %d needs %d cells (prompt %d) but %d of %d are spoken for: waiting for cells\n",
+-                                    id_task, need, task.n_tokens(), used, pool);
++                            SRV_WRN("task %d needs %d cells (prompt %d, %d of it in the slot) but %d of %d are spoken for: waiting for cells\n",
++                                    id_task, need, task.n_tokens(), n_held, used, pool);
+                             n_kv_deferred++;
+                             queue_tasks.defer(std::move(task));
+                             break;
+@@ -4065,6 +4259,10 @@ private:
+                             slot.prompt.checkpoints.empty() ||
+                             is_last_user_message || near_prompt_end ||
+                             n_tokens_start > slot.prompt.checkpoints.back().n_tokens + params_base.checkpoint_min_step);
++
++                    // customware (entry 012): the turn-end checkpoint already holds this state
++                    do_checkpoint = do_checkpoint &&
++                            !(!slot.prompt.checkpoints.empty() && slot.prompt.checkpoints.back().n_tokens == n_tokens_start);
+                     SLT_DBG(slot, "main/do_checkpoint = %s, pos_min = %d, pos_max = %d\n", do_checkpoint ? "yes" : "no", pos_min, pos_max);
+ 
+                     // note: we create the checkpoint before calling llama_decode(), so the current batch is not
+diff --git a/tools/server/server-task.cpp b/tools/server/server-task.cpp
+index 743f64c8acd7b4de74493ad528193eb0587d911a..b18ead14f91295fbcf95702b1b0e62d2e0142296 100644
+--- a/tools/server/server-task.cpp
++++ b/tools/server/server-task.cpp
+@@ -1727,6 +1727,11 @@ size_t server_prompt_cache::n_tokens() const {
+ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & prompt, size_t state_size_tgt, size_t state_size_dft) {
+     // first check if the current state is contained fully in the cache
+     for (auto it = states.begin(); it != states.end(); ++it) {
++        // customware (entry 012): a suspended slot's parked state has no token list and takes no part in matching
++        if (it->pinned) {
++            continue;
++        }
++
+         const int cur_lcp_len = it->prompt.tokens.get_common_prefix(prompt.tokens);
+ 
+         if (cur_lcp_len == (int) prompt.tokens.size()) {
+@@ -1752,6 +1757,13 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
+ 
+     // remove any cached prompts that are fully contained in the current prompt
+     for (auto it = states.begin(); it != states.end();) {
++        // customware (entry 012): never a pinned entry: its empty token list is "contained" in every prompt, and a
++        // suspended slot holds a pointer to it (found by a fork that was suspended, then a purge that saved first)
++        if (it->pinned) {
++            ++it;
++            continue;
++        }
++
+         const int len = it->prompt.tokens.get_common_prefix(prompt.tokens);
+ 
+         if (len == (int) it->prompt.tokens.size()) {
+@@ -1824,6 +1836,11 @@ std::list<server_prompt_cache_state>::const_iterator server_prompt_cache::select
+ 
+     // find the most similar cached prompt, that would also preserve the most context
+     for (auto it = states.cbegin(); it != states.cend(); ++it) {
++        // customware (entry 012): pinned entries belong to suspended slots and are not prompts to load
++        if (it->pinned) {
++            continue;
++        }
++
+         const int lcp_cur = it->prompt.tokens.get_common_prefix(tokens_new);
+ 
+         const float f_keep_cur = float(lcp_cur) / it->prompt.tokens.size();

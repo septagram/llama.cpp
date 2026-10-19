@@ -125,3 +125,14 @@ exists only in the f16 MMA kernel, and taking it with a quantized cache would fi
   Twelve layers at 88k: 15.9 ms -> 0.7 ms per token; the op no longer depends on the context to speak of.
 - Launcher verification of the 008 release (8a3a84e8c): 120k launcher up in 25 s, 22k code prompt 203.4 t/s
   prefill / 12.25 t/s generation at 15.4-15.8 GB (11.55 t/s with the previous binary in the same VRAM state).
+
+## Final commit list
+
+Sealed 2026-10-20 into `008-depth-profile.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `f6a59d2e8` server : admission never waits for cells nobody holds; reserve capped; launchers get the vision projector
+- `8a3a84e8c` cuda : sparse decode on a quantized KV cache gathers the selected cells; qwen4exp: block mean via pool_2d
+- `d11232d61` customware: entry 008 notes: perf of the op alone, launcher verification, what is left on the depth slope (notes only)
+- `01c3bae60` customware: launcher verification results of the 008 release (notes only)
+
+Its first commit `f6a59d2e8` also carries entry 007's admission follow-up and the launchers' vision projector.

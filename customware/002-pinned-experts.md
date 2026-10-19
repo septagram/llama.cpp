@@ -110,3 +110,10 @@ In `llm_graph_context::build_moe_ffn` (or a qwen4exp-local wrapper), when the sh
   scheduler would additionally need the GPU-subset split on a second CUDA stream for real overlap.
 - Verdict: keep the code (useful on Linux, where pinning is uncapped and `cudaHostRegister` works on
   mappings), do not use it here. The VRAM budget went to entry 003 (hot experts) instead.
+
+## Final commit list
+
+Sealed 2026-10-20 into `002-pinned-experts.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `5f782a926` llama : allow pinned host memory for overridden weights (-ot ...=CUDA_Host)
+- `defc32010` llama : keep -ot ...=CPU off pinned memory under mmap

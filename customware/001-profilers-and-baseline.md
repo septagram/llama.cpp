@@ -130,3 +130,11 @@ Neither profiler changes numerics. Both are a single `static int` env read per p
   - CUDA graphs are active (12 ms/token saved); threads 6 stays optimal; poll level irrelevant;
     large pages irrelevant; native Zen 2 build equal to the prebuilt.
 - Not done from the plan: `-mmp 0` vs `-mmp 1` (superseded by the pinned-memory work in entry 002).
+
+## Final commit list
+
+Sealed 2026-10-20 into `001-profilers-and-baseline.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `0721c0eb9` customware: fix the Windows build script for this toolchain (notes only)
+- `93f079ad6` ggml : add env-gated split and per-op profilers, bench tooling
+- `3a43bb23c` customware: DRAM/pinning probes and the first benchmark results (notes only)

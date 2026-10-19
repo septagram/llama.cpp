@@ -137,3 +137,17 @@ to it; several such requests take turns on the two slots; an idle source is stil
 
 Left for later (notes-forking.md "Later"): parking, refcounted checkpoints, range-limited save/restore, forking
 from an idle source that diverges before its end, preferring a longer cache entry over a shorter busy prefix.
+
+## Final commit list
+
+Sealed 2026-10-20 into `012-forking.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `44b40fca2` customware: NEXT.md: forking facts and direction, and the dead pre-compaction entries in the prompt cache (notes only)
+- `e8cb48ab7` customware: notes on forking (architecture in progress) and on checkpoint policy (parked); fork probe (notes only)
+- `1c59b2b4c` customware: fork notes: behaviour under pressure, how the queue admits a small request next to a large one (notes only)
+- `00ec137ff` server : forking v1 under --kv-unified: a request that branches from a busy conversation shares its prefix cells
+- `6f50e7617` server : the prompt cache never erases a pinned entry through its prompt matching (use-after-free on resume)
+- `1699c0159` customware: entry 012 verified at 16k (fan-out, overflow) and at 88k on the deployed launcher; notes closed (notes only)
+- `ee3260db5` customware: entry 012 note: the 3-token gap between the turn-end and the fork point is the template's end-of-turn tokens, not the echo (notes only)
+
+What shipped, measured results and deviations from the plan are recorded in the sections above (this entry predates the "Implementation notes" heading).

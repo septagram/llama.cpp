@@ -5,9 +5,17 @@ upstream. Each numbered entry has two files:
 
 - `NNN-<slug>.md` — the plan, including any deviations noted under
   "Implementation notes" after the work shipped.
-- `NNN-<slug>.patch` — `git diff upstream/master..HEAD --` at the time
-  the entry was sealed, used as the primary rebase tool on the next
-  upstream update.
+- `NNN-<slug>.patch` — this entry's own diff (customware/ excluded), so
+  the patches apply in numeric order onto the fork point (upstream
+  `6e60f3560`, tag `v0.5.0-customware.0`); the primary rebase tool on the
+  next upstream update. Each entry's "Final commit list" names its commits
+  and any code that travels in another entry's patch (history sometimes
+  interleaved two entries; 005 has no patch of its own for that reason).
+
+`entry-commits.txt` maps every commit to its entry; `seal-entries.sh`
+regenerates the patches from it on a scratch index and fails unless they
+apply in order and reproduce `master`'s code exactly; `seal-notes.py`
+writes the "Final commit list" sections.
 
 Tag format on `master`: `v<upstream-version>-customware.<n>`.
 Branches named `<upstream-version>` (no `customware` suffix) are

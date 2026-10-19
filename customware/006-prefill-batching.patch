@@ -1,0 +1,38 @@
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index 92485534b7db16d5440856246078ee117ec04301..2b6e9239ea7f85c69ee19fab9e756f537f03bbc7 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -1529,7 +1529,10 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+ 
+     // customware: hot experts in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS): decode mode only for ubatches that
+     // are known to leave the tail alone; a bigger ubatch runs the plain path and dirties the tail
+-    hot_mode_next = hot_alias ? (hot_buf != nullptr && ubatch.n_tokens <= hot_threshold) : true;
++    // a batch that is a prefill as a whole (a big prompt chunk, possibly with another slot's single token in front) runs
++    // every ubatch without the split: the small ubatch would otherwise restore the parked experts (0.66 s) only for the
++    // next ubatch to evict them again
++    hot_mode_next = hot_alias ? (hot_buf != nullptr && ubatch.n_tokens <= hot_threshold && !hot_batch_prefill) : true;
+ 
+     // the new graph parameters
+     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
+@@ -1943,6 +1946,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
+     }
+     n_queued_tokens += n_tokens_all;
+ 
++    // customware: a prefill-sized batch runs all of its ubatches without the hot split (see process_ubatch)
++    hot_batch_prefill = hot_alias && hot_buf != nullptr && n_tokens_all > hot_threshold;
++
+     output_swaps.clear();
+ 
+     sched_reserve();
+diff --git a/src/llama-context.h b/src/llama-context.h
+index 09046cb0f043b4c6e447b82adedac013f4b7b961..6d8a2ee223bf2b4a6b1f8cb8975a35705fd4043e 100644
+--- a/src/llama-context.h
++++ b/src/llama-context.h
+@@ -359,6 +359,7 @@ private:
+     bool                  hot_dirty     = true;
+     uint32_t              hot_threshold = 0;     // decode mode for ubatches up to this many tokens
+     bool                  hot_mode_next = true;  // read by graph_params(): build the hot split or not
++    bool                  hot_batch_prefill = false; // the whole batch of the current decode() is a prefill: no hot split for any of its ubatches
+     int64_t               hot_n_refills = 0;
+ 
+     void hot_alias_place();                                          // (re)bind the hot tensors to the current compute buffer

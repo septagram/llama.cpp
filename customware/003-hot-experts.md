@@ -133,3 +133,11 @@ into a lambda. The scheduler places each part by its weights, no forcing needed.
   where `-ot ...=CPU` still landed the experts in pinned host memory (`CUDA_Host model buffer size = 67200 MiB` in the
   log) and the WDDM shared budget ran out at the first GPU upload. Fixed by defc32010 in the repo; the release was
   simply never refreshed. `release.sh` now ships 13684c74e and the launcher sets `-fit off` (the fit step aborts anyway).
+
+## Final commit list
+
+Sealed 2026-10-20 into `003-hot-experts.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `4cbfd07e7` llama : hot experts on the GPU (LLAMA_HOT_EXPERTS)
+- `13684c74e` CUDA : mul_mat_id treats a negative expert id as "skip" (hot experts at prefill)
+- `df604b39f` customware: entry 003 results, refreshed release (120k / ub 2048 / 4 GB hot), entry 004 plan (notes only)

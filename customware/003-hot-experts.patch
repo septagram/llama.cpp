@@ -1,0 +1,782 @@
+diff --git a/ggml/src/ggml-backend.cpp b/ggml/src/ggml-backend.cpp
+index 29178b72c9871823fd83fd6f90168e88837a614d..f0cc80ae05c9192a9225d4722a16e3d88c73beb5 100644
+--- a/ggml/src/ggml-backend.cpp
++++ b/ggml/src/ggml-backend.cpp
+@@ -1769,7 +1769,11 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+                         for (int64_t i1 = 0; i1 < ids_tensor->ne[1]; i1++) {
+                             for (int64_t i0 = 0; i0 < ids_tensor->ne[0]; i0++) {
+                                 int32_t id = ids[i1 * ids_tensor->nb[1]/sizeof(int32_t) + i0 * ids_tensor->nb[0]/sizeof(int32_t)];
+-                                GGML_ASSERT(id >= 0 && id < n_expert);
++                                if (id < 0) {
++                                    // customware: slot served by another copy of the expert, nothing to stream
++                                    continue;
++                                }
++                                GGML_ASSERT(id < n_expert);
+                                 ggml_bitset_set(used_ids.data(), id);
+                             }
+                         }
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 4945210f1673f126148afe5d7a6dea1df8c1ee3c..73e8ce819311538b182cdb2e864cdaf54c637e13 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -1654,7 +1654,13 @@ static void ggml_compute_forward_mul_mat_id(
+             for (int id = 0; id < n_ids; ++id) {
+                 const int32_t i02 = *(const int32_t *) ((const char *) ids->data + iid1*ids->nb[1] + id*ids->nb[0]);
+ 
+-                assert(i02 >= 0 && i02 < n_as);
++                // customware: a negative id is a slot served elsewhere (hot expert on the GPU), leave zeros
++                if (i02 < 0) {
++                    memset((char *) dst->data + id*nb1 + iid1*nb2, 0, ne0*sizeof(float));
++                    continue;
++                }
++
++                assert(i02 < n_as);
+ 
+                 MMID_MATRIX_ROW(i02, matrix_row_counts[i02]) = (struct mmid_row_mapping) {id, iid1};
+                 matrix_row_counts[i02] += 1;
+@@ -3189,6 +3195,8 @@ static void ggml_cpu_prof_print(void) {
+ #define GGML_CPU_PROF_MAX_EXPERTS 1024
+ static int64_t g_cpu_prof_expert[GGML_CPU_PROF_MAX_LAYERS][GGML_CPU_PROF_MAX_EXPERTS];
+ static int     g_cpu_prof_expert_n[GGML_CPU_PROF_MAX_LAYERS];
++static int64_t g_cpu_prof_skipped = 0; // routed slots with a negative id (served by a hot expert elsewhere)
++static int64_t g_cpu_prof_slots   = 0;
+ 
+ static int ggml_cpu_prof_cmp_i64_desc(const void * a, const void * b) {
+     const int64_t x = *(const int64_t *) a;
+@@ -3237,6 +3245,10 @@ static void ggml_cpu_prof_print_experts(void) {
+         all_total += total;
+         n_layers++;
+     }
++    if (g_cpu_prof_slots > 0) {
++        fprintf(stderr, "cpu-prof:   routed slots on the CPU gate matmul: %lld, skipped (negative id): %lld (%.1f%%)\n",
++                (long long) g_cpu_prof_slots, (long long) g_cpu_prof_skipped, 100.0*g_cpu_prof_skipped/g_cpu_prof_slots);
++    }
+     if (all_total > 0) {
+         fprintf(stderr, "cpu-prof:   all %d layers: top5=%5.1f%% top10=%5.1f%% top20=%5.1f%%\n", n_layers,
+                 100.0*all_top[0]/all_total, 100.0*all_top[1]/all_total, 100.0*all_top[2]/all_total);
+@@ -3259,7 +3271,7 @@ static void ggml_cpu_prof_count_experts(const struct ggml_tensor * node) {
+     const struct ggml_tensor * src0 = node->src[0];
+     const struct ggml_tensor * ids  = node->src[2];
+     int il = -1;
+-    if (sscanf(src0->name, "blk.%d.ffn_gate_exps", &il) != 1 || il < 0 || il >= GGML_CPU_PROF_MAX_LAYERS) {
++    if (sscanf(src0->name, "blk.%d.", &il) != 1 || il < 0 || il >= GGML_CPU_PROF_MAX_LAYERS || strstr(src0->name, "ffn_gate_exps") == NULL) {
+         return;
+     }
+     const int n = (int) src0->ne[2];
+@@ -3272,7 +3284,10 @@ static void ggml_cpu_prof_count_experts(const struct ggml_tensor * node) {
+             const int32_t e = *(const int32_t *) ((const char *) ids->data + i1*ids->nb[1] + i0*ids->nb[0]);
+             if (e >= 0 && e < n) {
+                 g_cpu_prof_expert[il][e]++;
++            } else if (e < 0) {
++                g_cpu_prof_skipped++;
+             }
++            g_cpu_prof_slots++;
+         }
+     }
+ }
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 93846e3dd34906258ed12123d56954dba81dab06..5b19acbd22cca38937221791cce640fb08fae7a9 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -1986,17 +1986,24 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
+     std::vector<int32_t> tokens_per_expert(ne02);
+ 
+     ggml_cuda_pool_alloc<char> src1_sorted(ctx.pool(), ne12*n_expert_used*ne10*ts_src1_sorted);
+-    ggml_cuda_pool_alloc<char>  dst_sorted(ctx.pool(), ne2 *n_expert_used* ne0*ts_dst_sorted);
++    // customware: one extra zero row at the end, the target of slots with a negative id (served elsewhere)
++    ggml_cuda_pool_alloc<char>  dst_sorted(ctx.pool(), (ne2 *n_expert_used + 1)* ne0*ts_dst_sorted);
++    CUDA_CHECK(cudaMemsetAsync(dst_sorted.ptr + ne_get_rows*ne0*ts_dst_sorted, 0, ne0*ts_dst_sorted, stream));
+ 
+     std::vector<char> ids_host(ggml_nbytes(ids));
+     CUDA_CHECK(cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, stream));
+     CUDA_CHECK(cudaStreamSynchronize(stream));
+ 
++    // customware: slots with a negative id (served elsewhere) get no compact row and read the zero row at the end
++    std::fill(ids_from_sorted_host.begin(), ids_from_sorted_host.end(), -1);
+     for (int64_t i02 = 0; i02 < ne02; ++i02) { // expert matrices
+         for (int64_t i12 = 0; i12 < ne12; ++i12) { // tokens
+             for (int64_t iex = 0; iex < n_expert_used; ++iex) {
+                 const int32_t expert_to_use = *(const int32_t *)(ids_host.data() + i12*ids->nb[1] + iex*ids->nb[0]);
+-                assert(expert_to_use >= 0 && expert_to_use < ne02);
++                if (expert_to_use < 0) {
++                    continue;
++                }
++                assert(expert_to_use < ne02);
+                 if (expert_to_use == i02) {
+                     ids_from_sorted_host[i12*n_expert_used + iex] = ids_to_sorted_host.size();
+                     ids_to_sorted_host.push_back(i12*ne11 + iex % ne11);
+@@ -2006,20 +2013,26 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
+             }
+         }
+     }
+-    GGML_ASSERT(ids_to_sorted_host.size() == size_t(ne_get_rows));
++    const int64_t n_valid = (int64_t) ids_to_sorted_host.size();
++    GGML_ASSERT(n_valid <= ne_get_rows);
++    for (auto & v : ids_from_sorted_host) {
++        if (v < 0) {
++            v = (int32_t) ne_get_rows; // the zero row
++        }
++    }
+ 
+     ids_to_sorted_host.insert(ids_to_sorted_host.end(), ids_from_sorted_host.begin(), ids_from_sorted_host.end());
+ 
+-    CUDA_CHECK(cudaMemcpyAsync(ids_buf_dev.ptr, ids_to_sorted_host.data(), 2*ne_get_rows*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
++    CUDA_CHECK(cudaMemcpyAsync(ids_buf_dev.ptr, ids_to_sorted_host.data(), ids_to_sorted_host.size()*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
+     CUDA_CHECK(cudaStreamSynchronize(stream));
+ 
+-    const int32_t * ids_to_sorted   = ids_buf_dev.ptr + 0*ne_get_rows;
+-    const int32_t * ids_from_sorted = ids_buf_dev.ptr + 1*ne_get_rows;
++    const int32_t * ids_to_sorted   = ids_buf_dev.ptr;
++    const int32_t * ids_from_sorted = ids_buf_dev.ptr + n_valid;
+ 
+     get_rows_cuda(src1->data, src1->type, ids_to_sorted, src1_sorted.ptr, type_src1_sorted,
+         ne10, nb11, nb12, nb13,
+-        ne_get_rows, 1, 1, sizeof(int32_t), ne_get_rows*sizeof(int32_t), ne_get_rows*sizeof(int32_t),
+-        ne10*ts_src1_sorted, ne_get_rows*ne10*ts_src1_sorted, ne_get_rows*ne10*ts_src1_sorted, stream);
++        n_valid, 1, 1, sizeof(int32_t), n_valid*sizeof(int32_t), n_valid*sizeof(int32_t),
++        ne10*ts_src1_sorted, n_valid*ne10*ts_src1_sorted, n_valid*ne10*ts_src1_sorted, stream);
+     CUDA_CHECK(cudaGetLastError());
+ 
+     char * src1_data_cur = (char *) src1_sorted.ptr;
+diff --git a/ggml/src/ggml-cuda/mmid.cu b/ggml/src/ggml-cuda/mmid.cu
+index 0b222e63ac7d4c057dc0edfa6d53e1de0bb6dff9..cffff37e4adab401c413d21b12862486ac87d164 100644
+--- a/ggml/src/ggml-cuda/mmid.cu
++++ b/ggml/src/ggml-cuda/mmid.cu
+@@ -51,7 +51,9 @@ static __global__ void mm_ids_helper(
+         for (int it = 0; it < n_tokens; ++it) {
+             int iex_used = -1; // The index at which the expert is used, if any.
+             for (int iex = threadIdx.x; iex < n_expert_used; iex += warp_size) {
+-                const int expert_used = ids[it*si1 + iex];
++                // customware: a negative id is a slot served elsewhere, it uses no expert here
++                int expert_used = ids[it*si1 + iex];
++                expert_used = expert_used < 0 ? INT_MAX : expert_used;
+                 nex_prev += expert_used < expert;
+                 if (expert_used == expert) {
+                     iex_used = iex;
+@@ -74,8 +76,9 @@ static __global__ void mm_ids_helper(
+             const int it = it0 + threadIdx.x / neu_padded;
+ 
+             const int iex = threadIdx.x % neu_padded; // The index at which the expert is used, if any.
+-            const int expert_used = (neu_padded == n_expert_used || iex < n_expert_used) && it < n_tokens ?
++            int expert_used = (neu_padded == n_expert_used || iex < n_expert_used) && it < n_tokens ?
+                 ids[it*si1 + iex] : INT_MAX;
++            expert_used = expert_used < 0 ? INT_MAX : expert_used; // customware: negative id = slot served elsewhere
+             const int iex_used = expert_used == expert ? iex : -1;
+             nex_prev += expert_used < expert;
+ 
+diff --git a/ggml/src/ggml-cuda/mmq.cu b/ggml/src/ggml-cuda/mmq.cu
+index b13b34ee9cf0d24093ba59b233e917ffa7c5d2b6..36c79fe19b72445ab9ef83ad23fe3f0d42ce35d5 100644
+--- a/ggml/src/ggml-cuda/mmq.cu
++++ b/ggml/src/ggml-cuda/mmq.cu
+@@ -3,7 +3,9 @@
+ #include "quantize.cuh"
+ #include "mmid.cuh"
+ 
++#include <algorithm>
+ #include <cstdint>
++#include <vector>
+ 
+ static void ggml_cuda_mul_mat_q_switch_type(ggml_backend_cuda_context & ctx, const mmq_args & args, cudaStream_t stream) {
+     switch (args.type_x) {
+@@ -192,6 +194,43 @@ void ggml_cuda_mul_mat_q(
+     // scatter to its slots. ids_src1 then holds the inverse map (token slot -> compact row).
+     const bool dedup_bcast = ne11 == 1 && n_expert_used > 1;
+ 
++    // customware: op_params[3] == 1 marks ids that may hold -1 (slot served elsewhere); those slots get no
++    // compact row, so their inverse map entries stay -1 and their output rows stay zero
++    const bool ids_may_skip = ggml_get_op_params_i32(dst, 3) == 1;
++    if (ids_may_skip) {
++        // the helper writes one map entry per valid slot; the rest must read as "skip" for the quantize gather
++        CUDA_CHECK(cudaMemsetAsync(ids_src1.get(), 0xFF, ne_get_rows*sizeof(int32_t), stream));
++        CUDA_CHECK(cudaMemsetAsync(dst->data, 0, ggml_nbytes(dst), stream));
++    }
++
++    // customware: GGML_CUDA_MMQ_DEBUG=1 syncs after each stage and reports the ids summary on failure
++    static const bool mmq_debug = getenv("GGML_CUDA_MMQ_DEBUG") != nullptr;
++    auto mmq_stage = [&](const char * stage) {
++        if (!mmq_debug) {
++            return;
++        }
++        cudaError_t err = cudaStreamSynchronize(stream);
++        if (err == cudaSuccess) {
++            err = cudaGetLastError();
++        }
++        if (err != cudaSuccess) {
++            std::vector<int32_t> h(ne_get_rows);
++            (void) cudaGetLastError();
++            fprintf(stderr, "mmq-debug: stage '%s' failed: %s | %s: ne02=%lld ne12=%lld n_expert_used=%lld ne11=%lld dedup=%d skip=%d src0=%s\n",
++                    stage, cudaGetErrorString(err), dst->name, (long long) ne02, (long long) ne12, (long long) n_expert_used, (long long) ne11, (int) dedup_bcast, (int) ids_may_skip, ggml_type_name(src0->type));
++            GGML_ABORT("mmq-debug");
++        }
++    };
++    if (mmq_debug) {
++        std::vector<int32_t> h(ne_get_rows);
++        CUDA_CHECK(cudaMemcpy(h.data(), ids->data, ne_get_rows*sizeof(int32_t), cudaMemcpyDeviceToHost));
++        int64_t neg = 0, mn = INT32_MAX, mx = INT32_MIN;
++        for (int32_t v : h) { neg += v < 0; mn = std::min(mn, (int64_t) v); mx = std::max(mx, (int64_t) v); }
++        fprintf(stderr, "mmq-debug: %s ne02=%lld ne12=%lld n_used=%lld ne11=%lld dedup=%d skip=%d ids: neg=%lld min=%lld max=%lld\n",
++                dst->name, (long long) ne02, (long long) ne12, (long long) n_expert_used, (long long) ne11, (int) dedup_bcast, (int) ids_may_skip, (long long) neg, (long long) mn, (long long) mx);
++    }
++    mmq_stage("memset");
++
+     {
+         GGML_ASSERT(ids->nb[0] == ggml_element_size(ids));
+         const int si1  = ids->nb[1] / ggml_element_size(ids);
+@@ -200,6 +239,20 @@ void ggml_cuda_mul_mat_q(
+         ggml_cuda_launch_mm_ids_helper((const int32_t *) ids->data, ids_src1.get(), ids_dst.get(), expert_bounds.get(),
+             ne02, ne12, n_expert_used, ne11, si1, sis1, /*write_inverse =*/ dedup_bcast, stream);
+         CUDA_CHECK(cudaGetLastError());
++        mmq_stage("ids helper");
++        if (mmq_debug) {
++            std::vector<int32_t> m(ne_get_rows), b(ne02 + 1), d(ne_get_rows);
++            CUDA_CHECK(cudaMemcpy(m.data(), ids_src1.get(), ne_get_rows*sizeof(int32_t), cudaMemcpyDeviceToHost));
++            CUDA_CHECK(cudaMemcpy(d.data(), ids_dst.get(),  ne_get_rows*sizeof(int32_t), cudaMemcpyDeviceToHost));
++            CUDA_CHECK(cudaMemcpy(b.data(), expert_bounds.get(), (ne02 + 1)*sizeof(int32_t), cudaMemcpyDeviceToHost));
++            int64_t n_valid = 0, mn = INT32_MAX, mx = INT32_MIN, dmx = INT32_MIN;
++            for (int32_t v : m) { if (v >= 0) { n_valid++; mn = std::min(mn, (int64_t) v); mx = std::max(mx, (int64_t) v); } }
++            for (int32_t v : d) { dmx = std::max(dmx, (int64_t) v); }
++            fprintf(stderr, "mmq-debug:   map: valid=%lld min=%lld max=%lld (src1 rows flat=%lld) ids_dst max=%lld bounds[last]=%d si1=%d sis1=%d | quantize: ne0=%lld ne1=%lld s11=%lld s12=%lld src1 ne=[%lld,%lld,%lld] nb=[%zu,%zu,%zu]\n",
++                    (long long) n_valid, (long long) mn, (long long) mx, (long long) (ne12*ne11), (long long) dmx, b[ne02], si1, sis1,
++                    (long long) ne10_padded, (long long) (ne12*n_expert_used), (long long) (src1->nb[1]/ts_src1), (long long) (src1->nb[2]/ts_src1),
++                    (long long) src1->ne[0], (long long) src1->ne[1], (long long) src1->ne[2], src1->nb[0], src1->nb[1], src1->nb[2]);
++        }
+     }
+ 
+     const size_t nbytes_src1_q8_1 = ne12*n_expert_used*ne10_padded * y_block_size/y_values_per_block +
+@@ -237,6 +290,7 @@ void ggml_cuda_mul_mat_q(
+                                    ne10_padded, ne11_flat, ne12_flat, ne13_flat, stream);
+         }
+         CUDA_CHECK(cudaGetLastError());
++        mmq_stage("quantize");
+     }
+ 
+     static_assert(QK_FP4_MMQ == 8 * QK_MXFP4, "QK_FP4_MMQ needs to be 8 * QK_MXFP4");
+diff --git a/ggml/src/ggml-cuda/mmvq.cu b/ggml/src/ggml-cuda/mmvq.cu
+index a85155360a7ba48014bf8a450fc3a35bafd2aa1d..aa7a90af7baf2c4e6624f38b4bf32c839ddb919c 100644
+--- a/ggml/src/ggml-cuda/mmvq.cu
++++ b/ggml/src/ggml-cuda/mmvq.cu
+@@ -636,6 +636,15 @@ static __global__ void mul_mat_vec_q(
+     channel_y  = ncols_dst == 1 && ids ? fastmodulo(channel_dst, nchannels_y) : channel_dst;
+     sample_dst = blockIdx.z;
+ 
++    // customware: a negative id is a slot served by another copy of the expert, leave zeros
++    if (ncols_dst == 1 && ids && (int32_t) channel_x < 0) {
++        float * dst_blk = dst + sample_dst*stride_sample_dst + channel_dst*stride_channel_dst + row0;
++        if (threadIdx.y == 0 && threadIdx.x < rows_per_cuda_block && (rows_per_cuda_block == 1 || uint32_t(row0 + threadIdx.x) < stride_col_dst)) {
++            dst_blk[threadIdx.x] = 0.0f;
++        }
++        return;
++    }
++
+     const uint32_t sample_x    = fastdiv(sample_dst, sample_ratio);
+     const uint32_t sample_y    = sample_dst;
+ 
+@@ -904,7 +913,15 @@ static __global__ void mul_mat_vec_q_moe(
+     }
+ 
+     ggml_cuda_pdl_sync();
+-    const uint32_t channel_x = ids[channel_dst + token_idx * ids_stride];
++    const int32_t channel_x_raw = ids[channel_dst + token_idx * ids_stride];
++    if (channel_x_raw < 0) {
++        // customware: slot served by another copy of the expert, leave zeros
++        if (threadIdx.x < c_rows_per_block && (c_rows_per_block == 1 || uint32_t(row0 + threadIdx.x) < nrows_x)) {
++            dst[channel_dst*stride_channel_dst + token_idx*stride_col_dst + row0 + threadIdx.x] = 0.0f;
++        }
++        return;
++    }
++    const uint32_t channel_x = channel_x_raw;
+     const uint32_t channel_y = fastmodulo(channel_dst, nchannels_y);
+ 
+     const block_q8_1 * y = ((const block_q8_1 *) vy) + channel_y*stride_channel_y + token_idx*stride_col_y;
+diff --git a/ggml/src/ggml-cuda/quantize.cu b/ggml/src/ggml-cuda/quantize.cu
+index bcc7723957b5afb03983a158c237873d2b81f17b..17b482fd3ea8eecf138b7d8998d82ab857288beb 100644
+--- a/ggml/src/ggml-cuda/quantize.cu
++++ b/ggml/src/ggml-cuda/quantize.cu
+@@ -139,7 +139,10 @@ static __global__ void quantize_mmq_nvfp4(
+     } else {
+         const int64_t i2  = blockIdx.y % ne2;
+         const int64_t i3  = blockIdx.y / ne2;
+-        const int64_t i01 = ids ? ids[blockIdx.x] : blockIdx.x;
++        const int64_t i01 = ids ? (int64_t) ids[blockIdx.x] : (int64_t) blockIdx.x; // signed: a negative id must stay negative
++        if (i01 < 0) {
++            return; // customware: compact row without a slot (negative id), never read by the matmul
++        }
+         base_idx = i3 * s03 + i2 * s02 + i01 * s01;
+     }
+     const float * __restrict__  x_row = x + base_idx;
+@@ -184,6 +187,7 @@ static __global__ void quantize_mmq_nvfp4(
+ #pragma unroll
+                 for (int slot = 0; slot < n_expert_used; ++slot) {
+                     const int64_t i = ids[(int64_t) blockIdx.x * n_expert_used + slot];
++            if (i < 0) { continue; } // customware: slot served elsewhere
+                     scale[i] = warp_amax[0];
+                 }
+             } else {
+@@ -310,6 +314,7 @@ static __global__ void quantize_mmq_nvfp4(
+ #pragma unroll
+             for (int slot = 0; slot < n_expert_used; ++slot) {
+                 const int64_t i = ids[(int64_t) blockIdx.x * n_expert_used + slot];
++            if (i < 0) { continue; } // customware: slot served elsewhere
+                 block_fp4_mmq * yb = y + (k_block * ne1 + i);
+                 uint32_t * yqs = reinterpret_cast<uint32_t *>(yb->qs);
+                 yqs[2 * sub + 0] = q0;
+@@ -375,7 +380,10 @@ static __global__ void quantize_mmq_mxfp4(const float * __restrict__ x,
+     } else {
+         const int64_t i2  = blockIdx.z % ne2;
+         const int64_t i3  = blockIdx.z / ne2;
+-        const int64_t i01 = ids ? ids[blockIdx.x] : blockIdx.x;
++        const int64_t i01 = ids ? (int64_t) ids[blockIdx.x] : (int64_t) blockIdx.x; // signed: a negative id must stay negative
++        if (i01 < 0) {
++            return; // customware: compact row without a slot (negative id), never read by the matmul
++        }
+         base_pos = i3 * s03 + i2 * s02 + i01 * s01;
+     }
+ 
+@@ -428,6 +436,7 @@ static __global__ void quantize_mmq_mxfp4(const float * __restrict__ x,
+ #pragma unroll
+         for (int slot = 0; slot < n_expert_used; ++slot) {
+             const int64_t i = ids[(int64_t) blockIdx.x * n_expert_used + slot];
++            if (i < 0) { continue; } // customware: slot served elsewhere
+             block_fp4_mmq * yb = y + (k_block * ne1 + i);
+             char2 * yqs2 = (char2 *) yb->qs;
+             if (lane_in_group == 0) {
+@@ -478,7 +487,10 @@ static __global__ void quantize_mmq_q8_1(
+     } else {
+         const int64_t i2  = blockIdx.z % ne2;
+         const int64_t i3  = blockIdx.z / ne2;
+-        const int64_t i01 = ids ? ids[blockIdx.x] : blockIdx.x;
++        const int64_t i01 = ids ? (int64_t) ids[blockIdx.x] : (int64_t) blockIdx.x; // signed: a negative id must stay negative
++        if (i01 < 0) {
++            return; // customware: compact row without a slot (negative id), never read by the matmul
++        }
+         base_idx = i3*s03 + i2*s02 + i01*s01;
+     }
+ 
+@@ -527,6 +539,7 @@ static __global__ void quantize_mmq_q8_1(
+         int64_t ib;
+         if constexpr (scatter) {
+             const int64_t i = ids[(int64_t) blockIdx.x * n_expert_used + slot];
++            if (i < 0) { continue; } // customware: slot served elsewhere
+             ib = k_block*ne1 + i;
+         } else {
+             const int64_t ib0 = blockIdx.z*((int64_t)gridDim.x*gridDim.y*blockDim.x/QK8_1); // first block of channel
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 07ca49ad09d11c42e8669869a5feedec9e6e3989..6f5d77b85bdb9108ac6d90a9665cff4096ef6350 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1965,7 +1965,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+          ggml_tensor * up_exps_s,
+          ggml_tensor * gate_exps_s,
+          ggml_tensor * down_exps_s,
+-         ggml_tensor * selected_experts_in) const {
++         ggml_tensor * selected_experts_in,
++   const llm_moe_hot * hot) const {
+     return build_moe_ffn(
+         cur,
+         gate_inp,  /* gate_inp_b  */ nullptr,
+@@ -1986,7 +1987,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+         up_exps_s,
+         gate_exps_s,
+         down_exps_s,
+-        selected_experts_in
++        selected_experts_in,
++        hot
+     );
+ }
+ 
+@@ -2014,7 +2016,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+          ggml_tensor * up_exps_s,
+          ggml_tensor * gate_exps_s,
+          ggml_tensor * down_exps_s,
+-         ggml_tensor * selected_experts_in) const {
++         ggml_tensor * selected_experts_in,
++   const llm_moe_hot * hot) const {
+     const int64_t n_embd   = cur->ne[0];
+     const int64_t n_tokens = cur->ne[1];
+     const bool weight_before_ffn = arch == LLM_ARCH_LLAMA4; // for llama4, we apply the sigmoid-ed weights before the FFN
+@@ -2154,6 +2157,73 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     //call early so that topk-moe can be used
+     ggml_build_forward_expand(gf, weights);
+ 
++    // customware: hot experts (LLAMA_HOT_EXPERTS). The routed slots are split: slots whose expert has a GPU copy run
++    // there on the compacted tensors, the other slots run on the host tensors (on the CPU for small batches, streamed
++    // to the GPU by the scheduler for large ones). In each half the slots that belong to the other half carry the id
++    // -1, which the mul_mat_id kernels treat as "skip, leave zeros" (op_params[3] = 1 marks such ids). Both halves
++    // are masked by the routing weights and added.
++    const bool hot_simple = hot && hot->valid() && gate_exps && !gate_up_exps &&
++        !up_exps_b && !gate_exps_b && !down_exps_b && !up_exps_s && !gate_exps_s && !down_exps_s &&
++        type_op == LLM_FFN_SILU && !weight_before_ffn && (il < 0 || hparams.swiglu_clamp_exp[il] <= 1e-6f);
++    if (hot_simple) {
++        const int64_t n_expert_all = hot->hot_map->ne[0];
++        ggml_tensor * cold_map = hot->cold_map;
++
++        // the maps have no token dimension, so look them up with a flat index and restore the shape after
++        ggml_tensor * sel = selected_experts;
++        if (!ggml_is_contiguous(sel)) {
++            sel = ggml_cont(ctx0, sel);
++        }
++        sel = ggml_reshape_1d(ctx0, sel, n_expert_used*n_tokens);
++
++        ggml_tensor * ids_gpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_map,  1, n_expert_all), sel);
++        ggml_tensor * ids_cpu = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, cold_map, 1, n_expert_all), sel);
++        ggml_tensor * mask    = ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, hot->hot_mask, 1, n_expert_all), sel);
++        ids_gpu = ggml_reshape_2d(ctx0, ids_gpu, n_expert_used, n_tokens);
++        ids_cpu = ggml_reshape_2d(ctx0, ids_cpu, n_expert_used, n_tokens);
++        mask    = ggml_reshape_3d(ctx0, mask, 1, n_expert_used, n_tokens);
++        cb(ids_gpu, "ffn_moe_ids_hot", il);
++        cb(ids_cpu, "ffn_moe_ids_cold", il);
++
++        ggml_tensor * w_gpu = ggml_mul(ctx0, weights, mask);
++        ggml_tensor * w_cpu = ggml_sub(ctx0, weights, w_gpu);
++
++        ggml_tensor * x = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
++
++        auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag) {
++            ggml_tensor * u = build_lora_mm_id(w_up,   x, ids, nullptr); // [n_ff, n_expert_used, n_tokens]
++            u->op_params[3] = 1; // ids may hold -1
++            ggml_tensor * g = build_lora_mm_id(w_gate, x, ids, nullptr);
++            g->op_params[3] = 1; // ids may hold -1
++            ggml_tensor * h = ggml_swiglu_split(ctx0, g, u);
++            ggml_tensor * d = build_lora_mm_id(w_down, h, ids, nullptr); // [n_embd, n_expert_used, n_tokens]
++            d->op_params[3] = 1; // ids may hold -1
++            d = ggml_mul(ctx0, d, w);
++            cb(d, tag, il);
++            return d;
++        };
++
++        ggml_tensor * part_hot  = run(hot->up_hot, hot->gate_hot, hot->down_hot, ids_gpu, w_gpu, "ffn_moe_weighted_hot");
++        ggml_tensor * part_cold = run(up_exps,     gate_exps,     down_exps,     ids_cpu, w_cpu, "ffn_moe_weighted_cold");
++
++        ggml_tensor * experts = ggml_add(ctx0, part_hot, part_cold);
++        cb(experts, "ffn_moe_weighted", il);
++        ggml_build_forward_expand(gf, experts);
++
++        const uint32_t n_expert_used_il = hparams.n_expert_used(il);
++        ggml_tensor * moe_out = nullptr;
++        for (uint32_t i = 0; i < n_expert_used_il; ++i) {
++            ggml_tensor * e = ggml_view_2d(ctx0, experts, n_embd, n_tokens, experts->nb[2], i*experts->nb[1]);
++            moe_out = moe_out ? ggml_add(ctx0, moe_out, e) : e;
++            ggml_build_forward_expand(gf, moe_out);
++        }
++        if (n_expert_used_il == 1) {
++            moe_out = ggml_cont(ctx0, moe_out);
++        }
++        cb(moe_out, "ffn_moe_out", il);
++        return moe_out;
++    }
++
+     cur = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
+ 
+     if (weight_before_ffn) {
+diff --git a/src/llama-graph.h b/src/llama-graph.h
+index cc4110639d4b8417564b34baa99475e026f8b7db..7917cc1489b8244e4528c7621458786d2280442b 100644
+--- a/src/llama-graph.h
++++ b/src/llama-graph.h
+@@ -1109,6 +1109,18 @@ struct llm_graph_context {
+        llm_ffn_gate_type   type_gate,
+                      int   il) const;
+ 
++    // customware: GPU copies of a layer's most used experts (see LLAMA_HOT_EXPERTS in llama-model.cpp)
++    struct llm_moe_hot {
++        ggml_tensor * gate_hot  = nullptr;
++        ggml_tensor * up_hot    = nullptr;
++        ggml_tensor * down_hot  = nullptr;
++        ggml_tensor * hot_map   = nullptr;
++        ggml_tensor * cold_map  = nullptr; // cold -> expert, hot slots -> -1 (skipped by the kernels)
++        ggml_tensor * hot_mask  = nullptr;
++
++        bool valid() const { return gate_hot && up_hot && down_hot && hot_map && cold_map && hot_mask; }
++    };
++
+     // build MoE FFN without bias tensors
+     ggml_tensor * build_moe_ffn(
+              ggml_tensor * cur,
+@@ -1129,7 +1141,8 @@ struct llm_graph_context {
+              ggml_tensor * up_exps_s = nullptr,
+              ggml_tensor * gate_exps_s = nullptr,
+              ggml_tensor * down_exps_s = nullptr,
+-             ggml_tensor * selected_experts_in = nullptr) const;
++             ggml_tensor * selected_experts_in = nullptr,
++       const llm_moe_hot * hot = nullptr) const;
+ 
+     ggml_tensor * build_moe_ffn(
+              ggml_tensor * cur,
+@@ -1155,7 +1168,8 @@ struct llm_graph_context {
+              ggml_tensor * up_exps_s = nullptr,
+              ggml_tensor * gate_exps_s = nullptr,
+              ggml_tensor * down_exps_s = nullptr,
+-             ggml_tensor * selected_experts_in = nullptr) const;
++             ggml_tensor * selected_experts_in = nullptr,
++       const llm_moe_hot * hot = nullptr) const;
+ 
+     //
+     // inputs
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+index ff40b09276e7a85bdb9ac5b8571c4ac5ddebca0d..c45c50cec6aea30f8700ed6f01e60ee14c23326f 100644
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@ -1128,6 +1128,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+             int max_n_tensors = n_tensors;
+             max_n_tensors += 1;                   // duplicated output tensor
+             max_n_tensors += hparams.n_layer()*2; // duplicated rope freq tensors
++            max_n_tensors += hparams.n_layer()*8; // customware: hot expert copies and their maps (LLAMA_HOT_EXPERTS)
+             if (files.empty()) {
+                 max_n_tensors += hparams.n_layer()*256; // this should be well above what any model actually uses
+             }
+diff --git a/src/llama-model.cpp b/src/llama-model.cpp
+index e195f50d0bde50333eef771a651cebde87d9616f..aa6c40748246a6f043b835548fd6521a47e74a75 100644
+--- a/src/llama-model.cpp
++++ b/src/llama-model.cpp
+@@ -31,6 +31,7 @@
+ #include <cstdint>
+ #include <cstring>
+ #include <cmath>
++#include <fstream>
+ #include <functional>
+ #include <map>
+ #include <numeric>
+@@ -1187,6 +1188,9 @@ struct llama_model::impl {
+     llama_mlocks mlock_bufs;
+     llama_mlocks mlock_mmaps;
+ 
++    // customware: locks of single tensors selected by LLAMA_LOCK_TENSORS
++    llama_mlocks tensor_locks;
++
+     // contexts where the model tensors metadata is stored as well as the corresponding buffers:
+     std::vector<std::pair<ggml_context_ptr, std::vector<ggml_backend_buffer_ptr>>> ctxs_bufs;
+ 
+@@ -1429,6 +1433,40 @@ void llama_model_base::load_vocab(llama_model_loader & ml) {
+     vocab.load(ml, kv);
+ }
+ 
++// customware: LLAMA_HOT_EXPERTS=<file>, one line per layer: "<layer> <expert> <expert> ...". Those experts get a
++// copy on the first GPU device and build_moe_ffn serves them from there while the host tensors serve the rest.
++struct llama_hot_experts_spec {
++    std::map<int, std::vector<int32_t>> layers;
++};
++
++static llama_hot_experts_spec llama_hot_experts_read() {
++    llama_hot_experts_spec spec;
++    const char * path = getenv("LLAMA_HOT_EXPERTS");
++    if (!path || !*path) {
++        return spec;
++    }
++    std::ifstream f(path);
++    if (!f) {
++        LLAMA_LOG_WARN("%s: cannot open LLAMA_HOT_EXPERTS file %s\n", __func__, path);
++        return spec;
++    }
++    std::string line;
++    while (std::getline(f, line)) {
++        std::istringstream ss(line);
++        int il = -1;
++        if (!(ss >> il)) {
++            continue;
++        }
++        std::vector<int32_t> & v = spec.layers[il];
++        int32_t e = 0;
++        while (ss >> e) {
++            v.push_back(e);
++        }
++    }
++    LLAMA_LOG_INFO("%s: LLAMA_HOT_EXPERTS %s: %zu layers listed\n", __func__, path, spec.layers.size());
++    return spec;
++}
++
+ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+     const auto & split_mode   = params.split_mode;
+     const bool use_mlock      = params.load_mode == LLAMA_LOAD_MODE_MLOCK || params.load_mode == LLAMA_LOAD_MODE_MMAP_MLOCK;
+@@ -1718,6 +1756,47 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+     }
+     ml.done_getting_tensors();
+ 
++    // customware: hot experts get a GPU copy next to the host tensors (metadata now, data after the load)
++    const llama_hot_experts_spec hot_spec = llama_hot_experts_read();
++    if (!hot_spec.layers.empty()) {
++        if (devices.empty()) {
++            LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS set but there is no GPU device, ignored\n", __func__);
++        } else {
++            ggml_backend_buffer_type_t buft = ggml_backend_dev_buffer_type(devices[0].dev);
++            auto it = ml.ctx_map.find({buft, false});
++            if (it == ml.ctx_map.end()) {
++                LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS: no context for %s, ignored\n", __func__, ggml_backend_buft_name(buft));
++            } else {
++                ggml_context * ctx = it->second.get();
++                for (const auto & [il, experts] : hot_spec.layers) {
++                    if (il < 0 || il >= (int) layers.size() || experts.empty()) {
++                        continue;
++                    }
++                    auto & layer = layers[il];
++                    if (!layer.ffn_gate_exps || !layer.ffn_up_exps || !layer.ffn_down_exps) {
++                        continue;
++                    }
++                    const int64_t n_hot    = (int64_t) experts.size();
++                    const int64_t n_expert = layer.ffn_gate_exps->ne[2];
++                    auto mk = [&](ggml_tensor * src, const char * name) {
++                        ggml_tensor * t = ggml_new_tensor_3d(ctx, src->type, src->ne[0], src->ne[1], n_hot);
++                        ggml_format_name(t, "blk.%d.%s", il, name);
++                        return t;
++                    };
++                    layer.ffn_gate_hot = mk(layer.ffn_gate_exps, "ffn_gate_hot");
++                    layer.ffn_up_hot   = mk(layer.ffn_up_exps,   "ffn_up_hot");
++                    layer.ffn_down_hot = mk(layer.ffn_down_exps, "ffn_down_hot");
++                    layer.ffn_hot_map  = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_expert);
++                    layer.ffn_cold_map = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_expert);
++                    layer.ffn_hot_mask = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_expert);
++                    ggml_format_name(layer.ffn_hot_map,  "blk.%d.ffn_hot_map",  il);
++                    ggml_format_name(layer.ffn_cold_map, "blk.%d.ffn_cold_map", il);
++                    ggml_format_name(layer.ffn_hot_mask, "blk.%d.ffn_hot_mask", il);
++                }
++            }
++        }
++    }
++
+     // Tied NVFP4 output is valid when no separate LM-head scale tensors are present.
+     // If sidecar scales exist, the output weight must be an actual output tensor.
+     GGML_ASSERT(!(output && tok_embd &&
+@@ -1873,6 +1952,96 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+         }
+     }
+ 
++    // customware: fill the hot expert copies and their maps from the loaded full tensors
++    if (!hot_spec.layers.empty()) {
++        size_t n_hot_total = 0;
++        size_t bytes_total = 0;
++        size_t n_layers    = 0;
++        std::vector<uint8_t> tmp;
++        for (const auto & [il, experts] : hot_spec.layers) {
++            if (il < 0 || il >= (int) layers.size()) {
++                continue;
++            }
++            auto & layer = layers[il];
++            if (!layer.ffn_gate_hot) {
++                continue;
++            }
++            const int64_t n_expert = layer.ffn_gate_exps->ne[2];
++            std::vector<int32_t> hot_map(n_expert, -1);
++            std::vector<int32_t> cold_map(n_expert);
++            std::vector<float>   hot_mask(n_expert, 0.0f);
++            for (int64_t e = 0; e < n_expert; e++) {
++                cold_map[e] = (int32_t) e;
++            }
++            for (size_t s = 0; s < experts.size(); s++) {
++                const int32_t e = experts[s];
++                if (e < 0 || e >= n_expert) {
++                    continue;
++                }
++                hot_map[e]  = (int32_t) s;
++                cold_map[e] = -1;
++                hot_mask[e] = 1.0f;
++            }
++            ggml_backend_tensor_set(layer.ffn_hot_map,  hot_map.data(),  0, n_expert*sizeof(int32_t));
++            ggml_backend_tensor_set(layer.ffn_cold_map, cold_map.data(), 0, n_expert*sizeof(int32_t));
++            ggml_backend_tensor_set(layer.ffn_hot_mask, hot_mask.data(), 0, n_expert*sizeof(float));
++
++            auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
++                const size_t bytes = src->nb[2];
++                const bool host = ggml_backend_buffer_is_host(src->buffer);
++                for (size_t s = 0; s < experts.size(); s++) {
++                    const int32_t e = experts[s];
++                    if (e < 0 || e >= n_expert) {
++                        continue;
++                    }
++                    if (host) {
++                        ggml_backend_tensor_set(dst, (const char *) src->data + e*bytes, s*bytes, bytes);
++                    } else {
++                        tmp.resize(bytes);
++                        ggml_backend_tensor_get(src, tmp.data(), e*bytes, bytes);
++                        ggml_backend_tensor_set(dst, tmp.data(), s*bytes, bytes);
++                    }
++                    bytes_total += bytes;
++                }
++            };
++            copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
++            copy(layer.ffn_up_exps,   layer.ffn_up_hot);
++            copy(layer.ffn_down_exps, layer.ffn_down_hot);
++            n_hot_total += experts.size();
++            n_layers++;
++        }
++        LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s\n", __func__,
++                n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev));
++    }
++
++    // customware: LLAMA_LOCK_TENSORS=<regex> keeps only the matching host tensors resident (e.g. a sparsely and
++    // randomly read table that keeps losing the page cache race against weights that are streamed every token)
++    if (const char * lock_pattern = getenv("LLAMA_LOCK_TENSORS"); lock_pattern && *lock_pattern) {
++        const std::regex re(lock_pattern);
++        const size_t page = llama_mlock::SUPPORTED ? 4096 : 0;
++        size_t locked = 0;
++        size_t n_locked = 0;
++        for (const auto & [name, t] : tensors_by_name) {
++            if (!t->buffer || !ggml_backend_buffer_is_host(t->buffer) || !t->data || !std::regex_search(name, re)) {
++                continue;
++            }
++            if (page == 0) {
++                LLAMA_LOG_WARN("%s: LLAMA_LOCK_TENSORS: memory locking is not supported on this platform\n", __func__);
++                break;
++            }
++            const uintptr_t start = (uintptr_t) t->data & ~(uintptr_t) (page - 1);
++            const size_t   size  = ggml_nbytes(t) + ((uintptr_t) t->data - start);
++            auto lock = std::make_unique<llama_mlock>();
++            lock->init((void *) start);
++            lock->grow_to(size);
++            pimpl->tensor_locks.emplace_back(std::move(lock));
++            locked += size;
++            n_locked++;
++            LLAMA_LOG_INFO("%s: locked %s (%.2f MiB)\n", __func__, name.c_str(), size / 1024.0 / 1024.0);
++        }
++        LLAMA_LOG_INFO("%s: LLAMA_LOCK_TENSORS '%s': %zu tensors, %.2f MiB locked in RAM\n", __func__, lock_pattern, n_locked, locked / 1024.0 / 1024.0);
++    }
++
+     if (use_mmap_buffer) {
+         for (auto & mapping : ml.mappings) {
+             pimpl->mappings.emplace_back(std::move(mapping));
+diff --git a/src/llama-model.h b/src/llama-model.h
+index 984b2cf38837af133c28dc7acfe4b18979f9e8d0..7cd231225678c44c538028d40a9c4849aea9d317 100644
+--- a/src/llama-model.h
++++ b/src/llama-model.h
+@@ -334,6 +334,14 @@ struct llama_layer {
+     struct ggml_tensor * ffn_down_exps     = nullptr;
+     struct ggml_tensor * ffn_up_exps       = nullptr;
+     struct ggml_tensor * ffn_gate_up_exps  = nullptr;
++
++    // customware: the most used experts of this layer, resident on the GPU (LLAMA_HOT_EXPERTS)
++    struct ggml_tensor * ffn_gate_hot      = nullptr; // [n_embd, n_ff, n_hot]
++    struct ggml_tensor * ffn_up_hot        = nullptr;
++    struct ggml_tensor * ffn_down_hot      = nullptr; // [n_ff, n_embd, n_hot]
++    struct ggml_tensor * ffn_hot_map       = nullptr; // I32 [n_expert]: expert -> hot slot, cold -> -1 (skipped)
++    struct ggml_tensor * ffn_cold_map      = nullptr; // I32 [n_expert]: cold -> expert, hot -> -1 (skipped)
++    struct ggml_tensor * ffn_hot_mask      = nullptr; // F32 [n_expert]: 1 for hot experts
+     struct ggml_tensor * ffn_gate_inp_b    = nullptr;
+     struct ggml_tensor * ffn_gate_exps_b   = nullptr;
+     struct ggml_tensor * ffn_down_exps_b   = nullptr;
+diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
+index f33989de023d377505b0da438f484efb12114410..8a65aad3b54342ee31000cea80b02e496753a1ee 100644
+--- a/src/models/qwen4exp.cpp
++++ b/src/models/qwen4exp.cpp
+@@ -988,6 +988,15 @@ ggml_tensor * llama_model_qwen4exp::graph::build_layer_attn_linear(
+ ggml_tensor * llama_model_qwen4exp::graph::build_layer_ffn(ggml_tensor * cur, const int il) {
+     GGML_ASSERT(model.layers[il].ffn_gate_inp != nullptr);
+ 
++    const llm_moe_hot hot = {
++        model.layers[il].ffn_gate_hot,
++        model.layers[il].ffn_up_hot,
++        model.layers[il].ffn_down_hot,
++        model.layers[il].ffn_hot_map,
++        model.layers[il].ffn_cold_map,
++        model.layers[il].ffn_hot_mask,
++    };
++
+     ggml_tensor * moe_out =
+         build_moe_ffn(cur,
+             model.layers[il].ffn_gate_inp,
+@@ -1002,7 +1011,8 @@ ggml_tensor * llama_model_qwen4exp::graph::build_layer_ffn(ggml_tensor * cur, co
+             nullptr, model.layers[il].ffn_gate_up_exps,
+             model.layers[il].ffn_up_exps_s,
+             model.layers[il].ffn_gate_exps_s,
+-            model.layers[il].ffn_down_exps_s);
++            model.layers[il].ffn_down_exps_s,
++            nullptr, hot.valid() ? &hot : nullptr);
+     cb(moe_out, "ffn_moe_out", il);
+ 
+     // shared experts, as in the Qwen3Next reference

@@ -1,0 +1,1390 @@
+diff --git a/ggml/include/ggml-alloc.h b/ggml/include/ggml-alloc.h
+index a7926a21a9a20f37a4b75cf19fbca5d8d88b7779..f6c829e81ae2d3f88a7af7159f5d8d0a91448e89 100644
+--- a/ggml/include/ggml-alloc.h
++++ b/ggml/include/ggml-alloc.h
+@@ -73,6 +73,12 @@ GGML_API bool ggml_gallocr_alloc_graph(ggml_gallocr_t galloc, struct ggml_cgraph
+ 
+ GGML_API size_t ggml_gallocr_get_buffer_size(ggml_gallocr_t galloc, int buffer_id);
+ 
++// customware: the backend buffer behind one chunk of a galloc buffer (NULL if not allocated), and the high-water mark
++// (bytes of the first chunk used) of the graph reserved or allocated last. Lets a caller park its own tensors in the
++// tail of a compute buffer and know when a graph would reach into them.
++GGML_API ggml_backend_buffer_t ggml_gallocr_get_buffer_chunk(ggml_gallocr_t galloc, int buffer_id, int chunk);
++GGML_API size_t                ggml_gallocr_get_max_size(ggml_gallocr_t galloc, int buffer_id);
++
+ // Utils
+ // Create a buffer and allocate all the tensors in a ggml_context
+ // ggml_backend_alloc_ctx_tensors_from_buft_size returns the size of the buffer that would be allocated by ggml_backend_alloc_ctx_tensors_from_buft
+diff --git a/ggml/include/ggml-backend.h b/ggml/include/ggml-backend.h
+index cc3f8cd36e3549c4f3ed3d6ad5f6b577af4b837b..64fa920cb214054cab66d43eada9dde11e894652 100644
+--- a/ggml/include/ggml-backend.h
++++ b/ggml/include/ggml-backend.h
+@@ -333,6 +333,14 @@ extern "C" {
+     GGML_API ggml_backend_buffer_type_t ggml_backend_sched_get_buffer_type(ggml_backend_sched_t sched, ggml_backend_t backend);
+     GGML_API size_t                     ggml_backend_sched_get_buffer_size(ggml_backend_sched_t sched, ggml_backend_t backend);
+ 
++    // customware: zero the bytes between ggml_nbytes(tensor) and the buffer's allocation size (the quantization padding
++    // that weights buffers zero on init and compute buffers do not)
++    GGML_API void                       ggml_backend_tensor_memset_padding(struct ggml_tensor * tensor);
++
++    // customware: the compute buffer (first chunk) of a backend, and the high-water mark of the graph allocated last in it
++    GGML_API ggml_backend_buffer_t      ggml_backend_sched_get_buffer(ggml_backend_sched_t sched, ggml_backend_t backend);
++    GGML_API size_t                     ggml_backend_sched_get_buffer_max_size(ggml_backend_sched_t sched, ggml_backend_t backend);
++
+     GGML_API void                 ggml_backend_sched_set_tensor_backend(ggml_backend_sched_t sched, struct ggml_tensor * node, ggml_backend_t backend);
+     GGML_API ggml_backend_t       ggml_backend_sched_get_tensor_backend(ggml_backend_sched_t sched, struct ggml_tensor * node);
+ 
+diff --git a/ggml/src/ggml-alloc.c b/ggml/src/ggml-alloc.c
+index a71838eafc69d1cab66dfb87885690a6e1e464d0..f688586f686b039c00e55ef2998c8ed992a194a6 100644
+--- a/ggml/src/ggml-alloc.c
++++ b/ggml/src/ggml-alloc.c
+@@ -1115,6 +1115,23 @@ size_t ggml_gallocr_get_buffer_size(ggml_gallocr_t galloc, int buffer_id) {
+     return ggml_vbuffer_size(galloc->buffers[buffer_id]);
+ }
+ 
++ggml_backend_buffer_t ggml_gallocr_get_buffer_chunk(ggml_gallocr_t galloc, int buffer_id, int chunk) {
++    GGML_ASSERT(buffer_id >= 0 && buffer_id < galloc->n_buffers);
++    GGML_ASSERT(chunk >= 0 && chunk < GGML_VBUFFER_MAX_CHUNKS);
++
++    if (galloc->buffers[buffer_id] == NULL) {
++        return NULL;
++    }
++
++    return galloc->buffers[buffer_id]->chunks[chunk];
++}
++
++size_t ggml_gallocr_get_max_size(ggml_gallocr_t galloc, int buffer_id) {
++    GGML_ASSERT(buffer_id >= 0 && buffer_id < galloc->n_buffers);
++
++    return ggml_dyn_tallocr_max_size(galloc->buf_tallocs[buffer_id], 0);
++}
++
+ // utils
+ 
+ static void free_buffers(ggml_backend_buffer_t ** buffers, const size_t * n_buffers) {
+diff --git a/ggml/src/ggml-backend.cpp b/ggml/src/ggml-backend.cpp
+index f0cc80ae05c9192a9225d4722a16e3d88c73beb5..3295a762bb83ee12937fc8f7af7eef4d00d88601 100644
+--- a/ggml/src/ggml-backend.cpp
++++ b/ggml/src/ggml-backend.cpp
+@@ -2166,6 +2166,34 @@ size_t ggml_backend_sched_get_buffer_size(ggml_backend_sched_t sched, ggml_backe
+     return ggml_gallocr_get_buffer_size(sched->galloc, backend_index);
+ }
+ 
++void ggml_backend_tensor_memset_padding(struct ggml_tensor * tensor) {
++    GGML_ASSERT(tensor);
++    ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
++    GGML_ASSERT(buf != NULL && tensor->data != NULL);
++
++    const size_t nbytes = ggml_nbytes(tensor);
++    const size_t alloc  = ggml_backend_buffer_get_alloc_size(buf, tensor);
++    if (alloc > nbytes && buf->iface.memset_tensor) {
++        buf->iface.memset_tensor(buf, tensor, 0, nbytes, alloc - nbytes);
++    }
++}
++
++ggml_backend_buffer_t ggml_backend_sched_get_buffer(ggml_backend_sched_t sched, ggml_backend_t backend) {
++    GGML_ASSERT(sched);
++    int backend_index = ggml_backend_sched_backend_id(sched, backend);
++    GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
++
++    return ggml_gallocr_get_buffer_chunk(sched->galloc, backend_index, 0);
++}
++
++size_t ggml_backend_sched_get_buffer_max_size(ggml_backend_sched_t sched, ggml_backend_t backend) {
++    GGML_ASSERT(sched);
++    int backend_index = ggml_backend_sched_backend_id(sched, backend);
++    GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
++
++    return ggml_gallocr_get_max_size(sched->galloc, backend_index);
++}
++
+ void ggml_backend_sched_set_tensor_backend(ggml_backend_sched_t sched, struct ggml_tensor * node, ggml_backend_t backend) {
+     GGML_ASSERT(sched);
+     int backend_index = ggml_backend_sched_backend_id(sched, backend);
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index afdaddc79de81bc03dadee2707e67d2af4b814c0..d4a7dfac5fe5949b1cac8ed673d8f92f68486b3b 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -36,6 +36,7 @@ set(LLAMA_CORE_SOURCES
+     llama-model-loader.cpp
+     llama-model-saver.cpp
+     llama-model.cpp
++    llama-hot-experts.cpp
+     llama-quant.cpp
+     llama-sampler.cpp
+     llama-vocab.cpp
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index fcd4dfb13b10ab5f46b453e48cbf4b047154c684..92485534b7db16d5440856246078ee117ec04301 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -9,6 +9,7 @@
+ #include "llama-memory.h"
+ #include "llama-mmap.h"
+ #include "llama-model.h"
++#include "llama-hot-experts.h"
+ #include "llama-ext.h"
+ #include "llama-sampler.h"
+ #include "llama.h"
+@@ -758,12 +759,140 @@ void llama_context::sched_reserve() {
+                 val(n_input_tensors_pp, n_input_tensors_tg).c_str());
+     }
+ 
++    // customware: the compute buffers exist now, park the hot experts in the tail of the GPU one
++    hot_alias_place();
++
+     const int64_t t_end_us = ggml_time_us();
+ 
+     LLAMA_LOG_INFO("%s: reserve took %.2f ms, sched copies = %d\n",
+             __func__, (t_end_us - t_start_us)/1000.0, ggml_backend_sched_get_n_copies(sched.get()));
+ }
+ 
++void llama_context::hot_alias_place() {
++    hot_buf   = nullptr;
++    hot_dirty = true;
++    hot_alias = model.hot_alias();
++    if (!hot_alias) {
++        return;
++    }
++
++    hot_backend = nullptr;
++    for (ggml_backend_t b : backend_ptrs) {
++        if (!model.devices.empty() && ggml_backend_get_device(b) == model.devices[0].dev) {
++            hot_backend = b;
++        }
++    }
++    if (!hot_backend) {
++        LLAMA_LOG_WARN("%s: hot experts: no backend for the model's first device, hot experts disabled\n", __func__);
++        return;
++    }
++
++    ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched.get(), hot_backend);
++    if (!buf) {
++        LLAMA_LOG_WARN("%s: hot experts: %s has no compute buffer, hot experts disabled\n", __func__, ggml_backend_name(hot_backend));
++        return;
++    }
++
++    const size_t size  = ggml_backend_buffer_get_size(buf);
++    const size_t need  = model.hot_alias_bytes(buf);
++    const size_t align = ggml_backend_buffer_get_alignment(buf);
++    const size_t margin = 64u*1024*1024; // what a decode graph needs at the front, roughly
++
++    if (need + margin > size) {
++        LLAMA_LOG_WARN("%s: hot experts need %.1f MiB but the %s compute buffer is only %.1f MiB: hot experts disabled "
++                "(a bigger -ub or -c grows the buffer, or use a smaller placement)\n",
++                __func__, need / 1024.0 / 1024.0, ggml_backend_name(hot_backend), size / 1024.0 / 1024.0);
++        return;
++    }
++
++    hot_offset = (size - need) & ~(align - 1);
++    model.hot_alias_place(buf, hot_offset);
++
++    hot_buf       = buf;
++    hot_buf_size  = size;
++    hot_threshold = std::max(1u, cparams.n_ubatch / 2);
++
++    LLAMA_LOG_INFO("%s: hot experts parked at [%.1f, %.1f) MiB of the %.1f MiB %s compute buffer; "
++            "decode mode for ubatches up to %u tokens, refined as graphs are allocated\n", __func__,
++            hot_offset / 1024.0 / 1024.0, (hot_offset + need) / 1024.0 / 1024.0, size / 1024.0 / 1024.0,
++            ggml_backend_name(hot_backend), hot_threshold);
++}
++
++bool llama_context::hot_alias_check(bool decode_mode, uint32_t n_tokens) {
++    if (!hot_buf) {
++        // parking was refused (compute buffer too small): every graph is plain, nothing to check or re-park
++        return !decode_mode;
++    }
++    ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched.get(), hot_backend);
++    if (buf != hot_buf || (buf && ggml_backend_buffer_get_size(buf) != hot_buf_size)) {
++        LLAMA_LOG_WARN("%s: the %s compute buffer was reallocated (%.1f MiB), re-parking the hot experts\n", __func__,
++                ggml_backend_name(hot_backend), buf ? ggml_backend_buffer_get_size(buf) / 1024.0 / 1024.0 : 0.0);
++        hot_alias_place();
++        if (!hot_buf) {
++            return !decode_mode;
++        }
++    }
++
++    const size_t hwm = ggml_backend_sched_get_buffer_max_size(sched.get(), hot_backend);
++    if (hwm > hot_offset) {
++        hot_dirty = true;
++        if (decode_mode) {
++            hot_threshold = n_tokens > 0 ? n_tokens - 1 : 0;
++            LLAMA_LOG_INFO("%s: a %u-token ubatch needs %.1f MiB of the compute buffer, past the hot experts at %.1f MiB: "
++                    "prefill mode for ubatches above %u tokens\n", __func__,
++                    n_tokens, hwm / 1024.0 / 1024.0, hot_offset / 1024.0 / 1024.0, hot_threshold);
++            return false;
++        }
++    }
++
++    return true;
++}
++
++void llama_context::hot_refill() {
++    const int64_t t0 = ggml_time_us();
++
++    ggml_backend_sched_synchronize(sched.get());
++    const size_t bytes = model.hot_fill();
++
++    hot_dirty = false;
++    hot_n_refills++;
++
++    LLAMA_LOG_INFO("%s: hot experts restored: %.1f MiB in %.0f ms (refill #%" PRId64 ")\n", __func__,
++            bytes / 1024.0 / 1024.0, (ggml_time_us() - t0) / 1000.0, hot_n_refills);
++}
++
++void llama_context::hot_observe(const llm_graph_result * res, const llama_ubatch & ubatch) {
++    llama_hot_experts * hot = model.hot_experts();
++    if (!hot || res->t_moe_sel.empty()) {
++        return;
++    }
++
++    size_t total = 0;
++    for (const auto & [il, t] : res->t_moe_sel) {
++        total += (size_t) ggml_nelements(t);
++    }
++    hot_ids_buf.resize(total);
++
++    size_t off = 0;
++    for (const auto & [il, t] : res->t_moe_sel) {
++        ggml_backend_t backend = ggml_backend_sched_get_tensor_backend(sched.get(), t);
++        ggml_backend_tensor_get_async(backend, t, hot_ids_buf.data() + off, 0, ggml_nbytes(t));
++        off += (size_t) ggml_nelements(t);
++    }
++    ggml_backend_sched_synchronize(sched.get());
++
++    off = 0;
++    hot->begin_ubatch(ubatch.n_tokens);
++    for (const auto & [il, t] : res->t_moe_sel) {
++        const size_t n = (size_t) ggml_nelements(t);
++        hot->observe(il, hot_ids_buf.data() + off, n);
++        off += n;
++    }
++
++    // swaps may only touch the hot tensors while their storage is valid (entry 005 parks them during big prefills)
++    hot->tick(ubatch.n_tokens, !(hot_alias && hot_dirty));
++}
++
+ void llama_context::synchronize() {
+     if (!sched) {
+         return;
+@@ -1398,9 +1527,13 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+     auto * res = get_gf_res_prev();
+     auto * gf  = res->get_gf();
+ 
++    // customware: hot experts in the compute buffer tail (LLAMA_HOT_EXPERTS_ALIAS): decode mode only for ubatches that
++    // are known to leave the tail alone; a bigger ubatch runs the plain path and dirties the tail
++    hot_mode_next = hot_alias ? (hot_buf != nullptr && ubatch.n_tokens <= hot_threshold) : true;
++
+     // the new graph parameters
+     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
+-    const auto gparams = graph_params(res, ubatch, mctx, gtype);
++    auto gparams = graph_params(res, ubatch, mctx, gtype);
+ 
+     if (!graph_reuse_disable && gf_res_prev_active == res && res->can_reuse(gparams)) {
+         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
+@@ -1414,31 +1547,46 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+ 
+         n_reused++;
+     } else {
+-        gf_res_prev_active = nullptr;
+-        res->reset();
++        for (int attempt = 0; attempt < 2; ++attempt) {
++            gf_res_prev_active = nullptr;
++            res->reset();
+ 
+-        ggml_backend_sched_reset(sched.get());
+-        ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
++            ggml_backend_sched_reset(sched.get());
++            ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
+ 
+-        //const auto t_start_us = ggml_time_us();
++            //const auto t_start_us = ggml_time_us();
+ 
+-        gf = model.build_graph(gparams);
++            gf = model.build_graph(gparams);
+ 
+-        //LLAMA_LOG_INFO("graph build time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
++            //LLAMA_LOG_INFO("graph build time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
+ 
+-        if (!gf) {
+-            LLAMA_LOG_ERROR("%s: failed to initialize graph\n", __func__);
+-            ret = GGML_STATUS_FAILED;
+-            return nullptr;
+-        }
++            if (!gf) {
++                LLAMA_LOG_ERROR("%s: failed to initialize graph\n", __func__);
++                ret = GGML_STATUS_FAILED;
++                return nullptr;
++            }
+ 
+-        if (!ggml_backend_sched_alloc_graph(sched.get(), gf)) {
+-            LLAMA_LOG_ERROR("%s: failed to allocate graph\n", __func__);
+-            ret = GGML_STATUS_ALLOC_FAILED;
+-            return nullptr;
++            if (!ggml_backend_sched_alloc_graph(sched.get(), gf)) {
++                LLAMA_LOG_ERROR("%s: failed to allocate graph\n", __func__);
++                ret = GGML_STATUS_ALLOC_FAILED;
++                return nullptr;
++            }
++
++            gf_res_prev_active = res;
++
++            // customware: a decode-mode graph that reaches into the hot experts is rebuilt in prefill mode
++            if (hot_alias && !hot_alias_check(gparams.hot_experts, ubatch.n_tokens)) {
++                hot_mode_next = false;
++                gparams = graph_params(res, ubatch, mctx, gtype);
++                continue;
++            }
++            break;
+         }
++    }
+ 
+-        gf_res_prev_active = res;
++    // customware: the hot experts were overwritten by a prefill-mode graph, restore them before the split uses them
++    if (hot_alias && hot_buf && gparams.hot_experts && hot_dirty) {
++        hot_refill();
+     }
+ 
+     // set the input data for the input tensors
+@@ -1922,6 +2070,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
+         //    ggml_graph_dump_dot(gf, NULL, "llama.dot");
+         //}
+ 
++        // customware (entry 004): this ubatch's routing goes to the adaptive hot experts
++        hot_observe(res, ubatch);
++
+         auto * t_logits  = res->get_logits();
+         auto * t_embd    = cparams.embeddings       ? res->get_embd()     : nullptr;
+         auto * t_h_nextn = cparams.embeddings_nextn ? res->get_h_nextn()  : nullptr;
+@@ -2517,6 +2668,10 @@ ggml_cgraph * llama_context::graph_reserve(
+ 
+     auto * res = gf_res_reserve.get();
+ 
++    // customware: with aliased hot experts the reserve graphs are plain (their storage does not exist yet and the
++    // reserve must size the buffer for the plain worst case); otherwise the split is part of the worst case
++    hot_mode_next = !model.hot_alias();
++
+     const auto gparams = graph_params(res, ubatch, mctx, ctx_type_to_graph_type(cparams.ctx_type));
+ 
+     res->reset();
+@@ -2563,6 +2718,8 @@ llm_graph_params llama_context::graph_params(
+         /*.n_outputs   =*/ n_outputs,
+         /*.cb          =*/ graph_get_cb(),
+         /*.res         =*/ res,
++        /*.hot_experts =*/ hot_mode_next,
++        /*.moe_stats   =*/ model.hot_experts() != nullptr,
+     };
+ }
+ 
+diff --git a/src/llama-context.h b/src/llama-context.h
+index 77ef92fc6ab294698e1fabf6864064989dcd779f..09046cb0f043b4c6e447b82adedac013f4b7b961 100644
+--- a/src/llama-context.h
++++ b/src/llama-context.h
+@@ -349,6 +349,26 @@ private:
+ 
+     bool sched_need_reserve = true;
+ 
++    // customware: hot experts parked in the tail of the GPU compute buffer (LLAMA_HOT_EXPERTS_ALIAS). A ubatch runs in
++    // "decode mode" (hot split, tail valid) or "prefill mode" (plain path, the graph may use the tail); see process_ubatch.
++    bool                  hot_alias     = false;
++    ggml_backend_t        hot_backend   = nullptr;
++    ggml_backend_buffer_t hot_buf       = nullptr;
++    size_t                hot_buf_size  = 0;
++    size_t                hot_offset    = 0;
++    bool                  hot_dirty     = true;
++    uint32_t              hot_threshold = 0;     // decode mode for ubatches up to this many tokens
++    bool                  hot_mode_next = true;  // read by graph_params(): build the hot split or not
++    int64_t               hot_n_refills = 0;
++
++    void hot_alias_place();                                          // (re)bind the hot tensors to the current compute buffer
++    bool hot_alias_check(bool decode_mode, uint32_t n_tokens);       // after alloc: false = rebuild in prefill mode
++    void hot_refill();                                               // copy the experts back in
++
++    // customware (entry 004): feed the ubatch's routing ids to the adaptive hot experts runtime
++    void hot_observe(const llm_graph_result * res, const llama_ubatch & ubatch);
++    std::vector<int32_t> hot_ids_buf;
++
+     ggml_backend_t backend_cpu = nullptr;
+     std::vector<ggml_backend_ptr> backends;
+ 
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 6f5d77b85bdb9108ac6d90a9665cff4096ef6350..4548c0f5fc01996cb43bb14b793de9ff46bf49c0 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1330,6 +1330,8 @@ void llm_graph_result::reset() {
+     t_layer_inp.resize(LLAMA_MAX_LAYERS + 1);
+     std::fill(t_layer_inp.begin(), t_layer_inp.end(), nullptr);
+ 
++    t_moe_sel.clear();
++
+     t_sampled.clear();
+     t_sampled_probs.clear();
+     t_sampled_logits.clear();
+@@ -1372,6 +1374,9 @@ void llm_graph_result::set_outputs(const llm_graph_params & params) {
+     if (t_h_nextn != nullptr) {
+         ggml_set_output(t_h_nextn);
+     }
++    for (auto & [il, t] : t_moe_sel) {
++        ggml_set_output(t);
++    }
+     {
+         const auto & embeddings_layer_inp = params.cparams.embeddings_layer_inp;
+         for (size_t il = 0; il < embeddings_layer_inp.size(); ++il) {
+@@ -1493,7 +1498,9 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
+     cb_func          (params.cb),
+     res              (params.res),
+     ctx0             (res->get_ctx()),
+-    gf               (res->get_gf()) {
++    gf               (res->get_gf()),
++    hot_experts      (params.hot_experts),
++    moe_stats        (params.moe_stats) {
+         res->set_params(params);
+     }
+ 
+@@ -2162,6 +2169,15 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     // to the GPU by the scheduler for large ones). In each half the slots that belong to the other half carry the id
+     // -1, which the mul_mat_id kernels treat as "skip, leave zeros" (op_params[3] = 1 marks such ids). Both halves
+     // are masked by the routing weights and added.
++    // customware (entry 004): export this layer's routing ids; the context reads them back after the ubatch
++    ggml_tensor * sel_out = nullptr;
++    if (moe_stats && il >= 0) {
++        sel_out = ggml_is_contiguous(selected_experts) ? selected_experts : ggml_cont(ctx0, selected_experts);
++        cb(sel_out, "ffn_moe_sel_out", il);
++        ggml_build_forward_expand(gf, sel_out);
++        res->t_moe_sel.emplace_back(il, sel_out);
++    }
++
+     const bool hot_simple = hot && hot->valid() && gate_exps && !gate_up_exps &&
+         !up_exps_b && !gate_exps_b && !down_exps_b && !up_exps_s && !gate_exps_s && !down_exps_s &&
+         type_op == LLM_FFN_SILU && !weight_before_ffn && (il < 0 || hparams.swiglu_clamp_exp[il] <= 1e-6f);
+@@ -2170,7 +2186,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+         ggml_tensor * cold_map = hot->cold_map;
+ 
+         // the maps have no token dimension, so look them up with a flat index and restore the shape after
+-        ggml_tensor * sel = selected_experts;
++        ggml_tensor * sel = sel_out ? sel_out : selected_experts;
+         if (!ggml_is_contiguous(sel)) {
+             sel = ggml_cont(ctx0, sel);
+         }
+@@ -2190,7 +2206,14 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+ 
+         ggml_tensor * x = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
+ 
+-        auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag) {
++        // when the hot tensors live in the GPU compute buffer (LLAMA_HOT_EXPERTS_ALIAS) the scheduler's "run where the
++        // weights are" rule does not see them (it only looks at WEIGHTS buffers), so their matmuls are pinned to the GPU
++        ggml_backend_t backend_pin = nullptr;
++        if (sched && hot->gate_hot->buffer && ggml_backend_buffer_get_usage(hot->gate_hot->buffer) != GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
++            backend_pin = ggml_backend_sched_get_backend(sched, 0);
++        }
++
++        auto run = [&](ggml_tensor * w_up, ggml_tensor * w_gate, ggml_tensor * w_down, ggml_tensor * ids, ggml_tensor * w, const char * tag, bool pin) {
+             ggml_tensor * u = build_lora_mm_id(w_up,   x, ids, nullptr); // [n_ff, n_expert_used, n_tokens]
+             u->op_params[3] = 1; // ids may hold -1
+             ggml_tensor * g = build_lora_mm_id(w_gate, x, ids, nullptr);
+@@ -2198,13 +2221,18 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+             ggml_tensor * h = ggml_swiglu_split(ctx0, g, u);
+             ggml_tensor * d = build_lora_mm_id(w_down, h, ids, nullptr); // [n_embd, n_expert_used, n_tokens]
+             d->op_params[3] = 1; // ids may hold -1
++            if (pin && backend_pin) {
++                ggml_backend_sched_set_tensor_backend(sched, u, backend_pin);
++                ggml_backend_sched_set_tensor_backend(sched, g, backend_pin);
++                ggml_backend_sched_set_tensor_backend(sched, d, backend_pin);
++            }
+             d = ggml_mul(ctx0, d, w);
+             cb(d, tag, il);
+             return d;
+         };
+ 
+-        ggml_tensor * part_hot  = run(hot->up_hot, hot->gate_hot, hot->down_hot, ids_gpu, w_gpu, "ffn_moe_weighted_hot");
+-        ggml_tensor * part_cold = run(up_exps,     gate_exps,     down_exps,     ids_cpu, w_cpu, "ffn_moe_weighted_cold");
++        ggml_tensor * part_hot  = run(hot->up_hot, hot->gate_hot, hot->down_hot, ids_gpu, w_gpu, "ffn_moe_weighted_hot",  true);
++        ggml_tensor * part_cold = run(up_exps,     gate_exps,     down_exps,     ids_cpu, w_cpu, "ffn_moe_weighted_cold", false);
+ 
+         ggml_tensor * experts = ggml_add(ctx0, part_hot, part_cold);
+         cb(experts, "ffn_moe_weighted", il);
+diff --git a/src/llama-graph.h b/src/llama-graph.h
+index 7917cc1489b8244e4528c7621458786d2280442b..86b7c6ba7a36bd370f0dffe048c1819f099f1057 100644
+--- a/src/llama-graph.h
++++ b/src/llama-graph.h
+@@ -810,6 +810,13 @@ struct llm_graph_params {
+ 
+     llm_graph_result * res;
+ 
++    // customware: build the hot-expert split (decode mode). false = plain path for every layer (prefill mode), used
++    // while the hot tensors' storage is borrowed by a big prefill ubatch (LLAMA_HOT_EXPERTS_ALIAS)
++    bool hot_experts = true;
++
++    // customware: export every MoE layer's routing ids as graph outputs (adaptive hot experts, entry 004)
++    bool moe_stats = false;
++
+     // return true if the "other" params would result in a graph with the same topology as with the current params
+     //   having the same topology allows us to reuse the graph in some cases
+     bool allow_reuse(const llm_graph_params & other) const {
+@@ -880,7 +887,8 @@ struct llm_graph_params {
+             gtype == other.gtype &&
+             cvec  == other.cvec  &&
+             loras == other.loras &&
+-            cross == other.cross;
++            cross == other.cross &&
++            hot_experts == other.hot_experts;
+     }
+ };
+ 
+@@ -939,6 +947,9 @@ public:
+ 
+     std::vector<ggml_tensor *> t_layer_inp;
+ 
++    // customware: (layer, contiguous I32 [n_expert_used, n_tokens]) routing ids, read back after the ubatch
++    std::vector<std::pair<int, ggml_tensor *>> t_moe_sel;
++
+     std::vector<ggml_tensor *> t_sampled;
+     std::vector<ggml_tensor *> t_sampled_probs;
+     std::vector<ggml_tensor *> t_sampled_logits;
+@@ -1036,6 +1047,9 @@ struct llm_graph_context {
+     ggml_context * ctx0 = nullptr;
+     ggml_cgraph  * gf   = nullptr;
+ 
++    const bool hot_experts; // customware: see llm_graph_params::hot_experts
++    const bool moe_stats;   // customware: see llm_graph_params::moe_stats
++
+     llm_graph_context(const llm_graph_params & params);
+     virtual ~llm_graph_context() = default;
+ 
+diff --git a/src/llama-hot-experts.cpp b/src/llama-hot-experts.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0797d66ee8f403783772d893e98b4575c8388d8a
+--- /dev/null
++++ b/src/llama-hot-experts.cpp
+@@ -0,0 +1,410 @@
++#include "llama-hot-experts.h"
++
++#include "llama-impl.h"
++#include "llama-model.h"
++
++#include "ggml-backend.h"
++
++#include <algorithm>
++#include <cinttypes>
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <fstream>
++#include <sstream>
++
++llama_hot_experts::llama_hot_experts(int n_layer, int n_expert, const llama_hot_experts_config & cfg) :
++    cfg(cfg), n_layer(n_layer), n_expert(n_expert),
++    recent((size_t) n_layer * n_expert, 0.0f),
++    total ((size_t) n_layer * n_expert, 0.0f) {
++    if (!cfg.trace_path.empty()) {
++        trace = fopen(cfg.trace_path.c_str(), "ab");
++        if (!trace) {
++            LLAMA_LOG_WARN("%s: cannot open trace file %s\n", __func__, cfg.trace_path.c_str());
++        } else {
++            LLAMA_LOG_INFO("%s: routing trace appended to %s\n", __func__, cfg.trace_path.c_str());
++        }
++    }
++}
++
++llama_hot_experts::~llama_hot_experts() {
++    if (!cfg.stats_path.empty() && tokens_seen > 0) {
++        flush();
++    }
++    if (trace) {
++        fclose(trace);
++    }
++}
++
++bool llama_hot_experts::load_stats() {
++    if (cfg.stats_path.empty()) {
++        return false;
++    }
++    std::ifstream f(cfg.stats_path);
++    if (!f) {
++        return false;
++    }
++    std::string line;
++    size_t n_lines = 0;
++    while (std::getline(f, line)) {
++        if (line.empty()) {
++            continue;
++        }
++        if (line[0] == '#') {
++            int nl = 0, ne = 0;
++            if (sscanf(line.c_str(), "# llama-hot-experts-stats n_layer=%d n_expert=%d", &nl, &ne) == 2) {
++                if (nl != n_layer || ne != n_expert) {
++                    LLAMA_LOG_WARN("%s: %s is for n_layer=%d n_expert=%d, this model has %d/%d: ignored\n",
++                            __func__, cfg.stats_path.c_str(), nl, ne, n_layer, n_expert);
++                    return false;
++                }
++            }
++            continue;
++        }
++        // "cpu-prof-experts: <layer> <count> ..." (the same line format as the CPU profiler and expert-place.py)
++        const char * p = line.c_str();
++        const char * tag = "cpu-prof-experts:";
++        if (strncmp(p, tag, strlen(tag)) == 0) {
++            p += strlen(tag);
++        }
++        std::istringstream ss(p);
++        int il = -1;
++        if (!(ss >> il) || il < 0 || il >= n_layer) {
++            continue;
++        }
++        // the slow histogram is the file; the fast one starts at a quarter of it so a new workload takes over
++        // within a few thousand generated tokens while the shipped set is not churned out by the first few hundred
++        float v = 0.0f;
++        for (int e = 0; e < n_expert && (ss >> v); e++) {
++            total[(size_t) il * n_expert + e]  = v;
++            recent[(size_t) il * n_expert + e] = 0.25f * v;
++        }
++        n_lines++;
++    }
++    stats_loaded = n_lines > 0;
++    if (stats_loaded) {
++        double sum = 0.0;
++        for (float v : total) {
++            sum += v;
++        }
++        LLAMA_LOG_INFO("%s: %s: %zu layers, %.0f routed slots of history\n", __func__, cfg.stats_path.c_str(), n_lines, sum);
++    }
++    return stats_loaded;
++}
++
++std::map<int, std::vector<int32_t>> llama_hot_experts::placement(const std::map<int, size_t> & bytes_per_expert, size_t budget_bytes) const {
++    struct cand {
++        float  score;
++        int    il;
++        int    e;
++        size_t bytes;
++    };
++    std::vector<cand> cands;
++    cands.reserve(bytes_per_expert.size() * n_expert);
++    for (const auto & [il, bytes] : bytes_per_expert) {
++        if (il < 0 || il >= n_layer || bytes == 0) {
++            continue;
++        }
++        for (int e = 0; e < n_expert; e++) {
++            const float c = total[(size_t) il * n_expert + e];
++            if (c > 0.0f) {
++                cands.push_back({ c / (float) bytes, il, e, bytes });
++            }
++        }
++    }
++    std::sort(cands.begin(), cands.end(), [](const cand & a, const cand & b) { return a.score > b.score; });
++
++    std::map<int, std::vector<int32_t>> spec;
++    size_t used = 0;
++    for (const auto & c : cands) {
++        if (used + c.bytes > budget_bytes) {
++            continue;
++        }
++        spec[c.il].push_back(c.e);
++        used += c.bytes;
++    }
++    return spec;
++}
++
++double llama_hot_experts::coverage(const std::map<int, std::vector<int32_t>> & spec) const {
++    double all = 0.0, hot = 0.0;
++    for (int il = 0; il < n_layer; il++) {
++        for (int e = 0; e < n_expert; e++) {
++            all += total[(size_t) il * n_expert + e];
++        }
++    }
++    for (const auto & [il, experts] : spec) {
++        for (int32_t e : experts) {
++            if (il >= 0 && il < n_layer && e >= 0 && e < n_expert) {
++                hot += total[(size_t) il * n_expert + e];
++            }
++        }
++    }
++    return all > 0.0 ? hot / all : 0.0;
++}
++
++void llama_hot_experts::bind_layer(int il, llama_layer * layer, std::vector<int32_t> * slots) {
++    layer_state st;
++    st.layer = layer;
++    st.slots = slots;
++    st.hot_map.assign(n_expert, -1);
++    st.cold_map.resize(n_expert);
++    st.hot_mask.assign(n_expert, 0.0f);
++    for (int e = 0; e < n_expert; e++) {
++        st.cold_map[e] = e;
++    }
++    for (size_t s = 0; s < slots->size(); s++) {
++        const int32_t e = (*slots)[s];
++        if (e >= 0 && e < n_expert) {
++            st.hot_map[e]  = (int32_t) s;
++            st.cold_map[e] = -1;
++            st.hot_mask[e] = 1.0f;
++        }
++    }
++    st.protect_until.assign(slots->size(), 0);
++    layers[il] = std::move(st);
++}
++
++void llama_hot_experts::begin_ubatch(uint32_t n_tokens) {
++    std::lock_guard<std::mutex> lock(mtx);
++    obs_weight = n_tokens >= cfg.prefill_min_tokens ? cfg.prefill_weight : 1.0f;
++    if (trace) {
++        const int32_t tag = -1;
++        fwrite(&tag, sizeof(tag), 1, trace);
++        fwrite(&n_tokens, sizeof(n_tokens), 1, trace);
++    }
++}
++
++void llama_hot_experts::observe(int il, const int32_t * ids, size_t n) {
++    if (il < 0 || il >= n_layer) {
++        return;
++    }
++    std::lock_guard<std::mutex> lock(mtx);
++    float * r = recent.data() + (size_t) il * n_expert;
++    float * t = total.data()  + (size_t) il * n_expert;
++    const auto it = layers.find(il);
++    const int32_t * hot_map = it != layers.end() ? it->second.hot_map.data() : nullptr;
++    const float w = obs_weight;
++    for (size_t i = 0; i < n; i++) {
++        const int32_t e = ids[i];
++        if (e < 0 || e >= n_expert) {
++            continue;
++        }
++        r[e] += w;
++        t[e] += w;
++        win_obs++;
++        if (hot_map && hot_map[e] >= 0) {
++            win_hit++;
++        }
++    }
++    if (trace) {
++        const int32_t  l  = il;
++        const uint32_t nn = (uint32_t) n;
++        trace_buf.resize(n);
++        for (size_t i = 0; i < n; i++) {
++            trace_buf[i] = (int16_t) ids[i];
++        }
++        fwrite(&l,  sizeof(l),  1, trace);
++        fwrite(&nn, sizeof(nn), 1, trace);
++        fwrite(trace_buf.data(), sizeof(int16_t), n, trace);
++    }
++}
++
++void llama_hot_experts::decay(std::vector<float> & h, float factor) {
++    for (float & v : h) {
++        v *= factor;
++    }
++}
++
++void llama_hot_experts::upload_maps(layer_state & st) {
++    const llama_layer & layer = *st.layer;
++    ggml_backend_tensor_set(layer.ffn_hot_map,  st.hot_map.data(),  0, n_expert*sizeof(int32_t));
++    ggml_backend_tensor_set(layer.ffn_cold_map, st.cold_map.data(), 0, n_expert*sizeof(int32_t));
++    ggml_backend_tensor_set(layer.ffn_hot_mask, st.hot_mask.data(), 0, n_expert*sizeof(float));
++}
++
++void llama_hot_experts::apply_swap(layer_state & st, int il, int slot, int expert, bool tensors_valid) {
++    const llama_layer & layer = *st.layer;
++    const int32_t victim = (*st.slots)[slot];
++
++    if (victim >= 0 && victim < n_expert) {
++        st.hot_map[victim]  = -1;
++        st.cold_map[victim] = victim;
++        st.hot_mask[victim] = 0.0f;
++    }
++    st.hot_map[expert]  = slot;
++    st.cold_map[expert] = -1;
++    st.hot_mask[expert] = 1.0f;
++    (*st.slots)[slot] = expert;
++    st.protect_until[slot] = tick_no + cfg.protect_ticks;
++
++    if (tensors_valid) {
++        auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
++            const size_t bytes = src->nb[2];
++            if (ggml_backend_buffer_is_host(src->buffer)) {
++                ggml_backend_tensor_set(dst, (const char *) src->data + (size_t) expert*bytes, (size_t) slot*bytes, bytes);
++            } else {
++                tmp.resize(bytes);
++                ggml_backend_tensor_get(src, tmp.data(), (size_t) expert*bytes, bytes);
++                ggml_backend_tensor_set(dst, tmp.data(), (size_t) slot*bytes, bytes);
++            }
++            win_bytes += bytes;
++        };
++        copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
++        copy(layer.ffn_up_exps,   layer.ffn_up_hot);
++        copy(layer.ffn_down_exps, layer.ffn_down_hot);
++    }
++
++    win_swaps++;
++    swaps_total++;
++    GGML_UNUSED(il);
++}
++
++size_t llama_hot_experts::n_bound() const {
++    size_t n = 0;
++    for (const auto & [il, st] : layers) {
++        n += st.slots->size();
++    }
++    return n;
++}
++
++void llama_hot_experts::tick(uint32_t n_tokens, bool tensors_valid) {
++    std::lock_guard<std::mutex> lock(mtx);
++
++    const double weighted = (double) n_tokens * (n_tokens >= cfg.prefill_min_tokens ? cfg.prefill_weight : 1.0f);
++
++    tokens_seen    += n_tokens;
++    tokens_tick    += n_tokens;
++    tokens_flush   += n_tokens;
++    tokens_log     += n_tokens;
++    tokens_decay_r += weighted;
++    tokens_decay_t += weighted;
++
++    // decay, applied in steps of a quarter half-life
++    if (tokens_decay_r >= cfg.recent_half_life / 4) {
++        decay(recent, std::pow(0.5f, (float) (tokens_decay_r / cfg.recent_half_life)));
++        tokens_decay_r = 0;
++    }
++    if (tokens_decay_t >= cfg.total_half_life / 4) {
++        decay(total, std::pow(0.5f, (float) (tokens_decay_t / cfg.total_half_life)));
++        tokens_decay_t = 0;
++    }
++
++    const bool policy = cfg.swaps_enabled && !layers.empty() && (tokens_tick >= cfg.tick_tokens || n_tokens >= 32);
++    if (policy) {
++        tokens_tick = 0;
++        tick_no++;
++
++        std::vector<swap_candidate> cands;
++        for (auto & [il, st] : layers) {
++            const float * r = recent.data() + (size_t) il * n_expert;
++            const size_t n_hot = st.slots->size();
++            if (n_hot == 0) {
++                continue;
++            }
++            // residents by ascending score, outsiders by descending score
++            std::vector<int> res_slots(n_hot);
++            for (size_t s = 0; s < n_hot; s++) {
++                res_slots[s] = (int) s;
++            }
++            std::sort(res_slots.begin(), res_slots.end(), [&](int a, int b) {
++                const int32_t ea = (*st.slots)[a], eb = (*st.slots)[b];
++                const float sa = ea >= 0 ? r[ea] : -1.0f, sb = eb >= 0 ? r[eb] : -1.0f;
++                return sa < sb;
++            });
++            std::vector<int> out;
++            out.reserve(n_expert);
++            for (int e = 0; e < n_expert; e++) {
++                if (st.hot_map[e] < 0 && r[e] > 0.0f) {
++                    out.push_back(e);
++                }
++            }
++            std::partial_sort(out.begin(), out.begin() + std::min(out.size(), (size_t) cfg.max_swaps_per_layer), out.end(),
++                    [&](int a, int b) { return r[a] > r[b]; });
++
++            size_t vi = 0;
++            for (size_t k = 0; k < out.size() && k < cfg.max_swaps_per_layer; k++) {
++                // next evictable resident
++                while (vi < n_hot && st.protect_until[res_slots[vi]] > tick_no) {
++                    vi++;
++                }
++                if (vi >= n_hot) {
++                    break;
++                }
++                const int     slot   = res_slots[vi];
++                const int32_t victim = (*st.slots)[slot];
++                const float   sv     = victim >= 0 ? r[victim] : 0.0f;
++                const float   sc     = r[out[k]];
++                if (sc <= cfg.hysteresis_ratio * sv + cfg.hysteresis_margin) {
++                    break;
++                }
++                cands.push_back({ il, slot, out[k], sc - sv });
++                vi++;
++            }
++        }
++
++        std::sort(cands.begin(), cands.end(), [](const swap_candidate & a, const swap_candidate & b) { return a.gain > b.gain; });
++
++        size_t n_done = 0;
++        std::vector<int> touched;
++        for (const auto & c : cands) {
++            if (n_done >= cfg.max_swaps_per_tick) {
++                break;
++            }
++            layer_state & st = layers[c.il];
++            apply_swap(st, c.il, c.slot, c.expert, tensors_valid);
++            if (std::find(touched.begin(), touched.end(), c.il) == touched.end()) {
++                touched.push_back(c.il);
++            }
++            n_done++;
++        }
++        for (int il : touched) {
++            upload_maps(layers[il]);
++        }
++    }
++
++    if (cfg.log_tokens > 0 && tokens_log >= cfg.log_tokens) {
++        LLAMA_LOG_INFO("hot experts: %" PRIu64 " tokens, coverage %.1f%% over the last %" PRIu64 " (%zu resident), %" PRIu64 " swaps (%.1f MiB), %" PRIu64 " total\n",
++                tokens_seen, win_obs > 0 ? 100.0 * (double) win_hit / (double) win_obs : 0.0, tokens_log, n_bound(),
++                win_swaps, win_bytes / 1024.0 / 1024.0, swaps_total);
++        tokens_log = 0;
++        win_obs = win_hit = win_swaps = win_bytes = 0;
++    }
++
++    if (!cfg.stats_path.empty() && tokens_flush >= cfg.flush_tokens) {
++        tokens_flush = 0;
++        flush();
++    }
++    if (trace && policy) {
++        fflush(trace);
++    }
++}
++
++void llama_hot_experts::flush() {
++    if (cfg.stats_path.empty()) {
++        return;
++    }
++    const std::string tmp_path = cfg.stats_path + ".tmp";
++    {
++        std::ofstream f(tmp_path, std::ios::trunc);
++        if (!f) {
++            LLAMA_LOG_WARN("%s: cannot write %s\n", __func__, tmp_path.c_str());
++            return;
++        }
++        f << "# llama-hot-experts-stats n_layer=" << n_layer << " n_expert=" << n_expert << " tokens=" << tokens_seen << "\n";
++        f << "# one line per layer, decayed routed-slot counts per expert (half-life " << (uint64_t) cfg.total_half_life
++          << " tokens); readable by customware/expert-place.py\n";
++        for (int il = 0; il < n_layer; il++) {
++            const float * t = total.data() + (size_t) il * n_expert;
++            f << "cpu-prof-experts: " << il;
++            for (int e = 0; e < n_expert; e++) {
++                f << ' ' << (uint64_t) std::llround(t[e]);
++            }
++            f << "\n";
++        }
++    }
++    std::remove(cfg.stats_path.c_str());
++    if (std::rename(tmp_path.c_str(), cfg.stats_path.c_str()) != 0) {
++        LLAMA_LOG_WARN("%s: cannot rename %s to %s\n", __func__, tmp_path.c_str(), cfg.stats_path.c_str());
++    }
++}
+diff --git a/src/llama-hot-experts.h b/src/llama-hot-experts.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..97fe4ca16ce5eda9b941a5d4015fba14632e2b83
+--- /dev/null
++++ b/src/llama-hot-experts.h
+@@ -0,0 +1,126 @@
++#pragma once
++
++// customware: adaptive hot experts (entry 004).
++//
++// Collects the router's choices for every token (llama_context reads the per-layer top-k ids back after each ubatch),
++// keeps two decayed histograms per layer (a fast one that drives runtime swaps, a slow one that is persisted and
++// drives the placement at the next start), and swaps experts in and out of a layer's GPU slots between graph
++// computations. The slot -> expert lists are the model's placement spec, so a refill of parked tensors (entry 005)
++// always copies the current set.
++
++#include "ggml.h"
++
++#include <cstdint>
++#include <map>
++#include <mutex>
++#include <string>
++#include <vector>
++
++struct llama_layer;
++
++struct llama_hot_experts_config {
++    std::string stats_path;                 // LLAMA_HOT_EXPERTS_STATS: histogram file, read at start, rewritten periodically
++    size_t      budget_bytes        = 0;    // LLAMA_HOT_EXPERTS_MIB: placement budget from the stats (0 = use the placement file)
++    bool        swaps_enabled       = true; // LLAMA_HOT_EXPERTS_SWAP=0 turns the runtime swaps off (collect only)
++    uint32_t    tick_tokens         = 64;   // swap policy runs every this many decoded tokens (and after every prefill ubatch)
++    uint32_t    max_swaps_per_tick  = 48;   // global budget per tick (~3 MB each)
++    uint32_t    max_swaps_per_layer = 4;    // per layer per tick
++    uint32_t    protect_ticks       = 2;    // a freshly swapped-in expert cannot be evicted for this many ticks
++    float       hysteresis_ratio    = 1.5f; // swap when recent[cand] > ratio * recent[victim] + margin
++    float       hysteresis_margin   = 2.0f;
++    float       recent_half_life    = 4096.0f;   // weighted tokens
++    float       total_half_life     = 262144.0f; // weighted tokens
++    uint32_t    prefill_min_tokens  = 32;        // ubatches of at least this many tokens count as prefill
++    float       prefill_weight      = 1.0f/16;   // weight of a prefill token in the histograms and the decay clock
++    uint32_t    flush_tokens        = 8192; // rewrite the stats file every this many tokens
++    uint32_t    log_tokens          = 4096; // log coverage / swaps every this many tokens (0 = never)
++    std::string trace_path;                 // LLAMA_HOT_EXPERTS_TRACE: per-token routing ids, binary, for offline replay
++};
++
++class llama_hot_experts {
++public:
++    llama_hot_experts(int n_layer, int n_expert, const llama_hot_experts_config & cfg);
++    ~llama_hot_experts();
++
++    // read the stats file; returns false if it is missing or does not match the model
++    bool load_stats();
++
++    // greedy byte-aware placement from the slow histogram: for each eligible layer its expert byte size,
++    // returns layer -> experts (sorted by score) that fit the budget
++    std::map<int, std::vector<int32_t>> placement(const std::map<int, size_t> & bytes_per_expert, size_t budget_bytes) const;
++
++    // predicted share of routed slots the given placement serves on the slow histogram
++    double coverage(const std::map<int, std::vector<int32_t>> & spec) const;
++
++    // bind a layer's runtime state: the hot tensors, the full tensors, and the (mutable) slot -> expert list of the spec
++    void bind_layer(int il, llama_layer * layer, std::vector<int32_t> * slots);
++
++    // routing observations of one layer for one ubatch: ids[n_expert_used * n_tokens]. Big ubatches (prefill) are
++    // weighted down: the hot set pays off per decoded token, and a 22k prefill must not wipe the decode history
++    void begin_ubatch(uint32_t n_tokens);
++    void observe(int il, const int32_t * ids, size_t n);
++
++    // once per ubatch after all layers were observed. tensors_valid = false means the hot tensors' storage is
++    // currently borrowed (entry 005): swaps then update the spec and the maps only; the next refill copies the data
++    void tick(uint32_t n_tokens, bool tensors_valid);
++
++    void flush();
++
++    bool has_stats() const { return stats_loaded; }
++    const std::string & stats_path() const { return cfg.stats_path; }
++
++private:
++    struct layer_state {
++        llama_layer *          layer = nullptr;
++        std::vector<int32_t> * slots = nullptr;   // slot -> expert (the spec)
++        std::vector<int32_t>   hot_map;           // expert -> slot or -1
++        std::vector<int32_t>   cold_map;          // expert or -1
++        std::vector<float>     hot_mask;
++        std::vector<uint32_t>  protect_until;     // per slot, tick number
++    };
++
++    struct swap_candidate {
++        int   il;
++        int   slot;
++        int   expert;
++        float gain;
++    };
++
++    void   decay(std::vector<float> & h, float factor);
++    void   apply_swap(layer_state & st, int il, int slot, int expert, bool tensors_valid);
++    void   upload_maps(layer_state & st);
++    size_t n_bound() const;
++
++    llama_hot_experts_config cfg;
++
++    int n_layer  = 0;
++    int n_expert = 0;
++
++    std::vector<float> recent; // [n_layer * n_expert]
++    std::vector<float> total;  // [n_layer * n_expert]
++    std::map<int, layer_state> layers;
++
++    bool     stats_loaded   = false;
++    float    obs_weight     = 1.0f; // weight of the current ubatch's observations
++    uint64_t tokens_seen    = 0;   // observed tokens since start (raw)
++    uint64_t tokens_tick    = 0;   // since the last policy tick (raw)
++    uint64_t tokens_flush   = 0;
++    uint64_t tokens_log     = 0;
++    double   tokens_decay_r = 0;   // weighted
++    double   tokens_decay_t = 0;   // weighted
++    uint32_t tick_no        = 0;
++
++    // window statistics for the log line
++    uint64_t win_obs   = 0;
++    uint64_t win_hit   = 0;
++    uint64_t win_swaps = 0;
++    uint64_t win_bytes = 0;
++    uint64_t swaps_total = 0;
++
++    std::vector<uint8_t> tmp;
++    std::mutex mtx;
++
++    // trace file: records of {int32 -1, uint32 n_tokens} per ubatch, then {int32 layer, uint32 n, int16 ids[n]} per layer
++    FILE * trace = nullptr;
++    std::vector<int16_t> trace_buf;
++};
+diff --git a/src/llama-model.cpp b/src/llama-model.cpp
+index aa6c40748246a6f043b835548fd6521a47e74a75..738eea40d75f3d84dcdc1bfb5b3e1a52b2a7035b 100644
+--- a/src/llama-model.cpp
++++ b/src/llama-model.cpp
+@@ -7,6 +7,9 @@
+ #include "llama-mmap.h"
+ #include "llama-cparams.h"
+ #include "llama-model-loader.h"
++#include "llama-hot-experts.h"
++
++#include <unordered_set>
+ 
+ #include "llama-kv-cache.h"
+ #include "llama-kv-cache-iswa.h"
+@@ -1209,8 +1212,43 @@ struct llama_model::impl {
+     bool has_tensor_overrides;
+ 
+     std::vector<float> tensor_split_owned;
++
++    // customware: hot experts (LLAMA_HOT_EXPERTS). In alias mode (LLAMA_HOT_EXPERTS_ALIAS=1) the three big tensors per
++    // layer live in a no-alloc context of their own and borrow their storage from the context's GPU compute buffer.
++    std::map<int, std::vector<int32_t>> hot_spec;
++    bool                                hot_alias = false;
++    ggml_context_ptr                    hot_ctx;
++    std::unique_ptr<llama_hot_experts>  hot_rt;   // entry 004: collector + runtime swaps
+ };
+ 
++// customware: copy the listed experts of one layer from the (host) full tensors into the compacted hot tensors
++static size_t llama_hot_experts_copy(const llama_layer & layer, const std::vector<int32_t> & experts, std::vector<uint8_t> & tmp) {
++    const int64_t n_expert = layer.ffn_gate_exps->ne[2];
++    size_t bytes_total = 0;
++    auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
++        const size_t bytes = src->nb[2];
++        const bool host = ggml_backend_buffer_is_host(src->buffer);
++        for (size_t s = 0; s < experts.size(); s++) {
++            const int32_t e = experts[s];
++            if (e < 0 || e >= n_expert) {
++                continue;
++            }
++            if (host) {
++                ggml_backend_tensor_set(dst, (const char *) src->data + e*bytes, s*bytes, bytes);
++            } else {
++                tmp.resize(bytes);
++                ggml_backend_tensor_get(src, tmp.data(), e*bytes, bytes);
++                ggml_backend_tensor_set(dst, tmp.data(), s*bytes, bytes);
++            }
++            bytes_total += bytes;
++        }
++    };
++    copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
++    copy(layer.ffn_up_exps,   layer.ffn_up_hot);
++    copy(layer.ffn_down_exps, layer.ffn_down_hot);
++    return bytes_total;
++}
++
+ llama_model::llama_model(const llama_model_params & params) : params(params), pimpl(std::make_unique<impl>()) {
+     if (params.tensor_split != nullptr) {
+         // llama_model_params stores tensor_split as a borrowed pointer, but the model
+@@ -1757,7 +1795,52 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+     ml.done_getting_tensors();
+ 
+     // customware: hot experts get a GPU copy next to the host tensors (metadata now, data after the load)
+-    const llama_hot_experts_spec hot_spec = llama_hot_experts_read();
++    llama_hot_experts_spec hot_spec = llama_hot_experts_read();
++
++    // customware (entry 004): the adaptive runtime. With a stats file and a budget the placement comes from the
++    // accumulated routing history instead of the placement file.
++    {
++        llama_hot_experts_config hcfg;
++        if (const char * p = getenv("LLAMA_HOT_EXPERTS_STATS"); p && *p) { hcfg.stats_path = p; }
++        if (const char * p = getenv("LLAMA_HOT_EXPERTS_MIB");   p && *p) { hcfg.budget_bytes = (size_t) atoll(p) * 1024 * 1024; }
++        if (const char * p = getenv("LLAMA_HOT_EXPERTS_SWAP");  p && *p) { hcfg.swaps_enabled = *p != '0'; }
++        if (const char * p = getenv("LLAMA_HOT_EXPERTS_LOG");   p && *p) { hcfg.log_tokens = (uint32_t) atoi(p); }
++        if (const char * p = getenv("LLAMA_HOT_EXPERTS_TRACE"); p && *p) { hcfg.trace_path = p; }
++        if (!hcfg.stats_path.empty() || !hot_spec.layers.empty()) {
++            pimpl->hot_rt.reset(new llama_hot_experts((int) hparams.n_layer(), (int) hparams.n_expert, hcfg));
++            if (pimpl->hot_rt->load_stats() && hcfg.budget_bytes > 0 && !devices.empty()) {
++                // eligible: layers whose routed experts live on a host buffer type
++                std::unordered_set<const ggml_tensor *> host_tensors;
++                for (const auto & [ctx_key, ctx_ptr] : ml.ctx_map) {
++                    if (!ggml_backend_buft_is_host(ctx_key.buft)) {
++                        continue;
++                    }
++                    for (ggml_tensor * t = ggml_get_first_tensor(ctx_ptr.get()); t; t = ggml_get_next_tensor(ctx_ptr.get(), t)) {
++                        host_tensors.insert(t);
++                    }
++                }
++                std::map<int, size_t> bytes;
++                for (size_t il = 0; il < layers.size(); il++) {
++                    const auto & layer = layers[il];
++                    if (layer.ffn_gate_exps && layer.ffn_up_exps && layer.ffn_down_exps && host_tensors.count(layer.ffn_gate_exps)) {
++                        bytes[(int) il] = layer.ffn_gate_exps->nb[2] + layer.ffn_up_exps->nb[2] + layer.ffn_down_exps->nb[2];
++                    }
++                }
++                auto spec = pimpl->hot_rt->placement(bytes, hcfg.budget_bytes);
++                size_t n = 0;
++                for (const auto & [il, v] : spec) {
++                    n += v.size();
++                }
++                LLAMA_LOG_INFO("%s: hot experts: placement from %s: %zu experts on %zu layers within %zu MiB, predicted coverage %.1f%% (placement file ignored)\n",
++                        __func__, hcfg.stats_path.c_str(), n, spec.size(), hcfg.budget_bytes / 1024 / 1024, 100.0 * pimpl->hot_rt->coverage(spec));
++                hot_spec.layers = std::move(spec);
++            } else if (!hcfg.stats_path.empty()) {
++                LLAMA_LOG_INFO("%s: hot experts: no usable stats at %s yet, %s; the file is written as the model runs\n", __func__,
++                        hcfg.stats_path.c_str(), hot_spec.layers.empty() ? "no hot experts this run" : "using the placement file");
++            }
++        }
++    }
++
+     if (!hot_spec.layers.empty()) {
+         if (devices.empty()) {
+             LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS set but there is no GPU device, ignored\n", __func__);
+@@ -1768,6 +1851,20 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                 LLAMA_LOG_WARN("%s: LLAMA_HOT_EXPERTS: no context for %s, ignored\n", __func__, ggml_backend_buft_name(buft));
+             } else {
+                 ggml_context * ctx = it->second.get();
++                // alias mode: the big tensors get no buffer of their own; the context parks them in its compute buffer
++                const char * alias_env = getenv("LLAMA_HOT_EXPERTS_ALIAS");
++                pimpl->hot_alias = alias_env && *alias_env && *alias_env != '0';
++                ggml_context * ctx_big = ctx;
++                if (pimpl->hot_alias) {
++                    ggml_init_params ip = {
++                        /*.mem_size   =*/ ggml_tensor_overhead()*3*hot_spec.layers.size() + 1024,
++                        /*.mem_buffer =*/ nullptr,
++                        /*.no_alloc   =*/ true,
++                    };
++                    pimpl->hot_ctx.reset(ggml_init(ip));
++                    ctx_big = pimpl->hot_ctx.get();
++                    LLAMA_LOG_INFO("%s: LLAMA_HOT_EXPERTS_ALIAS: hot expert storage is borrowed from the context's compute buffer\n", __func__);
++                }
+                 for (const auto & [il, experts] : hot_spec.layers) {
+                     if (il < 0 || il >= (int) layers.size() || experts.empty()) {
+                         continue;
+@@ -1778,8 +1875,9 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                     }
+                     const int64_t n_hot    = (int64_t) experts.size();
+                     const int64_t n_expert = layer.ffn_gate_exps->ne[2];
++                    pimpl->hot_spec[il] = experts;
+                     auto mk = [&](ggml_tensor * src, const char * name) {
+-                        ggml_tensor * t = ggml_new_tensor_3d(ctx, src->type, src->ne[0], src->ne[1], n_hot);
++                        ggml_tensor * t = ggml_new_tensor_3d(ctx_big, src->type, src->ne[0], src->ne[1], n_hot);
+                         ggml_format_name(t, "blk.%d.%s", il, name);
+                         return t;
+                     };
+@@ -1986,32 +2084,29 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+             ggml_backend_tensor_set(layer.ffn_cold_map, cold_map.data(), 0, n_expert*sizeof(int32_t));
+             ggml_backend_tensor_set(layer.ffn_hot_mask, hot_mask.data(), 0, n_expert*sizeof(float));
+ 
+-            auto copy = [&](ggml_tensor * src, ggml_tensor * dst) {
+-                const size_t bytes = src->nb[2];
+-                const bool host = ggml_backend_buffer_is_host(src->buffer);
+-                for (size_t s = 0; s < experts.size(); s++) {
+-                    const int32_t e = experts[s];
+-                    if (e < 0 || e >= n_expert) {
+-                        continue;
+-                    }
+-                    if (host) {
+-                        ggml_backend_tensor_set(dst, (const char *) src->data + e*bytes, s*bytes, bytes);
+-                    } else {
+-                        tmp.resize(bytes);
+-                        ggml_backend_tensor_get(src, tmp.data(), e*bytes, bytes);
+-                        ggml_backend_tensor_set(dst, tmp.data(), s*bytes, bytes);
+-                    }
+-                    bytes_total += bytes;
+-                }
+-            };
+-            copy(layer.ffn_gate_exps, layer.ffn_gate_hot);
+-            copy(layer.ffn_up_exps,   layer.ffn_up_hot);
+-            copy(layer.ffn_down_exps, layer.ffn_down_hot);
++            if (pimpl->hot_alias) {
++                // no storage yet: the context fills the tensors once it has placed them (hot_fill)
++                bytes_total += (size_t) layer.ffn_gate_hot->nb[2]*experts.size()
++                             + (size_t) layer.ffn_up_hot->nb[2]*experts.size()
++                             + (size_t) layer.ffn_down_hot->nb[2]*experts.size();
++            } else {
++                bytes_total += llama_hot_experts_copy(layer, experts, tmp);
++            }
+             n_hot_total += experts.size();
+             n_layers++;
+         }
+-        LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s\n", __func__,
+-                n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev));
++        LLAMA_LOG_INFO("%s: hot experts: %zu experts on %zu layers, %.2f MiB on %s%s\n", __func__,
++                n_hot_total, n_layers, bytes_total / 1024.0 / 1024.0, ggml_backend_dev_name(devices[0].dev),
++                pimpl->hot_alias ? " (storage borrowed from the compute buffer, filled at context creation)" : "");
++
++        // entry 004: the runtime edits the slot lists in place and re-uploads the maps when it swaps
++        if (pimpl->hot_rt) {
++            for (auto & [il, slots] : pimpl->hot_spec) {
++                if (layers[il].ffn_gate_hot) {
++                    pimpl->hot_rt->bind_layer(il, &layers[il], &slots);
++                }
++            }
++        }
+     }
+ 
+     // customware: LLAMA_LOCK_TENSORS=<regex> keeps only the matching host tensors resident (e.g. a sparsely and
+@@ -2401,6 +2496,57 @@ ggml_backend_buffer_type_t llama_model::select_buft(int il) const {
+             });
+ }
+ 
++bool llama_model::hot_alias() const {
++    return pimpl->hot_alias && !pimpl->hot_spec.empty();
++}
++
++llama_hot_experts * llama_model::hot_experts() const {
++    return pimpl->hot_rt.get();
++}
++
++size_t llama_model::hot_alias_bytes(ggml_backend_buffer_t buf) const {
++    const size_t align = ggml_backend_buffer_get_alignment(buf);
++    size_t total = 0;
++    for (const auto & [il, experts] : pimpl->hot_spec) {
++        const auto & layer = layers[il];
++        for (ggml_tensor * t : { layer.ffn_gate_hot, layer.ffn_up_hot, layer.ffn_down_hot }) {
++            total += GGML_PAD(ggml_backend_buffer_get_alloc_size(buf, t), align);
++        }
++    }
++    return total;
++}
++
++void llama_model::hot_alias_place(ggml_backend_buffer_t buf, size_t offset) const {
++    const size_t align = ggml_backend_buffer_get_alignment(buf);
++    char * base = (char *) ggml_backend_buffer_get_base(buf);
++    for (const auto & [il, experts] : pimpl->hot_spec) {
++        const auto & layer = layers[il];
++        for (ggml_tensor * t : { layer.ffn_gate_hot, layer.ffn_up_hot, layer.ffn_down_hot }) {
++            t->buffer = nullptr;
++            t->data   = nullptr;
++            const size_t size = ggml_backend_buffer_get_alloc_size(buf, t);
++            const ggml_status st = ggml_backend_tensor_alloc(buf, t, base + offset);
++            GGML_ASSERT(st == GGML_STATUS_SUCCESS);
++            offset += GGML_PAD(size, align);
++        }
++    }
++}
++
++size_t llama_model::hot_fill() const {
++    std::vector<uint8_t> tmp;
++    size_t bytes = 0;
++    for (const auto & [il, experts] : pimpl->hot_spec) {
++        const auto & layer = layers[il];
++        bytes += llama_hot_experts_copy(layer, experts, tmp);
++        // compute buffers do not zero the quantization padding of their tensors (weights buffers do): do it here,
++        // the CUDA matmuls read the padded tail of a quantized tensor
++        for (ggml_tensor * t : { layer.ffn_gate_hot, layer.ffn_up_hot, layer.ffn_down_hot }) {
++            ggml_backend_tensor_memset_padding(t);
++        }
++    }
++    return bytes;
++}
++
+ bool llama_model::has_tensor_overrides() const {
+     return pimpl->has_tensor_overrides;
+ }
+diff --git a/src/llama-model.h b/src/llama-model.h
+index 7cd231225678c44c538028d40a9c4849aea9d317..ab8763408ef3679e995f22ed5f0d61209647ded9 100644
+--- a/src/llama-model.h
++++ b/src/llama-model.h
+@@ -758,6 +758,17 @@ struct llama_model {
+ 
+     bool has_tensor_overrides() const;
+ 
++    // customware: hot experts whose storage is borrowed from a context's GPU compute buffer (LLAMA_HOT_EXPERTS_ALIAS=1).
++    // The context reserves its compute buffers first, then places the hot tensors in the tail of the GPU one and fills
++    // them; a graph that reaches into that tail runs without the hot split and the context refills afterwards.
++    bool   hot_alias() const;
++    size_t hot_alias_bytes(ggml_backend_buffer_t buf) const;                // bytes needed in buf (padding + alignment included)
++    void   hot_alias_place(ggml_backend_buffer_t buf, size_t offset) const; // (re)bind the hot tensors to buf at offset
++    size_t hot_fill() const;                                                // copy the experts in, returns bytes copied
++
++    // customware: adaptive hot experts runtime (LLAMA_HOT_EXPERTS_STATS / _MIB / _SWAP), nullptr when not configured
++    class llama_hot_experts * hot_experts() const;
++
+     const struct ggml_tensor * get_tensor(const char * name) const;
+ 
+     float get_rope_freq_base (const llama_cparams & cparams, int il) const;
+diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
+index 8a65aad3b54342ee31000cea80b02e496753a1ee..cdefd03beb81c7f86e7b7bd0a256c763c13a8627 100644
+--- a/src/models/qwen4exp.cpp
++++ b/src/models/qwen4exp.cpp
+@@ -1012,7 +1012,7 @@ ggml_tensor * llama_model_qwen4exp::graph::build_layer_ffn(ggml_tensor * cur, co
+             model.layers[il].ffn_up_exps_s,
+             model.layers[il].ffn_gate_exps_s,
+             model.layers[il].ffn_down_exps_s,
+-            nullptr, hot.valid() ? &hot : nullptr);
++            nullptr, (hot_experts && hot.valid()) ? &hot : nullptr);
+     cb(moe_out, "ffn_moe_out", il);
+ 
+     // shared experts, as in the Qwen3Next reference

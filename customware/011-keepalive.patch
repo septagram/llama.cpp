@@ -1,0 +1,146 @@
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 4c8cb4f94801659285b0513fd50638116615c9c0..119c062d66859bfd97dafeebc2207ccbf9226360 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -4833,33 +4833,56 @@ std::unique_ptr<server_res_generator> server_routes::handle_completions_impl(
+         // in streaming mode, the first error must be treated as non-stream response
+         // this is to match the OAI API behavior
+         // ref: https://github.com/ggml-org/llama.cpp/pull/16486#discussion_r2419657309
+-        auto first_result = rd.next(req.should_stop);
+-        if (first_result == nullptr) {
++        //
++        // customware (entry 011): a request that has to wait (queued for KV cells or for a slot, its state being
++        // restored, a long prefill) has no first result for minutes, and until then nothing was sent, not even the
++        // headers: Node clients give up after 300 s without them. So the wait for the first result is bounded by
++        // the ping interval. In time: nothing changes, an early error is still an HTTP error. Not in time: commit
++        // to the stream with a ping as its first chunk; the loop below pings on silence and delivers whatever
++        // comes next, an error included (in-stream, as for any error after the first chunk).
++        bool first_timeout = false;
++        const int64_t t_first_wait = ggml_time_ms();
++        auto first_result = rd.next([&]() {
++            if (req.should_stop()) {
++                return true;
++            }
++            if (sse_ping_interval > 0 && ggml_time_ms() - t_first_wait > (int64_t) sse_ping_interval * 1000) {
++                first_timeout = true;
++                return true;
++            }
++            return false;
++        });
++        if (first_result == nullptr && !first_timeout) {
+             GGML_ASSERT(req.should_stop());
+             return res; // connection is closed
+         }
+ 
+-        if (first_result->is_error()) {
+-            res->error(first_result->to_json());
+-            return res;
+-        }
+-
+-        GGML_ASSERT(
+-            dynamic_cast<server_task_result_cmpl_partial*>(first_result.get()) != nullptr ||
+-            dynamic_cast<server_task_result_cmpl_final*>  (first_result.get()) != nullptr
+-        );
+-
+-        // next responses are streamed
+-        // to be sent immediately
+-        json first_result_json = first_result->to_json();
+-        if (first_result_json == nullptr) {
+-            res->data = ""; // simply send HTTP headers and status code
+-        } else if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
+-            res->data = format_anthropic_sse(first_result_json);
+-        } else if (res_type == TASK_RESPONSE_TYPE_OAI_RESP) {
+-            res->data = format_oai_resp_sse(first_result_json);
++        if (first_result == nullptr) {
++            SRV_INF("no result after %d s: the stream starts with a ping and the request keeps waiting\n", sse_ping_interval);
++            res->data = ":\n\n";
+         } else {
+-            res->data = format_oai_sse(first_result_json);
++            if (first_result->is_error()) {
++                res->error(first_result->to_json());
++                return res;
++            }
++
++            GGML_ASSERT(
++                dynamic_cast<server_task_result_cmpl_partial*>(first_result.get()) != nullptr ||
++                dynamic_cast<server_task_result_cmpl_final*>  (first_result.get()) != nullptr
++            );
++
++            // next responses are streamed
++            // to be sent immediately
++            json first_result_json = first_result->to_json();
++            if (first_result_json == nullptr) {
++                res->data = ""; // simply send HTTP headers and status code
++            } else if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
++                res->data = format_anthropic_sse(first_result_json);
++            } else if (res_type == TASK_RESPONSE_TYPE_OAI_RESP) {
++                res->data = format_oai_resp_sse(first_result_json);
++            } else {
++                res->data = format_oai_sse(first_result_json);
++            }
+         }
+         res->status = 200;
+         res->content_type = "text/event-stream";
+@@ -4949,7 +4972,11 @@ std::unique_ptr<server_res_generator> server_routes::handle_completions_impl(
+                         || dynamic_cast<server_task_result_cmpl_final*>(result.get()) != nullptr
+                     );
+                     json res_json = result->to_json();
+-                    if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
++                    if (res_json == nullptr) {
++                        // customware (entry 011): the begin marker of a task (it only asks for the headers, which a
++                        // stream that started with a ping has already sent). It must not go out as "data: null".
++                        output = ":\n\n";
++                    } else if (res_type == TASK_RESPONSE_TYPE_ANTHROPIC) {
+                         output = format_anthropic_sse(res_json);
+                     } else if (res_type == TASK_RESPONSE_TYPE_OAI_RESP) {
+                         output = format_oai_resp_sse(res_json);
+diff --git a/tools/server/server-queue.cpp b/tools/server/server-queue.cpp
+index 78169e9a5d86cdd44afc004790303ec048cee73d..5f8e4b6b229bfa0f372b7108a5fecacd2ffe0c0f 100644
+--- a/tools/server/server-queue.cpp
++++ b/tools/server/server-queue.cpp
+@@ -90,22 +90,31 @@ int server_queue::get_new_id() {
+ void server_queue::pop_deferred_task(int id_slot) {
+     std::unique_lock<std::mutex> lock(mutex_tasks);
+     if (!queue_tasks_deferred.empty()) {
+-        // try to find a task that uses the specified slot
+-        bool found = false;
+-        for (auto it = queue_tasks_deferred.begin(); it != queue_tasks_deferred.end(); ++it) {
+-            if (it->id_slot == id_slot) {
+-                QUE_DBG("pop deferred task (use slot %d), id_task = %d\n", id_slot, it->id);
+-                queue_tasks.emplace_front(std::move(*it));
+-                queue_tasks_deferred.erase(it);
+-                found = true;
+-                break;
++        // customware (entry 011): every deferred task gets another look when a slot is released, not only one.
++        // Upstream moved back a single task (one pinned to the released slot, else the first); when that one still
++        // could not start (under --kv-unified: not enough cells yet) it went to the back and the others waited for
++        // the next release, although a slot was free and a smaller request would have fitted.
++        // Order: the tasks pinned to the released slot, then the others, each group as it was deferred. A task
++        // that cannot start is deferred again as it is processed, so the order of the queue survives the round.
++        std::vector<server_task> pinned;
++        std::vector<server_task> others;
++        for (auto & task : queue_tasks_deferred) {
++            if (task.id_slot == id_slot) {
++                pinned.push_back(std::move(task));
++            } else {
++                others.push_back(std::move(task));
+             }
+         }
+-        // if not tasks found using the slot, just pop the first deferred task (default behavior)
+-        if (!found) {
+-            QUE_DBG("pop deferred task, id_task = %d\n", queue_tasks_deferred.front().id);
+-            queue_tasks.emplace_front(std::move(queue_tasks_deferred.front()));
+-            queue_tasks_deferred.pop_front();
++        queue_tasks_deferred.clear();
++
++        QUE_DBG("pop %zu deferred tasks (%zu use slot %d)\n", pinned.size() + others.size(), pinned.size(), id_slot);
++
++        // emplace_front reverses, so the last one goes in first
++        for (auto it = others.rbegin(); it != others.rend(); ++it) {
++            queue_tasks.emplace_front(std::move(*it));
++        }
++        for (auto it = pinned.rbegin(); it != pinned.rend(); ++it) {
++            queue_tasks.emplace_front(std::move(*it));
+         }
+     }
+     time_last_task = ggml_time_ms();

@@ -117,4 +117,8 @@ One primitive, "suspend a slot / resume a slot", used by the overflow path now a
 
 ## Final commit list
 
-- see the server commit below (batch-cut change of entry 006 included, same file)
+Sealed 2026-10-20 into `007-kvu-queueing-preemption.patch`: this entry's own diff (customware/ excluded), applied after the entries before it onto upstream `6e60f3560` (tag `v0.5.0-customware.0`); `customware/seal-entries.sh` rebuilds and checks it from `customware/entry-commits.txt`.
+
+- `df79272fd` server : KV-aware admission, preemption and resume under --kv-unified; full prompt batches
+
+Its commit `df79272fd` also carries entry 006's server-side batch cut. Its admission follow-up (a request never waits for cells nobody holds; the reserve capped at `LLAMA_KV_RESERVE`) landed in `f6a59d2e8` together with entry 008's profiling groundwork, and travels in `008-depth-profile.patch`.

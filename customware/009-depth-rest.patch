@@ -1,0 +1,366 @@
+diff --git a/ggml/src/ggml-cuda/getrows.cu b/ggml/src/ggml-cuda/getrows.cu
+index 6b36b8fbc18c8f257b1b1c208951fa1c38e985ca..aee6b25a417adef2ac0113f462817502ad78c5fa 100644
+--- a/ggml/src/ggml-cuda/getrows.cu
++++ b/ggml/src/ggml-cuda/getrows.cu
+@@ -129,6 +129,30 @@ static __global__ void k_get_rows_float_vec(
+     }
+ }
+ 
++// customware (entry 009): rows of a few elements, many of them (the qwen4exp indexer expands one score per block to
++// every cell: 88k rows of one float at decode). One thread per element instead of a 256-thread block per row.
++template<typename src0_t, typename dst_t>
++static __global__ void k_get_rows_float_tall(
++        const src0_t * __restrict__ src0, const int32_t * __restrict__ src1, dst_t * __restrict__ dst,
++        const int64_t ne00, const int64_t ne10, const int64_t ne11, const int64_t ne12,
++        const size_t s1, const size_t s2, const size_t s3,
++        const size_t nb01, const size_t nb02, const size_t nb03,
++        const size_t s10, const size_t s11, const size_t s12) {
++    const int64_t gid = (int64_t) blockIdx.x*blockDim.x + threadIdx.x;
++    if (gid >= ne00*ne10*ne11*ne12) {
++        return;
++    }
++    const int64_t i00 =  gid % ne00;
++    const int64_t i10 = (gid / ne00) % ne10;
++    const int64_t i11 = (gid / (ne00*ne10)) % ne11;
++    const int64_t i12 =  gid / (ne00*ne10*ne11);
++
++    const int i01 = src1[i10*s10 + i11*s11 + i12*s12];
++    const src0_t * src0_row = (const src0_t *) ((const char *) src0 + i01*nb01 + i11*nb02 + i12*nb03);
++
++    dst[i10*s1 + i11*s2 + i12*s3 + i00] = ggml_cuda_cast<dst_t>(src0_row[i00]);
++}
++
+ template<typename grad_t, typename dst_t>
+ static __global__ void k_get_rows_back_float(
+         const grad_t * __restrict__ grad, const int32_t * __restrict__ rows, dst_t * __restrict__ dst,
+@@ -254,6 +278,16 @@ static void get_rows_cuda_float(
+     GGML_ASSERT(ne11 <= std::numeric_limits<uint32_t>::max() / ne12);
+     const uint3 ne12_fdv = init_fastdiv_values(ne12);
+ 
++    // customware: tall and narrow gathers get one thread per element (GGML_CUDA_TALL_GET_ROWS=1 while it is bisected)
++    static const bool tall_enabled = getenv("GGML_CUDA_TALL_GET_ROWS") != nullptr && atoi(getenv("GGML_CUDA_TALL_GET_ROWS")) != 0;
++    if (tall_enabled && ne00 <= 8 && ne10*ne11*ne12 >= 1024) {
++        const int64_t n = ne00*ne10*ne11*ne12;
++        const dim3 block_nums((n + CUDA_GET_ROWS_BLOCK_SIZE - 1) / CUDA_GET_ROWS_BLOCK_SIZE, 1, 1);
++        k_get_rows_float_tall<src0_t, dst_t><<<block_nums, block_dims, 0, stream>>>(
++            src0_d, src1_d, dst_d, ne00, ne10, ne11, ne12, s1, s2, s3, nb01, nb02, nb03, s10, s11, s12);
++        return;
++    }
++
+     if constexpr (std::is_same<src0_t, dst_t>::value) {
+         constexpr int VEC = 16 / sizeof(dst_t);
+         const int64_t ne00v = ne00 / VEC;
+@@ -458,6 +492,175 @@ void ggml_cuda_op_get_rows(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+         ne00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb1, nb2, nb3, stream);
+ }
+ 
++// customware (entry 009): get_rows followed by an average pool over groups of r consecutive gathered rows, in one
++// pass: the qwen4exp indexer pools the raw keys of each block, and gathering all cells into f32 first cost four
++// times the traffic of the keys themselves. Only the shapes ggml_cuda_can_fuse admits reach here:
++// src0 [ne00, ne01, ne02], src1 [r*n_out, ne02] I32, dst [ne00, n_out, ne02] f32.
++template<int qk, int qr, dequantize_kernel_t dequantize_kernel>
++static __global__ void k_get_rows_mean_q(
++        const void * __restrict__ src0, const int32_t * __restrict__ src1, float * __restrict__ dst,
++        const int64_t ne00, const int r,
++        const size_t s1, const size_t s2, const size_t nb01, const size_t nb02, const size_t s10, const size_t s11) {
++    const int64_t i10 = blockIdx.x; // output row
++    const int64_t i11 = blockIdx.z; // stream
++
++    float * dst_row = dst + i10*s1 + i11*s2;
++
++    for (int64_t i00 = 2*(blockIdx.y*blockDim.x + threadIdx.x); i00 < ne00; i00 += 2*gridDim.y*blockDim.x) {
++        const int ib   =  i00/qk;      // block index
++        const int iqs  = (i00%qk)/qr;  // quant index
++        const int iybs = i00 - i00%qk; // dst block start index
++        const int y_offset = qr == 1 ? 1 : qk/2;
++
++        // the same arithmetic as pool2d_nchw_kernel (each term scaled, then summed), so the results match it bit for bit
++        const float scale = 1.0f / r;
++        float2 acc = make_float2(0.0f, 0.0f);
++        for (int k = 0; k < r; ++k) {
++            const int i01 = src1[(i10*r + k)*s10 + i11*s11];
++            const void * src0_row = (const char *) src0 + i01*nb01 + i11*nb02;
++
++            float2 v;
++            dequantize_kernel(src0_row, ib, iqs, v);
++            acc.x += v.x * scale;
++            acc.y += v.y * scale;
++        }
++
++        dst_row[iybs + iqs + 0]        = acc.x;
++        dst_row[iybs + iqs + y_offset] = acc.y;
++    }
++}
++
++template<typename src0_t>
++static __global__ void k_get_rows_mean_float(
++        const src0_t * __restrict__ src0, const int32_t * __restrict__ src1, float * __restrict__ dst,
++        const int64_t ne00, const int r,
++        const size_t s1, const size_t s2, const size_t nb01, const size_t nb02, const size_t s10, const size_t s11) {
++    const int64_t i10 = blockIdx.x;
++    const int64_t i11 = blockIdx.z;
++
++    float * dst_row = dst + i10*s1 + i11*s2;
++
++    const float scale = 1.0f / r;
++    for (int64_t i00 = blockIdx.y*blockDim.x + threadIdx.x; i00 < ne00; i00 += gridDim.y*blockDim.x) {
++        float acc = 0.0f;
++        for (int k = 0; k < r; ++k) {
++            const int i01 = src1[(i10*r + k)*s10 + i11*s11];
++            const src0_t * src0_row = (const src0_t *) ((const char *) src0 + i01*nb01 + i11*nb02);
++            acc += ggml_cuda_cast<float>(src0_row[i00]) * scale;
++        }
++        dst_row[i00] = acc;
++    }
++}
++
++void ggml_cuda_op_get_rows_pool2d(ggml_backend_cuda_context & ctx, const ggml_tensor * get_rows, ggml_tensor * dst) {
++    const ggml_tensor * src0 = get_rows->src[0];
++    const ggml_tensor * src1 = get_rows->src[1];
++
++    const int32_t * opts = (const int32_t *) dst->op_params;
++    const int r = opts[2]; // k1 == s1, checked by the fusion test
++
++    const int64_t ne00  = src0->ne[0];
++    const int64_t n_out = dst->ne[1];
++    const int64_t n_str = dst->ne[2];
++
++    const size_t s1  = dst->nb[1]/sizeof(float);
++    const size_t s2  = dst->nb[2]/sizeof(float);
++    const size_t s10 = src1->nb[0]/sizeof(int32_t);
++    const size_t s11 = src1->nb[1]/sizeof(int32_t);
++
++    cudaStream_t stream = ctx.stream();
++    const dim3 block_dims(CUDA_GET_ROWS_BLOCK_SIZE, 1, 1);
++
++    const void    * src0_d = src0->data;
++    const int32_t * src1_d = (const int32_t *) src1->data;
++    float         * dst_d  = (float *) dst->data;
++
++    static bool announced = false;
++    if (!announced) {
++        GGML_LOG_INFO("%s: fused get_rows + avg pool active (%s rows of %lld, groups of %d)\n",
++            __func__, ggml_type_name(src0->type), (long long) ne00, r);
++        announced = true;
++    }
++
++    switch (src0->type) {
++        case GGML_TYPE_F32:
++        case GGML_TYPE_F16: {
++            const int block_num_y = (ne00 + CUDA_GET_ROWS_BLOCK_SIZE - 1) / CUDA_GET_ROWS_BLOCK_SIZE;
++            const dim3 block_nums(n_out, MIN(block_num_y, UINT16_MAX), n_str);
++            if (src0->type == GGML_TYPE_F32) {
++                k_get_rows_mean_float<float><<<block_nums, block_dims, 0, stream>>>(
++                    (const float *) src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++            } else {
++                k_get_rows_mean_float<half><<<block_nums, block_dims, 0, stream>>>(
++                    (const half *) src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++            }
++        } break;
++        default: {
++            GGML_ASSERT(ne00 % 2 == 0);
++            const int block_num_y = (ne00 + 2*CUDA_GET_ROWS_BLOCK_SIZE - 1) / (2*CUDA_GET_ROWS_BLOCK_SIZE);
++            const dim3 block_nums(n_out, MIN(block_num_y, UINT16_MAX), n_str);
++            switch (src0->type) {
++                case GGML_TYPE_Q4_0:
++                    k_get_rows_mean_q<QK4_0, QR4_0, dequantize_q4_0><<<block_nums, block_dims, 0, stream>>>(
++                        src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++                    break;
++                case GGML_TYPE_Q4_1:
++                    k_get_rows_mean_q<QK4_1, QR4_1, dequantize_q4_1><<<block_nums, block_dims, 0, stream>>>(
++                        src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++                    break;
++                case GGML_TYPE_Q5_0:
++                    k_get_rows_mean_q<QK5_0, QR5_0, dequantize_q5_0><<<block_nums, block_dims, 0, stream>>>(
++                        src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++                    break;
++                case GGML_TYPE_Q5_1:
++                    k_get_rows_mean_q<QK5_1, QR5_1, dequantize_q5_1><<<block_nums, block_dims, 0, stream>>>(
++                        src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++                    break;
++                case GGML_TYPE_Q8_0:
++                    k_get_rows_mean_q<QK8_0, QR8_0, dequantize_q8_0><<<block_nums, block_dims, 0, stream>>>(
++                        src0_d, src1_d, dst_d, ne00, r, s1, s2, src0->nb[1], src0->nb[2], s10, s11);
++                    break;
++                default:
++                    GGML_ABORT("%s: unsupported src0 type: %s\n", __func__, ggml_type_name(src0->type));
++            }
++        } break;
++    }
++    CUDA_CHECK(cudaGetLastError());
++}
++
++// the fusion test for ggml_cuda_can_fuse: an average pool of whole groups of r gathered rows, nothing else
++bool ggml_cuda_can_fuse_get_rows_pool2d(const ggml_tensor * get_rows, const ggml_tensor * pool) {
++    // GGML_CUDA_NO_GET_ROWS_POOL=1 keeps every other fusion and disables this one: the A/B switch
++    static const bool disabled = getenv("GGML_CUDA_NO_GET_ROWS_POOL") != nullptr && atoi(getenv("GGML_CUDA_NO_GET_ROWS_POOL")) != 0;
++    if (disabled) {
++        return false;
++    }
++    if (get_rows->op != GGML_OP_GET_ROWS || pool->op != GGML_OP_POOL_2D || pool->src[0] != get_rows) {
++        return false;
++    }
++    const ggml_tensor * src0 = get_rows->src[0];
++    const ggml_tensor * src1 = get_rows->src[1];
++
++    switch (src0->type) {
++        case GGML_TYPE_F32: case GGML_TYPE_F16:
++        case GGML_TYPE_Q4_0: case GGML_TYPE_Q4_1: case GGML_TYPE_Q5_0: case GGML_TYPE_Q5_1: case GGML_TYPE_Q8_0:
++            break;
++        default:
++            return false;
++    }
++
++    const int32_t * opts = (const int32_t *) pool->op_params;
++    const int op = opts[0], k0 = opts[1], k1 = opts[2], s0 = opts[3], s1 = opts[4], p0 = opts[5], p1 = opts[6];
++
++    return op == GGML_OP_POOL_AVG && k0 == 1 && s0 == 1 && p0 == 0 && p1 == 0 && k1 > 0 && s1 == k1 &&
++        get_rows->type == GGML_TYPE_F32 && pool->type == GGML_TYPE_F32 &&
++        src1->type == GGML_TYPE_I32 && src1->nb[0] == sizeof(int32_t) && src1->ne[2] == 1 && src1->ne[3] == 1 &&
++        src0->nb[0] == ggml_type_size(src0->type) && src0->ne[3] == 1 &&
++        get_rows->ne[1] == (int64_t) k1*pool->ne[1] && get_rows->ne[3] == 1 &&
++        pool->ne[0] == src0->ne[0] && pool->ne[2] == src1->ne[1] && pool->nb[0] == sizeof(float) &&
++        ggml_is_contiguous(pool);
++}
++
+ void ggml_cuda_op_get_rows_back(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+     const ggml_tensor * src0 = dst->src[0]; // gradients of forward pass output
+     const ggml_tensor * src1 = dst->src[1]; // src1 in forward pass
+diff --git a/ggml/src/ggml-cuda/getrows.cuh b/ggml/src/ggml-cuda/getrows.cuh
+index 3c5bea5f48c1c71f0ceb9b8a7dad30bfad18d901..12039e06dea80e50f779b1354472ebd3087179d6 100644
+--- a/ggml/src/ggml-cuda/getrows.cuh
++++ b/ggml/src/ggml-cuda/getrows.cuh
+@@ -12,4 +12,8 @@ void get_rows_cuda(
+ 
+ void ggml_cuda_op_get_rows(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
+ 
++// customware: get_rows + avg pool_2d over groups of gathered rows in one pass (the qwen4exp indexer block mean)
++bool ggml_cuda_can_fuse_get_rows_pool2d(const ggml_tensor * get_rows, const ggml_tensor * pool);
++void ggml_cuda_op_get_rows_pool2d(ggml_backend_cuda_context & ctx, const ggml_tensor * get_rows, ggml_tensor * dst);
++
+ void ggml_cuda_op_get_rows_back(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 5b19acbd22cca38937221791cce640fb08fae7a9..8c5066b07510e557bd54a3cbe80bb6d5b2a258cd 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -3292,6 +3292,15 @@ static bool ggml_cuda_can_fuse(const struct ggml_cgraph *                cgraph,
+         }
+     }
+ 
++    // customware: get_rows + avg pool over groups of gathered rows (the qwen4exp indexer block mean). The pool's
++    // output is r times shorter than the gather's, so the generic same-shape check below cannot admit it.
++    std::initializer_list<enum ggml_op> get_rows_pool_ops = { GGML_OP_GET_ROWS, GGML_OP_POOL_2D };
++
++    if (is_equal(get_rows_pool_ops, ops)) {
++        return ggml_can_fuse_subgraph(cgraph, node_idx, ops, { node_idx + 1 }) &&
++            ggml_cuda_can_fuse_get_rows_pool2d(cgraph->nodes[node_idx], cgraph->nodes[node_idx + 1]);
++    }
++
+     if (!ggml_can_fuse(cgraph, node_idx, ops)) {
+         return false;
+     }
+@@ -4159,6 +4168,11 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph
+         return fused_node_count - 1;
+     }
+ 
++    if (ggml_cuda_can_fuse(cgraph, i, { GGML_OP_GET_ROWS, GGML_OP_POOL_2D }, {})) {
++        ggml_cuda_op_get_rows_pool2d(*cuda_ctx, node, cgraph->nodes[i + 1]);
++        return 1;
++    }
++
+     if (ggml_cuda_can_fuse(cgraph, i, { GGML_OP_RMS_NORM, GGML_OP_MUL, GGML_OP_ROPE, GGML_OP_VIEW, GGML_OP_SET_ROWS }, {})) {
+         ggml_cuda_op_rms_norm_mul_rope_fused(*cuda_ctx, node, cgraph->nodes[i + 1], cgraph->nodes[i + 2], cgraph->nodes[i + 4]);
+         return 4;
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index ea7558a516be396d254edb2cc952f016e0cdb532..e3cfeb4a560dc76a53abd86b14bd85234181cdce 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -6684,6 +6684,63 @@ struct test_top_k : public test_case {
+ };
+ 
+ // qwen4exp QSA indexer top-k fusion: expand per-block scores to cells, add the f16 mask, top-k.
++// customware (entry 009): get_rows of a cache followed by an average pool over groups of r gathered rows (the qwen4exp
++// indexer block mean); the CUDA backend fuses the pair into one kernel, the reference runs them one by one
++struct test_get_rows_pool2d : public test_case {
++    const ggml_type type;
++    const int64_t   n_embd;
++    const int64_t   n_cells;
++    const int64_t   n_blocks;
++    const int64_t   n_stream;
++    const int       r;
++    ggml_tensor *   out {};
++
++    std::string op_desc(ggml_tensor * t) override {
++        GGML_UNUSED(t);
++        return "GET_ROWS_POOL2D";
++    }
++
++    std::string vars() override {
++        return VARS_TO_STR6(type, n_embd, n_cells, n_blocks, n_stream, r);
++    }
++
++    test_get_rows_pool2d(ggml_type type = GGML_TYPE_Q8_0, int64_t n_embd = 128, int64_t n_cells = 4096,
++            int64_t n_blocks = 1000, int64_t n_stream = 1, int r = 4)
++        : type(type), n_embd(n_embd), n_cells(n_cells), n_blocks(n_blocks), n_stream(n_stream), r(r) {}
++
++    double max_err() override { return 1e-6; }
++    bool run_whole_graph() override { return true; }
++
++    ggml_tensor * build_graph(ggml_context * ctx) override {
++        ggml_tensor * cache = ggml_new_tensor_3d(ctx, type, n_embd, n_cells, n_stream);
++        ggml_set_name(cache, "cache");
++        ggml_tensor * blk_cells = ggml_new_tensor_2d(ctx, GGML_TYPE_I32, r*n_blocks, n_stream);
++        ggml_set_name(blk_cells, "blk_cells");
++
++        ggml_tensor * members = ggml_get_rows(ctx, cache, blk_cells);
++        out = ggml_pool_2d(ctx, members, GGML_OP_POOL_AVG, 1, r, 1, r, 0, 0);
++        ggml_set_name(out, "out");
++        return out;
++    }
++
++    std::vector<ggml_tensor *> fusion_test_nodes() override { return { out }; }
++
++    void initialize_tensors(ggml_context * ctx) override {
++        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
++            if (t->op != GGML_OP_NONE) {
++                continue;
++            }
++            if (t->type == GGML_TYPE_I32) {
++                std::vector<int32_t> data(ggml_nelements(t));
++                for (auto & v : data) { v = rand() % n_cells; }
++                ggml_backend_tensor_set(t, data.data(), 0, data.size() * sizeof(int32_t));
++            } else {
++                init_tensor_uniform(t);
++            }
++        }
++    }
++};
++
+ struct test_topk_qsa : public test_case {
+     const int64_t n_blocks;
+     const int64_t n_kv;
+@@ -9101,6 +9158,10 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+     }
+ 
+     test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 1, 8, 2, 1, 1, false));
++    // customware (entry 009): tall and narrow gathers (the qwen4exp score expansion: one float per cell at decode)
++    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 1, 4096, 90112, 1, 1, false));
++    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 2, 4096, 20000, 2, 1, false));
++    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F16, 1, 4096, 90112, 1, 1, false));
+     for (ggml_type type : all_types) {
+         for (int b : {1, 7}) {
+             for (bool v : {false, true}) {
+@@ -10576,6 +10637,13 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+     test_cases.emplace_back(new test_top_k(GGML_TYPE_F32, { 8192,  2, 1, 1 }, 2051, true));
+     test_cases.emplace_back(new test_top_k(GGML_TYPE_F32, { 33024, 4, 1, 1 }, 2051, true));
+ 
++    // customware (entry 009): qwen4exp indexer block mean, get_rows + avg pool fused on CUDA
++    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q8_0, 128,  4096,  1000, 1, 4));
++    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q8_0, 128, 90112, 22528, 1, 4));
++    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q8_0, 128,  4096,   500, 2, 4));
++    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_F16,  128,  4096,  1000, 1, 4));
++    test_cases.emplace_back(new test_get_rows_pool2d(GGML_TYPE_Q4_0, 128,  4096,  1000, 1, 8));
++
+     // qwen4exp QSA indexer top-k fusion (get_rows + f16 mask + top_k)
+     test_cases.emplace_back(new test_topk_qsa(512,  2048,  1, 1, 1500));
+     test_cases.emplace_back(new test_topk_qsa(512,  2048,  2, 1, 1500));

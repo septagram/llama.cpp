@@ -1,0 +1,220 @@
+diff --git a/common/arg.cpp b/common/arg.cpp
+index 63e342776d549b6abaf9c4aef5543a729e6dfd97..ff69255a1a8dd8f1246369a9b6b91d15133817c0 100644
+--- a/common/arg.cpp
++++ b/common/arg.cpp
+@@ -259,6 +259,11 @@ static void parse_tensor_buffer_overrides(const std::string & value, std::vector
+         if (buft) {
+             buft_list[ggml_backend_buft_name(buft)] = buft;
+         }
++        // customware: pinned host memory of a GPU (e.g. CUDA_Host) as an explicit target for streamed weights
++        auto * host_buft = ggml_backend_dev_host_buffer_type(dev);
++        if (host_buft) {
++            buft_list[ggml_backend_buft_name(host_buft)] = host_buft;
++        }
+     }
+ 
+     for (const auto & override : string_split<std::string>(value, ',')) {
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index c135802ab87e793357e6f94036016266b69aa7ee..4945210f1673f126148afe5d7a6dea1df8c1ee3c 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -3148,6 +3148,8 @@ static int ggml_cpu_prof_cmp(const void * a, const void * b) {
+     return ta < tb ? 1 : ta > tb ? -1 : 0;
+ }
+ 
++static void ggml_cpu_prof_print_experts(void);
++
+ static void ggml_cpu_prof_print(void) {
+     static struct ggml_cpu_prof_key keys[GGML_OP_COUNT*GGML_TYPE_COUNT*2];
+     int n_keys = 0;
+@@ -3179,6 +3181,100 @@ static void ggml_cpu_prof_print(void) {
+                 ggml_op_name((enum ggml_op) keys[i].op), ggml_type_name((enum ggml_type) keys[i].type), keys[i].cls,
+                 (long long) e->n, e->us_comp / 1000.0, e->us_wait / 1000.0, (double) (e->us_comp + e->us_wait) / (double) e->n, gbs);
+     }
++    ggml_cpu_prof_print_experts();
++}
++
++// expert usage per layer, counted on the gate matmul only ("blk.N.ffn_gate_exps.weight")
++#define GGML_CPU_PROF_MAX_LAYERS  128
++#define GGML_CPU_PROF_MAX_EXPERTS 1024
++static int64_t g_cpu_prof_expert[GGML_CPU_PROF_MAX_LAYERS][GGML_CPU_PROF_MAX_EXPERTS];
++static int     g_cpu_prof_expert_n[GGML_CPU_PROF_MAX_LAYERS];
++
++static int ggml_cpu_prof_cmp_i64_desc(const void * a, const void * b) {
++    const int64_t x = *(const int64_t *) a;
++    const int64_t y = *(const int64_t *) b;
++    return x < y ? 1 : x > y ? -1 : 0;
++}
++
++static void ggml_cpu_prof_print_experts(void) {
++    static int64_t sorted[GGML_CPU_PROF_MAX_EXPERTS];
++    int64_t all_total = 0;
++    int64_t all_top[3] = {0, 0, 0};
++    const double fracs[3] = {0.05, 0.10, 0.20};
++    int n_layers = 0;
++    for (int il = 0; il < GGML_CPU_PROF_MAX_LAYERS; il++) {
++        const int n = g_cpu_prof_expert_n[il];
++        if (n == 0) {
++            continue;
++        }
++        int64_t total = 0;
++        for (int e = 0; e < n; e++) {
++            sorted[e] = g_cpu_prof_expert[il][e];
++            total += sorted[e];
++        }
++        if (total == 0) {
++            continue;
++        }
++        qsort(sorted, n, sizeof(sorted[0]), ggml_cpu_prof_cmp_i64_desc);
++        int64_t top[3] = {0, 0, 0};
++        int n_used = 0;
++        for (int e = 0; e < n; e++) {
++            n_used += sorted[e] > 0;
++            for (int f = 0; f < 3; f++) {
++                if (e < (int) (n*fracs[f] + 0.5)) {
++                    top[f] += sorted[e];
++                }
++            }
++        }
++        if (n_layers == 0) {
++            fprintf(stderr, "cpu-prof: expert usage per layer: share of routed slots taken by the top 5%% / 10%% / 20%% of experts\n");
++        }
++        fprintf(stderr, "cpu-prof:   layer %3d: %5d used of %4d, top5=%5.1f%% top10=%5.1f%% top20=%5.1f%% (n=%lld)\n", il, n_used, n,
++                100.0*top[0]/total, 100.0*top[1]/total, 100.0*top[2]/total, (long long) total);
++        for (int f = 0; f < 3; f++) {
++            all_top[f] += top[f];
++        }
++        all_total += total;
++        n_layers++;
++    }
++    if (all_total > 0) {
++        fprintf(stderr, "cpu-prof:   all %d layers: top5=%5.1f%% top10=%5.1f%% top20=%5.1f%%\n", n_layers,
++                100.0*all_top[0]/all_total, 100.0*all_top[1]/all_total, 100.0*all_top[2]/all_total);
++    }
++    // raw counts for offline placement decisions: one line per layer
++    for (int il = 0; il < GGML_CPU_PROF_MAX_LAYERS; il++) {
++        const int n = g_cpu_prof_expert_n[il];
++        if (n == 0) {
++            continue;
++        }
++        fprintf(stderr, "cpu-prof-experts: %d", il);
++        for (int e = 0; e < n; e++) {
++            fprintf(stderr, " %lld", (long long) g_cpu_prof_expert[il][e]);
++        }
++        fprintf(stderr, "\n");
++    }
++}
++
++static void ggml_cpu_prof_count_experts(const struct ggml_tensor * node) {
++    const struct ggml_tensor * src0 = node->src[0];
++    const struct ggml_tensor * ids  = node->src[2];
++    int il = -1;
++    if (sscanf(src0->name, "blk.%d.ffn_gate_exps", &il) != 1 || il < 0 || il >= GGML_CPU_PROF_MAX_LAYERS) {
++        return;
++    }
++    const int n = (int) src0->ne[2];
++    if (n > GGML_CPU_PROF_MAX_EXPERTS) {
++        return;
++    }
++    g_cpu_prof_expert_n[il] = n;
++    for (int64_t i1 = 0; i1 < ids->ne[1]; i1++) {
++        for (int64_t i0 = 0; i0 < ids->ne[0]; i0++) {
++            const int32_t e = *(const int32_t *) ((const char *) ids->data + i1*ids->nb[1] + i0*ids->nb[0]);
++            if (e >= 0 && e < n) {
++                g_cpu_prof_expert[il][e]++;
++            }
++        }
++    }
+ }
+ 
+ static void ggml_cpu_prof_record(const struct ggml_tensor * node, int64_t us_comp, int64_t us_wait) {
+@@ -3191,6 +3287,7 @@ static void ggml_cpu_prof_record(const struct ggml_tensor * node, int64_t us_com
+         const struct ggml_tensor * ids = node->src[2];
+         cls   = ids->ne[1] > 1 ? 1 : 0;
+         bytes = ids->ne[0]*ids->ne[1]*src0->nb[2];
++        ggml_cpu_prof_count_experts(node);
+     } else if (node->op == GGML_OP_MUL_MAT) {
+         cls   = src1->ne[1]*src1->ne[2] > 1 ? 1 : 0;
+         bytes = ggml_nbytes(src0);
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 27b83503d28b00e0ac831af0fe2a68f9b1288875..93846e3dd34906258ed12123d56954dba81dab06 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -1291,6 +1291,19 @@ static void * ggml_cuda_host_malloc(size_t size) {
+     return ptr;
+ }
+ 
++// customware: WDDM refuses single pinned allocations of tens of GB but accepts many smaller ones,
++// so cap the buffer size and let the allocator split large contexts (GGML_CUDA_HOST_MAX_SIZE_MB, default 2048)
++static size_t ggml_backend_cuda_host_buffer_type_get_max_size(ggml_backend_buffer_type_t buft) {
++    static const size_t max_size = [] {
++        const char * env = getenv("GGML_CUDA_HOST_MAX_SIZE_MB");
++        const long mb = env ? atol(env) : 2048;
++        return mb > 0 ? (size_t) mb * 1024 * 1024 : SIZE_MAX;
++    }();
++    return max_size;
++
++    GGML_UNUSED(buft);
++}
++
+ static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+     void * ptr = ggml_cuda_host_malloc(size);
+ 
+@@ -1312,7 +1325,7 @@ ggml_backend_buffer_type_t ggml_backend_cuda_host_buffer_type() {
+             /* .get_name         = */ ggml_backend_cuda_host_buffer_type_name,
+             /* .alloc_buffer     = */ ggml_backend_cuda_host_buffer_type_alloc_buffer,
+             /* .get_alignment    = */ ggml_backend_cpu_buffer_type()->iface.get_alignment,
+-            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
++            /* .get_max_size     = */ ggml_backend_cuda_host_buffer_type_get_max_size,
+             /* .get_alloc_size   = */ ggml_backend_cpu_buffer_type()->iface.get_alloc_size,
+             /* .is_host          = */ ggml_backend_cpu_buffer_type()->iface.is_host,
+         },
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+index 43c396f15af3475e405da8dd73e6a8010ce3d7a5..ff40b09276e7a85bdb9ac5b8571c4ac5ddebca0d 100644
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@ -1231,6 +1231,10 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+ 
+         ggml_backend_buffer_type_t buft = nullptr;
+ 
++        // customware: an override that names a host buffer type (e.g. -ot ...=CUDA_Host) is kept even with mmap:
++        // the data is copied out of the mapping into pinned memory, which the GPU can then stream by DMA
++        bool host_buft_override = false;
++
+         // check overrides
+         if (tensor_buft_overrides) {
+             std::string tensor_name = tn.str();
+@@ -1248,6 +1252,8 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+                         }
+                     } else {
+                         buft = overrides->buft;
++                        auto * dev = ggml_backend_buft_get_device(buft);
++                        host_buft_override = dev && buft == ggml_backend_dev_host_buffer_type(dev);
+                     }
+ 
+                     LLAMA_LOG_DEBUG("tensor %s (%zu MiB %s) buffer type overridden to %s\n",
+@@ -1268,7 +1274,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+ 
+         // avoid using a host buffer when using mmap
+         auto * buft_dev = ggml_backend_buft_get_device(buft);
+-        if (use_mmap && buft_dev && buft == ggml_backend_dev_host_buffer_type(buft_dev)) {
++        if (use_mmap && !host_buft_override && buft_dev && buft == ggml_backend_dev_host_buffer_type(buft_dev)) {
+             auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+             if (!cpu_dev) {
+                 throw std::runtime_error("no CPU backend found");
+diff --git a/tools/llama-bench/llama-bench.cpp b/tools/llama-bench/llama-bench.cpp
+index 6541bb5078633c7a8bc5295763ddd2383be9253c..4be380dfb2456bd50162ef1b98dc5235b218c21a 100644
+--- a/tools/llama-bench/llama-bench.cpp
++++ b/tools/llama-bench/llama-bench.cpp
+@@ -943,6 +943,11 @@ static cmd_params parse_cmd_params(int argc, char ** argv) {
+                         if (buft) {
+                             buft_list[ggml_backend_buft_name(buft)] = buft;
+                         }
++                        // customware: pinned host memory of a GPU (e.g. CUDA_Host) as an explicit target
++                        auto * host_buft = ggml_backend_dev_host_buffer_type(dev);
++                        if (host_buft) {
++                            buft_list[ggml_backend_buft_name(host_buft)] = host_buft;
++                        }
+                     }
+                 }
+                 auto override_group_span_len = std::strcspn(value, ",");

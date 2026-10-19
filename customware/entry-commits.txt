@@ -1,0 +1,19 @@
+# customware entry -> its commits (whole commits; a commit carrying another entry's code is noted in that entry's
+# "Final commit list"). Commits that touch only customware/ are listed for the record and contribute nothing to a
+# patch. Order inside a line = history order. Used by customware/seal-entries.sh.
+# 004 carries 005's code commit 1fdd1bd9e at its head: it landed first and 004's code edits the same lines, so the
+# two cannot be separated (a three-way merge conflicts); 005 has no patch of its own.
+001 0721c0eb9 93f079ad6 3a43bb23c
+002 5f782a926 defc32010
+003 4cbfd07e7 13684c74e df604b39f
+004 1fdd1bd9e 35299131e a14357033 47de4e9af bf0c4a1ab db463d126 6b942ba4e 409993d70 2106c4415
+005 aa3b888ad 6b858f249 1a7dd9ac8 98fb93872
+006 8866fc27e
+007 df79272fd
+008 f6a59d2e8 8a3a84e8c d11232d61 01c3bae60
+009 b4ba3b3fa ea2d1ce84 6bd072ce9
+010 d8a68dfff dfa8b58dc 23d1877d3
+011 f5f79c20b d071a9646 17138311b 78f546959
+012 44b40fca2 e8cb48ab7 1c59b2b4c 00ec137ff 6f50e7617 1699c0159 ee3260db5
+013 f257465c6 d39d22e07 3511e93a0 5d5c6b4c1 3374cecd2 e49f3c06a cdda90e0b c83093965
+014 88de1d50e de2360b44 c7c82797d 56b24a07b 46b6c069d 6e708180e 9441764e1 3d68d48f6 b3fe31f24 078c1a86c 739fa64e0 5c6a27f06 8cb144dc4 fba9e9252
