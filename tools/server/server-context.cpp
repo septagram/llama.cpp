@@ -334,6 +334,12 @@ struct server_slot {
     server_prompt_cache       * cache_for_suspend = nullptr;
     server_prompt_cache_state * suspended_state   = nullptr;
     int64_t                     t_suspended       = 0;
+    // review fix (iteration 4): was the slot generating when it was parked? Only then does it resume as generating;
+    // a prefill in progress, or a launch whose prompt loop had not run yet (the slot still holding its previous
+    // conversation's tokens, possibly more of them than the new prompt has), goes back to STARTED, whose block
+    // recomputes the common prefix. Judged from token counts, a longer old conversation came back as "generating"
+    // and streamed its continuation to the new client.
+    bool                        suspended_generating = false;
     int                         resume_failures   = 0;
     int32_t                     resume_last_used  = -1;
 
@@ -353,10 +359,11 @@ struct server_slot {
 
         mem.seq_rm(id, -1, -1);
 
-        suspended_state = st;
-        t_suspended     = ggml_time_us();
-        i_batch         = -1;
-        state           = SLOT_STATE_SUSPENDED;
+        suspended_state      = st;
+        suspended_generating = state == SLOT_STATE_GENERATING;
+        t_suspended          = ggml_time_us();
+        i_batch              = -1;
+        state                = SLOT_STATE_SUSPENDED;
 
         SLT_WRN(*this, "suspended: %d tokens parked in RAM (%.1f MiB), cells freed\n", prompt.n_tokens(), (size_tgt + size_dft) / (1024.0 * 1024.0));
 
@@ -389,8 +396,9 @@ struct server_slot {
         }
 
         // customware (entry 013): a request suspended during its prompt returns to the prompt loop, which finds the
-        // processed prefix in place and continues; a generating one picks up with its pending sampled token
-        state = task && prompt.n_tokens() < task->n_tokens() ? SLOT_STATE_STARTED : SLOT_STATE_GENERATING;
+        // processed prefix in place and continues; a generating one picks up with its pending sampled token.
+        // Review fix (iteration 4): decided by what the slot was doing when parked, not by token counts
+        state = suspended_generating ? SLOT_STATE_GENERATING : SLOT_STATE_STARTED;
 
         SLT_WRN(*this, "resumed after %.1f s with %d tokens\n", (ggml_time_us() - t_suspended) / 1e6, prompt.n_tokens());
 
